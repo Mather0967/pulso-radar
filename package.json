@@ -1,0 +1,2 @@
+{"name":"pulso-radar","version":"0.3.0","private":true,"type":"module","scripts":{"dev":"node --watch --watch-path=src --watch-path=scripts scripts/dev.mjs","start":"node scripts/dev.mjs","build":"node scripts/build.mjs","test":"node scripts/build.mjs && node --test tests/*.test.mjs","monitor":"node scripts/monitor.mjs"},"engines":{"node":">=22"}}
+

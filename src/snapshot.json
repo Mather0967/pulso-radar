@@ -1,0 +1,780 @@
+{
+  "source": "OpenStreetMap via Overpass",
+  "region": "frontera",
+  "elements": [
+    {
+      "type": "node",
+      "id": 1580094866,
+      "lat": -30.8835288,
+      "lon": -55.5213721,
+      "tags": {
+        "brand": "Atacadão",
+        "brand:wikidata": "Q2868739",
+        "name": "Atacadão",
+        "note": "Antigo BIG.",
+        "shop": "supermarket"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2354162290,
+      "lat": -30.9004597,
+      "lon": -55.5246246,
+      "tags": {
+        "name": "Ta-Ta",
+        "name:es": "Ta-Ta",
+        "shop": "supermarket",
+        "website": "https://www.tata.com.uy/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 2648241962,
+      "lat": -30.889268,
+      "lon": -55.5272523,
+      "tags": {
+        "name": "La Farina",
+        "shop": "bakery"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3402806780,
+      "lat": -30.8911639,
+      "lon": -55.535424,
+      "tags": {
+        "name": "Floricultura Multiplantas",
+        "shop": "florist"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4404553192,
+      "lat": -30.9118046,
+      "lon": -55.5435857,
+      "tags": {
+        "addr:housenumber": "1228 Bis",
+        "addr:postcode": "40000",
+        "addr:street": "Doctor José Emerik Royol",
+        "email": "jcsuarezdr@gmail.com",
+        "name": "MultiService - Informática",
+        "name:es": "MultiService - Informática",
+        "opening_hours": "Mo-Fr 21:00-08:00; Sa 21:00-00:00",
+        "phone": "+598 99 822 132",
+        "shop": "computer"
+      }
+    },
+    {
+      "type": "node",
+      "id": 4408119092,
+      "lat": -30.9060116,
+      "lon": -55.5444635,
+      "tags": {
+        "name": "Ta-Ta",
+        "shop": "supermarket"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6571143973,
+      "lat": -30.8891367,
+      "lon": -55.5308411,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "868",
+        "addr:postcode": "97573-470",
+        "addr:street": "Rua 7 de Setembro",
+        "addr:suburb": "Centro",
+        "name": "Padaria Pampa",
+        "opening_hours": "Mo-Fr 07:30-19:30; Sa 07:30-12:00,14:30-19:00",
+        "payment:cash": "yes",
+        "phone": "+55 55 3243-5723",
+        "shop": "bakery"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6571143974,
+      "lat": -30.8890976,
+      "lon": -55.5309001,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "860",
+        "addr:postcode": "97573-470",
+        "addr:street": "Rua 7 de Setembro",
+        "addr:suburb": "Centro",
+        "brand": "Yamaha",
+        "brand:wikidata": "Q158888",
+        "name": "Motogiro Yamaha Livramento",
+        "opening_hours": "Mo-Fr 08:00-18:00; Sa 08:30-12:30",
+        "phone": "+55 55 3243-2113",
+        "shop": "motorcycle"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6571143978,
+      "lat": -30.8888375,
+      "lon": -55.5307654,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "47",
+        "addr:street": "Travessa Agostinho Campos",
+        "addr:suburb": "Centro",
+        "name": "Casa das Miudezas",
+        "opening_hours": "Mo-Fr 08:30-12:00,14:00-18:30; Sa 08:30-12:00",
+        "payment:cash": "yes",
+        "phone": "+55 55 3242-3700",
+        "shop": "craft;sewing"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6642492579,
+      "lat": -30.8847932,
+      "lon": -55.5261768,
+      "tags": {
+        "addr:city": "Santana do Livramento",
+        "addr:housenumber": "1491",
+        "addr:street": "Rua dos Andradas",
+        "addr:suburb": "Centro",
+        "name": "Bicicletaria Silva",
+        "payment:cash": "yes",
+        "payment:credit_cards": "yes",
+        "payment:debit_cards": "yes",
+        "phone": "+55 55 3243 4452",
+        "service:bicycle:Bicycle_Sales_and_Service": "yes",
+        "service:bicycle:bicycle": "yes",
+        "service:bicycle:cleaning": "yes",
+        "service:bicycle:parts": "yes",
+        "service:bicycle:repair": "yes",
+        "service:bicycle:retail": "yes",
+        "service:bicycle:sales": "yes",
+        "shop": "bicycle"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6642496288,
+      "lat": -30.885097,
+      "lon": -55.5265416,
+      "tags": {
+        "amenity": "marketplace",
+        "name": "Feira Cabotiá",
+        "payment:cash": "yes",
+        "shop": "variety_store"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797341505,
+      "lat": -30.8829395,
+      "lon": -55.555778,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "54",
+        "addr:postcode": "40000",
+        "addr:street": "Hermanos Spikerman",
+        "name": "Tienda Nury",
+        "ref:AGESIC": "0101000020D17F00003D0AD723A0782341B81E851B351C5941/54",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797587694,
+      "lat": -30.9293845,
+      "lon": -55.5526943,
+      "tags": {
+        "addr:city": "Mandubí",
+        "addr:housenumber": "2432",
+        "addr:postcode": "40000",
+        "addr:street": "Carlos de Mello",
+        "name": "Almacén de Mari",
+        "ref:AGESIC": "0101000020D17F0000295C8F42A87A2341000000002E175941/2432",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797589411,
+      "lat": -30.9242926,
+      "lon": -55.5768681,
+      "tags": {
+        "addr:city": "Santa Teresa",
+        "addr:housenumber": "1110",
+        "addr:postcode": "40000",
+        "addr:street": "Juan J. Vazquez",
+        "name": "Almacén",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797589732,
+      "lat": -30.9241959,
+      "lon": -55.577081,
+      "tags": {
+        "addr:city": "Santa Teresa",
+        "addr:postcode": "40000",
+        "addr:street": "Miguel Barreiro",
+        "name": "Juegueteria y Regaleria",
+        "shop": "gift"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797592086,
+      "lat": -30.9260378,
+      "lon": -55.5774748,
+      "tags": {
+        "addr:city": "Santa Teresa",
+        "addr:housenumber": "235",
+        "addr:postcode": "40000",
+        "addr:street": "Miguel Barreiro",
+        "name": "Almacén",
+        "ref:AGESIC": "0101000020D17F00000AD7A37014682341A4703DEA8F175941/235",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797613579,
+      "lat": -30.8968895,
+      "lon": -55.5356315,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "1180",
+        "addr:postcode": "40000",
+        "addr:street": "Treinta Y Tres Orientales",
+        "name": "Alus Muebles & Decoración",
+        "ref:AGESIC": "0101000020D17F000014AE47E1A5872341CDCCCCACAA1A5941/1180",
+        "shop": "furniture"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797629832,
+      "lat": -30.8973326,
+      "lon": -55.5347645,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "1224",
+        "addr:postcode": "40000",
+        "addr:street": "Treinta Y Tres Orientales",
+        "duty_free": "yes",
+        "name": "Omega Free Shop",
+        "ref:AGESIC": "0101000020D17F0000713D0A574A882341000000209E1A5941/1224",
+        "shop": "electronics"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797630156,
+      "lat": -30.8969691,
+      "lon": -55.535477,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "1186",
+        "addr:postcode": "40000",
+        "addr:street": "Treinta Y Tres Orientales",
+        "name": "Madonna Shop",
+        "ref:AGESIC": "0101000020D17F0000F6285C0FC28723419A999979A81A5941/1186",
+        "shop": "gift"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6797630855,
+      "lat": -30.8965077,
+      "lon": -55.5376052,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "338",
+        "addr:postcode": "40000",
+        "addr:street": "Avenida Sarandí",
+        "duty_free": "yes",
+        "name": "Siñeriz Free Shop",
+        "ref:AGESIC": "0101000020D17F0000E17A14AE2D862341000000E0B51A5941/338",
+        "shop": "general"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6815976632,
+      "lat": -30.9082698,
+      "lon": -55.5138157,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:postcode": "40000",
+        "addr:street": "Maestra Alicia Mendez Manfredini",
+        "name": "Almacén El Repecho",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 6815980148,
+      "lat": -30.9057883,
+      "lon": -55.5144873,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:postcode": "40000",
+        "addr:street": "Doctor Altivo Estevez",
+        "name": "Provisión Suárez",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7401961531,
+      "lat": -30.8966357,
+      "lon": -55.5327226,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "169",
+        "addr:street": "Avenida Presidente João Belchior Goulart",
+        "addr:suburb": "Centro",
+        "name": "Bicicletaria Italiano",
+        "payment:cash": "yes",
+        "payment:credit_cards": "yes",
+        "payment:debit_cards": "yes",
+        "phone": "+55 55 3242-3866",
+        "service:bicycle:Bicycle_Sales_and_Service": "yes",
+        "service:bicycle:bicycle": "yes",
+        "service:bicycle:cleaning": "yes",
+        "service:bicycle:clothing": "yes",
+        "service:bicycle:mtb": "yes",
+        "service:bicycle:parts": "yes",
+        "service:bicycle:repair": "yes",
+        "service:bicycle:sales": "yes",
+        "shop": "bicycle"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7554393380,
+      "lat": -30.8965326,
+      "lon": -55.5389683,
+      "tags": {
+        "name": "Le Carroussel",
+        "name:es": "Le Carroussel",
+        "shop": "cheese",
+        "website": "https://pt-br.facebook.com/LeCarrousselFreeShop/"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7861566005,
+      "lat": -30.8910482,
+      "lon": -55.5444662,
+      "tags": {
+        "addr:housenumber": "238",
+        "addr:postcode": "97573-520",
+        "addr:street": "Avenida João Pessoa",
+        "addr:suburb": "centro",
+        "name": "Righi Max",
+        "payment:cash": "yes",
+        "payment:credit_cards": "yes",
+        "shop": "supermarket"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7861622516,
+      "lat": -30.8916541,
+      "lon": -55.5434717,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "360",
+        "addr:postcode": "97573-520",
+        "addr:street": "Avenida João Pessoa",
+        "addr:suburb": "centro",
+        "name": "Sul Frangos",
+        "payment:cash": "yes",
+        "payment:credit_cards": "yes",
+        "shop": "supermarket"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7861622517,
+      "lat": -30.8909996,
+      "lon": -55.5445777,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:housenumber": "228",
+        "addr:postcode": "97573-520",
+        "addr:street": "Avenida João Pessoa",
+        "addr:suburb": "centro",
+        "name": "Atacarejo Rafael",
+        "payment:cash": "yes",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 7861622519,
+      "lat": -30.8909373,
+      "lon": -55.5446413,
+      "tags": {
+        "addr:city": "Sant'Ana do Livramento",
+        "addr:postcode": "97573-520",
+        "addr:street": "Avenida João Pessoa",
+        "addr:suburb": "centro",
+        "name": "Divisa Auto Peças",
+        "payment:cash": "yes",
+        "shop": "car_repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 10998181218,
+      "lat": -30.902969,
+      "lon": -55.515282,
+      "tags": {
+        "name": "L & M Mecanica",
+        "shop": "car_repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 10998181219,
+      "lat": -30.9039985,
+      "lon": -55.5158447,
+      "tags": {
+        "name": "Mecanica Machado",
+        "shop": "car_repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 10998181222,
+      "lat": -30.9023084,
+      "lon": -55.5189531,
+      "tags": {
+        "name": "Autoservice Bascuade",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 10998194760,
+      "lat": -30.8764136,
+      "lon": -55.5571315,
+      "tags": {
+        "name": "Almacén Azul",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11153327267,
+      "lat": -30.9004876,
+      "lon": -55.5133804,
+      "tags": {
+        "name": "Carniceria Caqueiro",
+        "shop": "butcher"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11153448788,
+      "lat": -30.9028399,
+      "lon": -55.5185826,
+      "tags": {
+        "name": "Barraca Caio",
+        "shop": "hardware"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11153474209,
+      "lat": -30.9018515,
+      "lon": -55.5125566,
+      "tags": {
+        "name": "Taller de autos",
+        "shop": "repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161529178,
+      "lat": -30.9024945,
+      "lon": -55.5161574,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Miguel de Unamuno",
+        "name": "Taller de autos",
+        "shop": "repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161533185,
+      "lat": -30.9045499,
+      "lon": -55.5181739,
+      "tags": {
+        "name": "Gomeria",
+        "service": "tyres",
+        "service:vehicle:alignment": "yes",
+        "service:vehicle:tyres": "yes",
+        "shop": "car_repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161533190,
+      "lat": -30.9047823,
+      "lon": -55.5190799,
+      "tags": {
+        "name": "Andein Mesoterapia",
+        "shop": "massage"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161533191,
+      "lat": -30.9048584,
+      "lon": -55.519262,
+      "tags": {
+        "name": "Barberia Springfield",
+        "shop": "hairdresser"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161533195,
+      "lat": -30.9036322,
+      "lon": -55.5198997,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Francisco Ferrer",
+        "name": "Almacén",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161533199,
+      "lat": -30.9022884,
+      "lon": -55.5211576,
+      "tags": {
+        "name": "Barberia Don Juan",
+        "shop": "hairdresser"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161588200,
+      "lat": -30.9070401,
+      "lon": -55.5122967,
+      "tags": {
+        "name": "Servicio automotriz Rafael Godoy (R.G.)",
+        "shop": "car_repair"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161605006,
+      "lat": -30.9099549,
+      "lon": -55.5097765,
+      "tags": {
+        "name": "Barraca Garcia",
+        "shop": "hardware"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161605007,
+      "lat": -30.9104678,
+      "lon": -55.5097065,
+      "tags": {
+        "name": "Transporte Cuello",
+        "shop": "travel_agency"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161605008,
+      "lat": -30.9064998,
+      "lon": -55.5138061,
+      "tags": {
+        "name": "Pescaderia",
+        "shop": "seafood"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11161605009,
+      "lat": -30.9045885,
+      "lon": -55.5138458,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "171",
+        "name": "Almacén",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174476436,
+      "lat": -30.9323442,
+      "lon": -55.5562225,
+      "tags": {
+        "addr:housenumber": "2466",
+        "name": "Almacén Daniel",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174564252,
+      "lat": -30.9339589,
+      "lon": -55.5578267,
+      "tags": {
+        "name": "Kiosko Los Campeones CNdeF",
+        "shop": "kiosk"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174564253,
+      "lat": -30.9338451,
+      "lon": -55.557669,
+      "tags": {
+        "name": "Almacén Dos Hermanos",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174564255,
+      "lat": -30.9337305,
+      "lon": -55.5585583,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "2598",
+        "addr:street": "Ingeniero Francisco Serralta",
+        "name": "WR Comercio Minorista",
+        "shop": "convenience"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174564257,
+      "lat": -30.9345338,
+      "lon": -55.5599608,
+      "tags": {
+        "name": "Almacén La Esquina",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174586832,
+      "lat": -30.8806614,
+      "lon": -55.554035,
+      "tags": {
+        "name": "Bicicleteria",
+        "shop": "bicycle"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174676750,
+      "lat": -30.9339808,
+      "lon": -55.5576333,
+      "tags": {
+        "name": "Peluqueria y Merceria Noelia",
+        "shop": "hairdresser"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174704718,
+      "lat": -30.918697,
+      "lon": -55.5332562,
+      "tags": {
+        "name": "Peluqueria",
+        "shop": "hairdresser"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174792413,
+      "lat": -30.915657,
+      "lon": -55.5331596,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Las Flores",
+        "name": "Almacén Jamaica",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174792414,
+      "lat": -30.9165062,
+      "lon": -55.5335319,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Masoller",
+        "name": "Almacén Azul",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174854351,
+      "lat": -30.9167859,
+      "lon": -55.5339911,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Minuanes",
+        "name": "Mamá Emprendedora (tienda on-line)",
+        "shop": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174876935,
+      "lat": -30.9170323,
+      "lon": -55.5324007,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:housenumber": "1930",
+        "addr:street": "Lagos del Norte",
+        "name": "Barraca",
+        "shop": "hardware"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174877592,
+      "lat": -30.915487,
+      "lon": -55.5332051,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "Amarillo - Edilberto Berrueta",
+        "name": "Barberia Angel",
+        "shop": "hairdresser"
+      }
+    },
+    {
+      "type": "node",
+      "id": 11174942287,
+      "lat": -30.9165676,
+      "lon": -55.5318555,
+      "tags": {
+        "addr:city": "Rivera",
+        "addr:street": "La Puente",
+        "name": "Almacén",
+        "shop": "yes"
+      }
+    }
+  ],
+  "fetchedAt": "2026-10-09T00:44:45.7728973Z",
+  "osmBase": "2026-10-09T00:42:21Z"
+}
+
