@@ -134,6 +134,7 @@ function renderAll(){refreshSelects();renderDashboard();renderCompanies();render
 function openCompanyDialog(){$('#company-dialog').showModal();$('#company-name').focus()}
 $('#quick-add').onclick=openCompanyDialog;$('#add-company').onclick=openCompanyDialog;
 $('#primary-action').onclick=()=>{if(!store.companies.length)openCompanyDialog();else setView('research')};
+$('#api-settings').onclick=()=>setView('agent');
 $$('.dialog-close').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $('#company-form').onsubmit=e=>{e.preventDefault();const c={id:uid(),name:$('#company-name').value.trim(),sector:$('#company-sector').value.trim(),city:$('#company-city').value.trim(),website:safeUrl($('#company-website').value),process:$('#company-process').value.trim(),createdAt:new Date().toISOString()};store.companies.unshift(c);activeId=c.id;persist();e.target.reset();$('#company-city').value='Rivera';$('#company-dialog').close();renderAll();toast('Empresa agregada a la cartera.');setView('research')};
 $('#company-search').oninput=renderCompanies;$('#company-filter').onchange=renderCompanies;
