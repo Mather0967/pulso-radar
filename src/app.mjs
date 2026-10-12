@@ -22,6 +22,15 @@ let activeId=store.companies[0]?.id||null;
 let radar=[];
 let currentDemo='';
 
+const preferredTheme=localStorage.getItem('pulso-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+function applyTheme(theme){
+ document.documentElement.dataset.theme=theme;
+ const button=$('#theme-toggle');
+ if(button){button.querySelector('span').textContent=theme==='dark'?'☼':'◐';button.querySelector('b').textContent=theme==='dark'?'Claro':'Oscuro';button.setAttribute('aria-label',theme==='dark'?'Activar modo claro':'Activar modo oscuro')}
+}
+applyTheme(preferredTheme);
+$('#theme-toggle').onclick=()=>{const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';localStorage.setItem('pulso-theme',theme);applyTheme(theme)};
+
 const references=[
  {sector:['retail','comercio','supermercado','ferretería','tienda'],name:'Zoho Inventory',pattern:'Inventario, pedidos, alertas y flujos conectados por webhooks.',source:'https://www.zoho.com/inventory/',fit:'Control de stock y seguimiento de pedidos'},
  {sector:['gastronomía','panadería','restaurante','alimentos'],name:"Domino's",pattern:'Pedido digital y seguimiento como parte central de la experiencia.',source:'https://www.dominos.com/',fit:'Pedidos estructurados y estado visible'},
