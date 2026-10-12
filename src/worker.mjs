@@ -9,9 +9,12 @@ const clean=(value,max=500)=>String(value??'').replace(/[\u0000-\u001f]/g,' ').t
 
 async function analyzeWithAI(request,env){
   if(!sameOrigin(request,new URL(request.url)))return json({error:'Origen no admitido'},403);
-  if(!userId(request))return json({error:'Abrí Pulso con tu sesión de ChatGPT para usar la IA.'},401);
-  if(!env?.OPENAI_API_KEY)return json({error:'La clave OPENAI_API_KEY todavía no está configurada como secreto del Site.'},503);
   let body;try{body=await request.json()}catch{return json({error:'Solicitud no válida'},400)}
+  const geminiKey=clean(request.headers.get('X-Pulso-Gemini-Key'),512);
+  const useGemini=body?.provider==='gemini'||!!geminiKey;
+  if(useGemini&&geminiKey.length<20)return json({error:'Pegá una API key válida de Google Gemini.'},400);
+  if(!useGemini&&!userId(request))return json({error:'Abrí Pulso con tu sesión de ChatGPT para usar OpenAI.'},401);
+  if(!useGemini&&!env?.OPENAI_API_KEY)return json({error:'No hay un proveedor configurado. Pegá una clave temporal de Gemini.'},503);
   const c=body?.company||{};
   const company={
     name:clean(c.name,120),sector:clean(c.sector,100),city:clean(c.city,100),
@@ -33,6 +36,20 @@ Proponé una demo pequeña y medible que el equipo pueda mostrar sin conectarse 
 
 Empresa:
 ${JSON.stringify(company)}`;
+  if(useGemini){
+    const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
+      method:'POST',headers:{'x-goog-api-key':geminiKey,'Content-Type':'application/json'},
+      body:JSON.stringify({model:'gemini-3.8-flash',input:prompt,tools:[{type:'google_search'}],store:false,generation_config:{thinking_level:'low'}}),
+      signal:AbortSignal.timeout(60000)
+    });
+    const data=await response.json();
+    if(!response.ok)return json({error:data?.error?.message||'Gemini no respondió'},502);
+    const blocks=(data.steps||[]).filter(step=>step.type==='model_output').flatMap(step=>step.content||[]).filter(block=>block.type==='text');
+    const analysis=data.output_text||blocks.map(block=>block.text||'').join('\n')||'';
+    const citations=[...new Map(blocks.flatMap(block=>block.annotations||[]).filter(a=>a.type==='url_citation'&&a.url).map(a=>[a.url,{title:a.title||'Fuente',url:a.url}])).values()];
+    const cited= citations.length?analysis+'\n\nFUENTES\n'+citations.map((c,i)=>`${i+1}. ${c.title}: ${c.url}`).join('\n'):analysis;
+    return json({analysis:cited,provider:'gemini',model:data.model||'gemini-3.8-flash',generatedAt:new Date().toISOString()});
+  }
   const response=await fetch('https://api.openai.com/v1/responses',{
     method:'POST',
     headers:{'Authorization':`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},
@@ -42,13 +59,13 @@ ${JSON.stringify(company)}`;
   const data=await response.json();
   if(!response.ok)return json({error:data?.error?.message||'La IA no respondió'},502);
   const analysis=data.output_text||data.output?.flatMap(item=>item.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('\n')||'';
-  return json({analysis,model:data.model||env.OPENAI_MODEL||'gpt-5-mini',generatedAt:new Date().toISOString()});
+  return json({analysis,provider:'openai',model:data.model||env.OPENAI_MODEL||'gpt-5-mini',generatedAt:new Date().toISOString()});
 }
 
 export default {
   async fetch(request,env,ctx){
     const url=new URL(request.url);
-    if(url.pathname==='/api/ai/status'&&request.method==='GET')return json({configured:!!env?.OPENAI_API_KEY,model:env?.OPENAI_MODEL||null,requiresSignIn:true});
+    if(url.pathname==='/api/ai/status'&&request.method==='GET')return json({configured:!!env?.OPENAI_API_KEY,model:env?.OPENAI_MODEL||null,geminiByok:true,requiresSignIn:true});
     if(url.pathname==='/api/ai/analyze'&&request.method==='POST')return analyzeWithAI(request,env);
     if(url.pathname==='/api/agent/state'&&request.method==='GET'){try{return json(await readMonitor(env?.BUCKET))}catch{return json({error:'No se pudo leer el historial del agente'},503)}}
     if(url.pathname==='/api/agent/import'&&request.method==='POST'){

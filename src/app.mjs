@@ -21,6 +21,7 @@ if(!Array.isArray(store.demos))store.demos=[];
 let activeId=store.companies[0]?.id||null;
 let radar=[];
 let currentDemo='';
+let geminiKey='';
 
 const preferredTheme=localStorage.getItem('pulso-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
 function applyTheme(theme){
@@ -147,8 +148,11 @@ $('#open-demo').onclick=()=>{$('#demo-full').innerHTML=`<iframe style="width:100
 $('#radar-search').oninput=renderRadar;$('#refresh-radar').onclick=()=>loadRadar(true);
 $('#import-selected').onclick=()=>{const ids=new Set($$('[data-radar-id]:checked').map(n=>n.dataset.radarId));const selected=radar.filter(b=>ids.has(`${b.type}/${b.id}`));let added=0;for(const b of selected){const sourceId=`osm:${b.type}/${b.id}`;if(store.companies.some(c=>c.sourceId===sourceId))continue;store.companies.push({id:uid(),sourceId,name:b.tags.name,sector:b.tags.shop,city:b.tags['addr:city']||'Rivera / Livramento',website:safeUrl(b.tags.website||b.tags['contact:website']),process:'',sourceUrl:`https://www.openstreetmap.org/${b.type}/${b.id}`,createdAt:new Date().toISOString()});added++}persist();renderAll();toast(`${added} empresas agregadas desde OSM.`)};
 
-async function loadAIStatus(){try{const r=await fetch('/api/ai/status');const d=await r.json();const text=d.configured?'IA configurada':'IA por configurar';$('#ai-status').textContent=text;$('#ai-chip').textContent=text;$('#ai-status').className='chip '+(d.configured?'':'neutral');$('#ai-chip').className='chip '+(d.configured?'':'neutral');$('#run-ai').disabled=!d.configured}catch{$('#ai-status').textContent='Estado no disponible';$('#run-ai').disabled=true}}
+function updateKeyState(){const ready=geminiKey.length>=20;$('#gemini-key-state').textContent=ready?'Gemini listo durante esta pestaña':'Sin clave temporal';$('#ai-status').textContent=ready?'Gemini temporal listo':'IA por configurar';$('#ai-chip').textContent=ready?'Gemini listo':'IA por configurar';$('#run-ai').disabled=!ready&&!$('#run-ai').dataset.serverReady}
+async function loadAIStatus(){try{const r=await fetch('/api/ai/status');const d=await r.json();$('#run-ai').dataset.serverReady=d.configured?'1':'';if(!geminiKey){const text=d.configured?'OpenAI configurado':'IA por configurar';$('#ai-status').textContent=text;$('#ai-chip').textContent=text;$('#ai-status').className='chip '+(d.configured?'':'neutral');$('#ai-chip').className='chip '+(d.configured?'':'neutral');$('#run-ai').disabled=!d.configured}else updateKeyState()}catch{$('#ai-status').textContent='Estado no disponible';$('#run-ai').disabled=!geminiKey}}
+$('#gemini-key').oninput=e=>{geminiKey=e.target.value.trim();updateKeyState()};
+$('#clear-gemini-key').onclick=()=>{geminiKey='';$('#gemini-key').value='';updateKeyState();toast('Clave temporal eliminada de la pestaña.')};
 $('#refresh-ai').onclick=loadAIStatus;
-$('#run-ai').onclick=async()=>{const c=company();if(!c)return toast('Agregá una empresa primero.');$('#ai-output').textContent='Investigando fuentes públicas y preparando el diagnóstico…';$('#run-ai').disabled=true;try{const r=await fetch('/api/ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:c})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo ejecutar');$('#ai-output').textContent=d.analysis||'Sin resultado'}catch(e){$('#ai-output').textContent=e.message}finally{$('#run-ai').disabled=false}};
+$('#run-ai').onclick=async()=>{const c=company();if(!c)return toast('Agregá una empresa primero.');$('#ai-output').textContent='Investigando fuentes públicas y preparando el diagnóstico…';$('#run-ai').disabled=true;try{const headers={'Content-Type':'application/json'};if(geminiKey)headers['X-Pulso-Gemini-Key']=geminiKey;const r=await fetch('/api/ai/analyze',{method:'POST',headers,body:JSON.stringify({company:c,provider:geminiKey?'gemini':'openai'})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo ejecutar');$('#ai-output').textContent=d.analysis||'Sin resultado'}catch(e){$('#ai-output').textContent=e.message}finally{updateKeyState()}};
 
 renderAll();renderBenchmarks(company());loadAIStatus();
