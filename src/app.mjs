@@ -162,5 +162,5 @@ $('#run-ai').onclick=async()=>{const c=company();if(!c)return toast('Agregá una
 renderAll();renderBenchmarks(company());loadAIStatus();
 
 
-refreshV1=initWorkspace({getCompanies:()=>store.companies,getCompany:()=>company(),setCompany:id=>setActive(id),replaceCompanies:companies=>{const previous=store.companies;store.companies=companies;try{persist()}catch(error){store.companies=previous;throw error}activeId=companies[0]?.id||null;renderAll()},toast});
+refreshV1=initWorkspace({getCompanies:()=>store.companies,getCompany:()=>company(),setCompany:id=>setActive(id),replaceCompanies:companies=>{const previous=store.companies;store.companies=companies;try{persist()}catch(error){store.companies=previous;throw error}activeId=companies[0]?.id||null;renderAll()},toast,getGeminiKey:()=>geminiKey,configureAI:()=>setView('agent')});
 setView('workspace');

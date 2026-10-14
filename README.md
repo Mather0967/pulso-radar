@@ -4,7 +4,7 @@
 
 La nueva entrada **Ciclo de oportunidad** aplica el roadmap de inteligencia comercial interna de RIVECT. Incluye evidencia local trazable, biblioteca internacional, análisis revisado, informes versionados exportables y medición de piloto. Diseño naranja cobre con modo oscuro predeterminado y modo claro disponible.
 
-Ver [ROADMAP-V1.md](ROADMAP-V1.md) para el alcance aplicado, uso, respaldo y pendientes reales. La V1 no se declara cerrada: falta el piloto y la extracción asistida por IA. Las herramientas de la demo anterior se conservan y no alimentan automáticamente el nuevo informe.
+Ver [ROADMAP-V1.md](ROADMAP-V1.md) para el alcance aplicado, uso, respaldo y pendientes reales. La V1 no se declara cerrada: faltan el piloto y la validación de Gemini con una clave real. La extracción, las consultas con citas y las relaciones asistidas están implementadas con revisión humana. Las herramientas de la demo anterior se conservan y no alimentan automáticamente el nuevo informe.
 
 Migración del código completo de la demo del equipo LIDIA en Rivera/Livramento. Conserva radar, ideas, perfiles, puntajes, calculadora, seguimiento, exportación, roadmap, fuentes e historial del monitor. Uso local; el repositorio no despliega la aplicación.
 

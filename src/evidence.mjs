@@ -2,6 +2,11 @@
 export const SECTORS=['Contable','Jurídico','Escribanía'];
 const text=(v,max=12000)=>String(v??'').trim().slice(0,max);
 export function sourceUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
+export function createAIHypothesis(original,suggestion){
+ if(!original||suggestion.recordId!==original.id||typeof suggestion.quote!=='string'||!suggestion.quote||!original.body.includes(suggestion.quote))throw new Error('La sugerencia no corresponde al original.');
+ const body=`${text(suggestion.summary,2000)}\n\nFragmento original:\n${suggestion.quote}`;
+ return {...validateRecord({...original,title:suggestion.title,body,type:'hipótesis',reviewed:false},original.kind==='case'?'case':'evidence'),id:crypto.randomUUID(),originId:original.id,originalBody:original.body,ai:{provider:'gemini',model:'gemini-3.8-flash',generatedAt:new Date().toISOString()},createdAt:new Date().toISOString()};
+}
 export function validateRecord(input,kind='evidence'){
  const title=text(input.title,180),body=text(input.body),source=text(input.source,500),date=text(input.date,10);
  if(!title||!body||!source)throw new Error('Completá título, contenido original y fuente o referencia.');

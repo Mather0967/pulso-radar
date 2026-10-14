@@ -1,4 +1,5 @@
-import {SECTORS,validateRecord,searchEvidence,alertsFor,makeReport,reportIsCurrent,pilotStatus,sourceUrl,validateBackup} from './evidence.mjs';
+import {SECTORS,validateRecord,searchEvidence,alertsFor,makeReport,reportIsCurrent,pilotStatus,sourceUrl,validateBackup,createAIHypothesis} from './evidence.mjs';
+import {wireEvidenceAssistant} from './evidence-assistant.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const date=()=>new Date().toISOString().slice(0,10);
@@ -6,7 +7,7 @@ const link=r=>sourceUrl(r.source)?`<a href="${esc(sourceUrl(r.source))}" target=
 const empty=message=>`<p class="empty-state">${message}</p>`;
 const download=(name,data,type='application/json')=>{const url=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 const field=(name,label,value='',textarea=true)=>`<label>${label}${textarea?`<textarea name="${name}" maxlength="12000">${esc(value)}</textarea>`:`<input name="${name}" value="${esc(value)}" required>`}</label>`;
-export function initWorkspace({getCompanies,getCompany,setCompany,replaceCompanies,toast}){
+export function initWorkspace({getCompanies,getCompany,setCompany,replaceCompanies,toast,getGeminiKey=()=>'',configureAI=()=>{}}){
  let db={version:1,evidence:[],cases:[],analyses:{},reports:[],pilots:{}};
  let storageBroken=false;
  try{const saved=JSON.parse(localStorage.getItem('pulso-evidence-v1')||'null');if(saved){validateBackup({...saved,companies:getCompanies()});db=saved}}catch{storageBroken=true;toast('No se pudo leer el respaldo V1. Exportá los datos guardados antes de reemplazarlos.');}
@@ -48,6 +49,12 @@ export function initWorkspace({getCompanies,getCompany,setCompany,replaceCompani
  content.innerHTML=`<div class="workspace-grid v1-grid"><section class="panel"><p class="eyebrow">CRITERIOS DE CIERRE V1</p><h2>${status.closed?'Piloto verificado':'Piloto pendiente'}</h2><ul class="pilot-checks">${status.checks.map(([s,ok])=>`<li><span>${ok?'✓':'○'}</span>${s}</li>`).join('')}</ul><div class="pilot-saving">${status.saved===null?'Sin medición':`${status.saved} min`}<small>Diferencia por ciclo de la misma tarea</small></div><p class="small">Emití un informe actualizado después de corregir brechas. El cierre no es una predicción comercial.</p><p class="eyebrow">FUERA DE V1</p><p class="small">Agentes autónomos complejos, monitoreo amplio, predicción, puntuación comercial, propuestas avanzadas y oferta a terceros.</p></section><section class="panel span-2"><p class="eyebrow">VALIDACIÓN EN UNA OPORTUNIDAD REAL</p><h2>Medir antes de cerrar</h2><form id="v1-pilot" class="form-stack">${field('reference','Referencia de oportunidad real / evidencia del piloto',pilot.reference,'')}<div class="two"><label>Tiempo manual antes (min/ciclo)<input name="before" type="number" min="0.01" step="any" required value="${esc(pilot.before??'')}"></label><label>Tiempo con Pulso (min/ciclo)<input name="after" type="number" min="0" step="any" required value="${esc(pilot.after??'')}"></label></div>${field('measurement','Tarea, fecha, condiciones y método de medición',pilot.measurement)}${field('feedback','Resultado, límites y brechas del piloto',pilot.feedback)}<label class="check-label"><input name="validated" type="checkbox" ${pilot.validated?'checked':''}>El equipo verificó las mediciones y el resultado</label><button class="primary">Guardar medición</button></form><p class="small">Arquitectura V1: persistencia local exportable y orquestación directa en la aplicación. n8n se incorpora sólo si un flujo concreto demuestra valor.</p></section></div>`;
  $('#v1-pilot').onsubmit=e=>{e.preventDefault();const old=db.pilots[id];const f=new FormData(e.target);const next={...Object.fromEntries(f),validated:e.target.elements.validated.checked};if(next.validated&&!next.measurement.trim())return toast('Documentá la tarea y el método de medición antes de validarlo.');db.pilots[id]=next;try{save();refresh();toast('Medición guardada.')}catch(error){db.pilots[id]=old;toast(error.message)}};
  }
+ wireEvidenceAssistant({root,tab,records,cases:db.cases,getKey:getGeminiKey,configure:configureAI,toast,acceptExtraction:(original,suggestion)=>{
+  const list=original.kind==='case'?db.cases:db.evidence,current=list.find(r=>r.id===original.id);
+  if(!current||current.body!==original.body)throw new Error('El original cambió; volvé a consultar.');
+  const next=createAIHypothesis(original,suggestion);
+  list.push(next);try{save()}catch(error){list.pop();throw error}
+ }});
  }
  refresh();return refresh;
 }
