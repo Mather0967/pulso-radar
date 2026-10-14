@@ -1,3 +1,5 @@
+import {initWorkspace} from './workspace.mjs';
+let refreshV1=()=>{};
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -5,6 +7,7 @@ const uid=()=>crypto.randomUUID?.()||Date.now().toString(36)+Math.random().toStr
 const money=v=>'USD '+Math.round(Number(v)||0).toLocaleString('es-UY');
 const safeUrl=value=>{try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}};
 const labels={
+ workspace:['INTELIGENCIA COMERCIAL','Ciclo de oportunidad','La evidencia abre oportunidades.','Del conocimiento local a una reunión mejor preparada. Fuentes, contexto y decisiones que podés defender.'],
  command:['RADAR OPERATIVO','Centro de mando','Detectá dónde se escapa valor.','De una empresa real a una oportunidad concreta de automatización, con evidencia, supuestos visibles y una demo para conversar.'],
  companies:['CARTERA','Empresas','Una vista única de cada empresa, su evidencia y el próximo paso.','Agregá empresas manualmente o desde el radar público de Rivera y Livramento.'],
  research:['INVESTIGACIÓN','Huella digital','Convertí presencia pública en un expediente trazable.','Enlaces, canales, señales operativas y vacíos visibles; hechos separados de hipótesis.'],
@@ -23,7 +26,7 @@ let radar=[];
 let currentDemo='';
 let geminiKey='';
 
-const preferredTheme=localStorage.getItem('pulso-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+const preferredTheme=localStorage.getItem('pulso-theme')||'dark';
 function applyTheme(theme){
  document.documentElement.dataset.theme=theme;
  const button=$('#theme-toggle');
@@ -47,7 +50,8 @@ function setView(view){
  $$('.view').forEach(v=>v.hidden=v.id!==view+'-view');
  $$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
  const l=labels[view];$('#breadcrumb').textContent=l[1];$('#page-kicker').textContent=l[0];$('#page-title').textContent=l[2];$('#page-copy').textContent=l[3];
- $('#primary-action').textContent=view==='companies'?'Agregar empresa':view==='demos'?'Generar demo':'Analizar empresa';
+ $('#primary-action').textContent=(view==='workspace'||view==='companies')?'Agregar empresa':view==='demos'?'Generar demo':'Analizar empresa';
+ if(view==='workspace')refreshV1();
  if(view==='research')renderFootprint(company());if(view==='benchmark')renderGap(company());if(view==='radar')loadRadar(false);if(view==='agent')loadAIStatus();
 }
 $$('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
@@ -116,7 +120,7 @@ function demoDocument(c,type,goal){
   dashboard:`<h2>Operación de hoy</h2><div class="kpis"><b>24 tareas</b><b>87% a tiempo</b></div><div class="item">Pedidos procesados · 18/21</div><div class="item">Tiempo medio · 12 min</div><button>Ver detalle</button>`,
   assistant:`<h2>Asistente interno</h2><div class="chat"><p>¿Qué pedidos están demorados?</p><b>Hay 3 pedidos fuera del tiempo objetivo. Revisá #1041, #1048 y #1050.</b></div><input placeholder="Preguntá sobre la operación"><button>Consultar</button>`
  }[type];
- return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#eff4f5;font:15px Arial;color:#17353d;padding:24px}.app{max-width:680px;margin:auto;background:#fff;border:1px solid #d8e3e5;border-radius:14px;overflow:hidden}.top{background:#102f39;color:#fff;padding:20px}.top b{font-size:22px}.top p{color:#bdd0d4;margin:6px 0 0}.body{padding:24px}h2{margin-top:0}.kpis{display:flex;gap:10px;margin:15px 0}.kpis b{background:#e8f4d5;padding:13px;border-radius:8px;flex:1}.item,.chat{border:1px solid #dce6e8;padding:14px;border-radius:8px;margin:9px 0}button{background:#102f39;color:#fff;border:0;padding:11px 15px;border-radius:7px;margin-top:12px}input{width:100%;padding:12px;border:1px solid #ccdadd;border-radius:7px}.goal{font-size:12px;color:#71858b;margin-top:18px}</style></head><body><div class="app"><div class="top"><b>${name}</b><p>Demo ilustrativa · datos ficticios</p></div><div class="body">${content}<p class="goal"><b>Objetivo:</b> ${g}</p></div></div></body></html>`;
+ return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;background:#eff4f5;font:15px Arial;color:#17353d;padding:24px}.app{max-width:680px;margin:auto;background:#fff;border:1px solid #d8e3e5;border-radius:14px;overflow:hidden}.top{background:#102f39;color:#fff;padding:20px}.top b{font-size:22px}.top p{color:#bdd0d4;margin:6px 0 0}.body{padding:24px}h2{margin-top:0}.kpis{display:flex;gap:10px;margin:15px 0}.kpis b{background:#fae1cf;padding:13px;border-radius:8px;flex:1}.item,.chat{border:1px solid #dce6e8;padding:14px;border-radius:8px;margin:9px 0}button{background:#102f39;color:#fff;border:0;padding:11px 15px;border-radius:7px;margin-top:12px}input{width:100%;padding:12px;border:1px solid #ccdadd;border-radius:7px}.goal{font-size:12px;color:#71858b;margin-top:18px}</style></head><body><div class="app"><div class="top"><b>${name}</b><p>Demo ilustrativa · datos ficticios</p></div><div class="body">${content}<p class="goal"><b>Objetivo:</b> ${g}</p></div></div></body></html>`;
 }
 
 function renderDemos(){const d=store.demos.find(d=>d.id===company()?.demoId);if(d){currentDemo=d.html;$('#demo-frame').srcdoc=d.html;$('#demo-title').textContent=d.title;$('#open-demo').disabled=false}else{$('#demo-frame').srcdoc='';$('#demo-title').textContent='Sin demo';$('#open-demo').disabled=true}}
@@ -130,11 +134,11 @@ async function loadRadar(fresh){
  try{let data;if(!fresh){const r=await fetch('/api/agent/state');const s=await r.json();data=s.businesses}if(!data){const r=await fetch('/api/businesses?region=frontera',{signal:AbortSignal.timeout(35000)});data=await r.json()}if(!Array.isArray(data?.elements))throw new Error(data?.error||'Fuente no disponible');radar=data.elements;$('#radar-status').textContent=`${radar.length} registros · ${new Date(data.fetchedAt).toLocaleString('es-UY')} · fuente OpenStreetMap`;renderRadar()}catch(e){$('#radar-status').textContent='No se pudo actualizar: '+e.message+'. Se conservan los datos ya visibles.'}
 }
 
-function renderAll(){refreshSelects();renderDashboard();renderCompanies();renderFootprint(company());renderGap(company());renderBenchmarks(company());renderDemos();$('#company-count').textContent=store.companies.length}
+function renderAll(){refreshSelects();renderDashboard();renderCompanies();renderFootprint(company());renderGap(company());renderBenchmarks(company());renderDemos();$('#company-count').textContent=store.companies.length;refreshV1()}
 
 function openCompanyDialog(){$('#company-dialog').showModal();$('#company-name').focus()}
 $('#quick-add').onclick=openCompanyDialog;$('#add-company').onclick=openCompanyDialog;
-$('#primary-action').onclick=()=>{if(!store.companies.length)openCompanyDialog();else setView('research')};
+$('#primary-action').onclick=()=>{if(!store.companies.length||!$('#workspace-view')?.hidden)openCompanyDialog();else setView('research')};
 $('#api-settings').onclick=()=>setView('agent');
 $$('.dialog-close').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $('#company-form').onsubmit=e=>{e.preventDefault();const c={id:uid(),name:$('#company-name').value.trim(),sector:$('#company-sector').value.trim(),city:$('#company-city').value.trim(),website:safeUrl($('#company-website').value),process:$('#company-process').value.trim(),createdAt:new Date().toISOString()};store.companies.unshift(c);activeId=c.id;persist();e.target.reset();$('#company-city').value='Rivera';$('#company-dialog').close();renderAll();toast('Empresa agregada a la cartera.');setView('research')};
@@ -156,3 +160,7 @@ $('#refresh-ai').onclick=loadAIStatus;
 $('#run-ai').onclick=async()=>{const c=company();if(!c)return toast('Agregá una empresa primero.');$('#ai-output').textContent='Investigando fuentes públicas y preparando el diagnóstico…';$('#run-ai').disabled=true;try{const headers={'Content-Type':'application/json'};if(geminiKey)headers['X-Pulso-Gemini-Key']=geminiKey;const r=await fetch('/api/ai/analyze',{method:'POST',headers,body:JSON.stringify({company:c,provider:geminiKey?'gemini':'openai'})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo ejecutar');$('#ai-output').textContent=d.analysis||'Sin resultado'}catch(e){$('#ai-output').textContent=e.message}finally{updateKeyState()}};
 
 renderAll();renderBenchmarks(company());loadAIStatus();
+
+
+refreshV1=initWorkspace({getCompanies:()=>store.companies,getCompany:()=>company(),setCompany:id=>setActive(id),replaceCompanies:companies=>{const previous=store.companies;store.companies=companies;try{persist()}catch(error){store.companies=previous;throw error}activeId=companies[0]?.id||null;renderAll()},toast});
+setView('workspace');
