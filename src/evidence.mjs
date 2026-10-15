@@ -50,12 +50,13 @@ export function pilotStatus(pilot,report){
 export function validateBackup(data){
  if(data?.version!==1||!Array.isArray(data.evidence)||!Array.isArray(data.cases)||!data.analyses||Array.isArray(data.analyses)||!Array.isArray(data.reports)||!data.pilots||Array.isArray(data.pilots)||!Array.isArray(data.companies))throw new Error('Respaldo V1 no válido.');
  if(data.evidence.length+data.cases.length>2000||data.reports.length>500)throw new Error('El respaldo excede los límites.');
- const safeId=v=>typeof v==='string'&&v.length>0&&v.length<=150&&!['__proto__','constructor','prototype'].includes(v);
+ const safeId=v=>typeof v==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._/-]{0,149}$/.test(v)&&!['__proto__','constructor','prototype'].includes(v);
  const ids=new Set();for(const c of data.companies){if(!safeId(c.id)||typeof c.name!=='string'||ids.has(c.id))throw new Error('Empresas no válidas.');ids.add(c.id)}
- const recordIds=new Set();for(const [kind,list]of [['evidence',data.evidence],['case',data.cases]])for(const r of list){if(typeof r.id!=='string'||!r.id||recordIds.has(r.id))throw new Error('Identificadores de registros no válidos.');recordIds.add(r.id);validateRecord(r,kind);if(kind==='evidence'&&!ids.has(r.companyId))throw new Error('Evidencia sin empresa en el respaldo.');}
+ const recordIds=new Set();for(const [kind,list]of [['evidence',data.evidence],['case',data.cases]])for(const r of list){if(!safeId(r.id)||recordIds.has(r.id))throw new Error('Identificadores de registros no válidos.');recordIds.add(r.id);validateRecord(r,kind);if(kind==='evidence'&&!ids.has(r.companyId))throw new Error('Evidencia sin empresa en el respaldo.');}
  const checkAnalysis=a=>{if(!a||typeof a!=='object'||Array.isArray(a)||!Array.isArray(a.caseIds)||!a.caseIds.every(safeId)||Object.entries(a).some(([k,v])=>k!=='caseIds'&&(typeof v!=='string'||v.length>12000)))throw new Error('Análisis no válidos.');};
  for(const [id,a]of Object.entries(data.analyses)){if(!safeId(id))throw new Error('Expediente no válido.');checkAnalysis(a);}
  for(const p of Object.values(data.pilots))if(!p||typeof p!=='object'||Array.isArray(p)||Object.entries(p).some(([k,v])=>k==='validated'?typeof v!=='boolean':typeof v!=='string'))throw new Error('Piloto no válido.');
  for(const r of data.reports){if(!safeId(r.id)||!safeId(r.companyId)||typeof r.companyName!=='string'||!Number.isFinite(Date.parse(r.createdAt))||typeof r.ready!=='boolean'||!Array.isArray(r.missing)||!r.missing.every(v=>typeof v==='string'))throw new Error('Informe no válido.');checkAnalysis(r.analysis);for(const key of ['facts','hypotheses','cases']){if(!Array.isArray(r[key]))throw new Error('Fuentes de informe no válidas.');for(const item of r[key])validateRecord(item,key==='cases'?'case':'evidence');}}
  return data;
 }
+

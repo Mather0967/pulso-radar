@@ -2,6 +2,7 @@ import {assets} from './assets.mjs';
 import {fetchBusinesses,fetchSignals,REGIONS} from './providers.mjs';
 import {readMonitor,runMonitor,importBusinesses} from './monitor.mjs';
 import {handleGeminiEvidence} from './gemini-evidence.mjs';
+import {workspaceAPI} from './cloud.mjs';
 
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const sameOrigin=(request,url)=>{const origin=request.headers.get('Origin');return !origin||origin===url.origin};
@@ -66,9 +67,11 @@ ${JSON.stringify(company)}`;
 export default {
   async fetch(request,env,ctx){
     const url=new URL(request.url);
+    if(url.pathname==='/api/workspace')return workspaceAPI(request,env);
+    if(url.pathname==='/api/health')return json({ok:true,version:'2.0',storage:!!env?.BUCKET});
     if(url.pathname==='/api/ai/evidence'&&request.method==='POST')return handleGeminiEvidence(request);
     if(url.pathname==='/api/ai/status'&&request.method==='GET')return json({configured:!!env?.OPENAI_API_KEY,model:env?.OPENAI_MODEL||null,geminiByok:true,requiresSignIn:true});
-    if(url.pathname==='/api/ai/analyze'&&request.method==='POST')return analyzeWithAI(request,env);
+    if(url.pathname==='/api/ai/analyze'&&request.method==='POST'){try{return await analyzeWithAI(request,env)}catch{return json({error:'No se pudo completar la investigación. Tus datos siguen guardados; reintentá más tarde.'},502)}}
     if(url.pathname==='/api/agent/state'&&request.method==='GET'){try{return json(await readMonitor(env?.BUCKET))}catch{return json({error:'No se pudo leer el historial del agente'},503)}}
     if(url.pathname==='/api/agent/import'&&request.method==='POST'){
       if(!sameOrigin(request,url))return json({error:'Origen no admitido'},403);
@@ -103,4 +106,5 @@ export default {
     return new Response(file.body,{headers:{'Content-Type':file.type,'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':'no-cache'}});
   }
 };
+
 
