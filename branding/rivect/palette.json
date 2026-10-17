@@ -1,0 +1,12 @@
+{
+  "brand": "RIVECT",
+  "product": "Pulso",
+  "version": "2.0-rv",
+  "colors": {
+    "mandarin": "#FF762E",
+    "midnight": "#11222C",
+    "slate": "#405C6B",
+    "ivory": "#F7F5EF",
+    "white": "#FFFFFF"
+  }
+}
