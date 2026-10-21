@@ -12,7 +12,7 @@ const clean=(value,max=500)=>String(value??'').replace(/[\u0000-\u001f]/g,' ').t
 async function analyzeWithAI(request,env){
   if(!sameOrigin(request,new URL(request.url)))return json({error:'Origen no admitido'},403);
   let body;try{body=await request.json()}catch{return json({error:'Solicitud no válida'},400)}
-  const geminiKey=clean(request.headers.get('X-Pulso-Gemini-Key'),512);
+  const geminiKey=clean(request.headers.get('X-Pulso-Gemini-Key')||env?.GEMINI_API_KEY,512);
   const useGemini=body?.provider==='gemini'||!!geminiKey;
   if(useGemini&&geminiKey.length<20)return json({error:'Pegá una API key válida de Google Gemini.'},400);
   if(!useGemini&&!userId(request))return json({error:'Abrí Pulso con tu sesión de ChatGPT para usar OpenAI.'},401);
@@ -41,7 +41,7 @@ ${JSON.stringify(company)}`;
   if(useGemini){
     const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
       method:'POST',headers:{'x-goog-api-key':geminiKey,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'gemini-3.8-flash',input:prompt,tools:[{type:'google_search'}],store:false,generation_config:{thinking_level:'low'}}),
+      body:JSON.stringify({model:env?.GEMINI_MODEL||'gemini-3.8-flash',input:prompt,tools:[{type:'google_search'}],store:false,generation_config:{thinking_level:'low'}}),
       signal:AbortSignal.timeout(60000)
     });
     const data=await response.json();
@@ -50,7 +50,7 @@ ${JSON.stringify(company)}`;
     const analysis=data.output_text||blocks.map(block=>block.text||'').join('\n')||'';
     const citations=[...new Map(blocks.flatMap(block=>block.annotations||[]).filter(a=>a.type==='url_citation'&&a.url).map(a=>[a.url,{title:a.title||'Fuente',url:a.url}])).values()];
     const cited= citations.length?analysis+'\n\nFUENTES\n'+citations.map((c,i)=>`${i+1}. ${c.title}: ${c.url}`).join('\n'):analysis;
-    return json({analysis:cited,provider:'gemini',model:data.model||'gemini-3.8-flash',generatedAt:new Date().toISOString()});
+    return json({analysis:cited,provider:'gemini',model:data.model||env?.GEMINI_MODEL||'gemini-3.8-flash',generatedAt:new Date().toISOString()});
   }
   const response=await fetch('https://api.openai.com/v1/responses',{
     method:'POST',
@@ -69,8 +69,8 @@ export default {
     const url=new URL(request.url);
     if(url.pathname==='/api/workspace')return workspaceAPI(request,env);
     if(url.pathname==='/api/health')return json({ok:true,version:'2.0',storage:!!env?.BUCKET});
-    if(url.pathname==='/api/ai/evidence'&&request.method==='POST')return handleGeminiEvidence(request);
-    if(url.pathname==='/api/ai/status'&&request.method==='GET')return json({configured:!!env?.OPENAI_API_KEY,model:env?.OPENAI_MODEL||null,geminiByok:true,requiresSignIn:true});
+    if(url.pathname==='/api/ai/evidence'&&request.method==='POST')return handleGeminiEvidence(request,fetch,env);
+    if(url.pathname==='/api/ai/status'&&request.method==='GET')return json({configured:!!(env?.GEMINI_API_KEY||env?.OPENAI_API_KEY),provider:env?.GEMINI_API_KEY?'gemini':env?.OPENAI_API_KEY?'openai':null,model:env?.GEMINI_API_KEY?(env.GEMINI_MODEL||'gemini-3.8-flash'):(env?.OPENAI_MODEL||null),geminiByok:true,requiresSignIn:true});
     if(url.pathname==='/api/ai/analyze'&&request.method==='POST'){try{return await analyzeWithAI(request,env)}catch{return json({error:'No se pudo completar la investigación. Tus datos siguen guardados; reintentá más tarde.'},502)}}
     if(url.pathname==='/api/agent/state'&&request.method==='GET'){try{return json(await readMonitor(env?.BUCKET))}catch{return json({error:'No se pudo leer el historial del agente'},503)}}
     if(url.pathname==='/api/agent/import'&&request.method==='POST'){
@@ -97,7 +97,7 @@ export default {
         if(env?.BUCKET){const put=env.BUCKET.put(cacheKey,JSON.stringify(result),{httpMetadata:{contentType:'application/json'}}).catch(()=>{});ctx?.waitUntil?ctx.waitUntil(put):await put}
         return json(result);
       }catch(e){
-        if(local&&env?.BUCKET){try{const previous=await readMonitor(env.BUCKET);if(previous.businesses)return json({...previous.businesses,cached:true,warning:'La consulta directa falló; se muestra la última captura del agente con su fecha.'})}catch{}}
+        if(local&&env?.BUCKET){try{const stale=await env.BUCKET.get(cacheKey);if(stale)return json({...await stale.json(),cached:true,warning:'La fuente no está disponible; se muestra la última captura guardada con su fecha.'});const previous=await readMonitor(env.BUCKET);if(previous.businesses)return json({...previous.businesses,cached:true,warning:'La consulta directa falló; se muestra la última captura del agente con su fecha.'})}catch{}}
         return json({error:e.name==='TimeoutError'?'La fuente demoró demasiado. Intentá más tarde.':e.message},502);
       }
     }
@@ -106,5 +106,3 @@ export default {
     return new Response(file.body,{headers:{'Content-Type':file.type,'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','Cache-Control':'no-cache'}});
   }
 };
-
-

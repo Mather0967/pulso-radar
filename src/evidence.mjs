@@ -1,5 +1,5 @@
 // Pure V1 rules. No inferred commercial score and no network or provider calls.
-export const SECTORS=['Contable','Jurídico','Escribanía'];
+export const SECTORS=['General / Otro','Comercio','Panadería / Gastronomía','Servicios','Salud','Educación','Contable','Jurídico','Escribanía'];
 const text=(v,max=12000)=>String(v??'').trim().slice(0,max);
 export function sourceUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
 export function createAIHypothesis(original,suggestion){
@@ -59,4 +59,3 @@ export function validateBackup(data){
  for(const r of data.reports){if(!safeId(r.id)||!safeId(r.companyId)||typeof r.companyName!=='string'||!Number.isFinite(Date.parse(r.createdAt))||typeof r.ready!=='boolean'||!Array.isArray(r.missing)||!r.missing.every(v=>typeof v==='string'))throw new Error('Informe no válido.');checkAnalysis(r.analysis);for(const key of ['facts','hypotheses','cases']){if(!Array.isArray(r[key]))throw new Error('Fuentes de informe no válidas.');for(const item of r[key])validateRecord(item,key==='cases'?'case':'evidence');}}
  return data;
 }
-
