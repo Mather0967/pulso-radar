@@ -39,3 +39,12 @@ test('radar usa una segunda fuente si falla la primera y rechaza regiones antes 
  assert.equal(calls,2);assert.deepEqual(data.elements,[]);
  await assert.rejects(fetchBusinesses('invalid',async()=>{throw Error('should not fetch')}),/Región no admitida/);
 });
+
+test('todos los usuarios del proyecto pueden consultar IA sin dar escritura a viewers',async()=>{
+ const {projectMethodAllowed:allowed}=await import('../namecheap/server/access.mjs');
+ for(const endpoint of ['/api/ai/analyze','/api/ai/evidence'])assert.equal(allowed('viewer',endpoint,'POST'),true);
+ for(const endpoint of ['/api/workspace','/api/agent/import','/api/agent/run','/api/admin/users'])assert.equal(allowed('viewer',endpoint,'PUT'),false);
+ assert.equal(allowed('viewer','/api/workspace','GET'),true);
+ assert.equal(allowed(null,'/api/ai/analyze','POST'),false);
+ assert.equal(allowed('editor','/api/workspace','PUT'),true);
+});

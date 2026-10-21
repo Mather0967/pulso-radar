@@ -6,6 +6,7 @@ import {AuthStore,digest,token,publicUser} from './auth.mjs';
 import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
+import {projectMethodAllowed} from './access.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dataDir=path.resolve(root,process.env.DATA_DIR||'data');
 const store=new AuthStore(dataDir),env={BUCKET:diskBucket(path.join(dataDir,'pulso')),GEMINI_API_KEY:process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||'',GEMINI_MODEL:process.env.GEMINI_MODEL||'gemini-3.8-flash'};
@@ -42,7 +43,7 @@ async function route(req,ip){
   return json({error:'Ruta no encontrada.'},404)
  }
  const access=projectAccess(u);if(!access)return json({error:'No tenés permiso para este proyecto.'},403);
- if(access==='viewer'&&!['GET','HEAD'].includes(method))return json({error:'Tu acceso a Pulso es de sólo lectura.'},403);
+ if(!projectMethodAllowed(access,p,method))return json({error:'Tu acceso a Pulso es de sólo lectura.'},403);
  if(p==='/pulso'&&method==='GET'){
   let page=await readFile(path.join(root,'src/index.html'),'utf8');
   page=page.replace('<head>','<head><script src="/auth/pulso-session.js"></script>');
