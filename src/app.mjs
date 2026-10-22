@@ -1,8 +1,10 @@
+import {initResearch} from './analysis-client.mjs';
 import {initLab} from './lab.mjs';
 import {initOperations} from './operations.mjs';
 import {initSync} from './sync.mjs';
 import {initWorkspace} from './workspace.mjs';
 let refreshV1=()=>{};
+let refreshAnalysis=()=>{};
 let refreshLab=null;
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
@@ -17,7 +19,7 @@ const labels={
  research:['INVESTIGACIÓN','Huella digital','Convertí presencia pública en un expediente trazable.','Enlaces, canales, señales operativas y vacíos visibles; hechos separados de hipótesis.'],
  benchmark:['PLANIFICACIÓN','Escenarios','Hacé explícitos tus supuestos.','Explorá horas, costos y oportunidades declaradas. Estas cifras no demuestran ahorro ni demanda comercial.'],
  demos:['LABORATORIOS','Demo Lab','Probá el flujo. Validá la mejora.','Laboratorios interactivos con registros editables, persistencia, respaldo y exportación independiente.'],
- agent:['CONFIGURACIÓN','Agente IA','Autonomía con evidencia, límites y aprobación humana.','La IA investiga y propone; nunca contacta empresas ni transforma supuestos en hechos.'],
+ agent:['INTELIGENCIA COMERCIAL','Informe de empresa','Investigá. Compará. Anticipá.','Fuentes públicas, escenarios de dinero y tiempo, y riesgos para diseñar un piloto defendible.'],
  radar:['FUENTE LOCAL','Radar Rivera','Descubrí empresas cercanas para incorporar.','OpenStreetMap aporta registros públicos; no confirma actividad ni necesidad de compra.']
 };
 
@@ -27,6 +29,7 @@ if(!Array.isArray(store.companies))store.companies=[];
 if(!Array.isArray(store.demos))store.demos=[];
 let activeId=store.companies[0]?.id||null;
 let radar=[];
+let radarLoading=false;
 let currentDemo='';
 let geminiKey='';
 
@@ -57,7 +60,7 @@ function setView(view){
  const l=labels[view];$('#breadcrumb').textContent=l[1];$('#page-kicker').textContent=l[0];$('#page-title').textContent=l[2];$('#page-copy').textContent=l[3];
  $('#primary-action').textContent=(view==='workspace'||view==='companies'||view==='command')?'Agregar empresa':view==='demos'?'Crear laboratorio':'Abrir expediente';
  if(view==='workspace')refreshV1();
- if(view==='research')renderFootprint(company());if(view==='benchmark')renderGap(company());if(view==='radar')loadRadar(false);if(view==='agent')loadAIStatus();
+ if(view==='research')renderFootprint(company());if(view==='benchmark')renderGap(company());if(view==='radar')loadRadar(false);if(view==='agent'){loadAIStatus();refreshAnalysis();}
 }
 $$('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $$('[data-go]').forEach(b=>b.onclick=()=>setView(b.dataset.go));
@@ -135,11 +138,12 @@ function renderRadar(){
  $('#radar-list').innerHTML=list.slice(0,100).map(b=>`<label class="radar-item"><input type="checkbox" data-radar-id="${b.type}/${b.id}"><span><b>${esc(b.tags.name)}</b><small>${esc(b.tags.shop)} · registro OSM</small></span></label>`).join('')||'<div class="empty-state">No hay resultados.</div>';
 }
 async function loadRadar(fresh){
+ if(radarLoading)return;radarLoading=true;$('#refresh-radar').disabled=true;
  $('#radar-status').textContent=fresh?'Consultando OpenStreetMap…':'Cargando la última captura…';
- try{let data;if(!fresh){const r=await fetch('/api/agent/state');const s=await r.json();data=s.businesses}if(!data){const r=await fetch('/api/businesses?region=frontera',{signal:AbortSignal.timeout(35000)});data=await r.json()}if(!Array.isArray(data?.elements))throw new Error(data?.error||'Fuente no disponible');radar=data.elements;$('#radar-status').textContent=`${radar.length} registros · ${new Date(data.fetchedAt).toLocaleString('es-UY')} · fuente OpenStreetMap`;renderRadar()}catch(e){$('#radar-status').textContent='No se pudo actualizar: '+e.message+'. Se conservan los datos ya visibles.'}
+ try{let data;if(!fresh){const r=await fetch('/api/agent/state',{signal:AbortSignal.timeout(10000)});const s=await r.json();if(!r.ok)throw Error(s.error||'No se pudo leer la captura');data=s.businesses}if(!data){const r=await fetch('/api/businesses?region=frontera',{signal:AbortSignal.timeout(35000)});data=await r.json();if(!r.ok)throw Error(data.error||'Fuente no disponible')}if(!Array.isArray(data?.elements))throw new Error(data?.error||'Fuente no disponible');radar=data.elements;$('#radar-status').textContent=`${radar.length} registros · ${new Date(data.fetchedAt).toLocaleString('es-UY')} · fuente OpenStreetMap${data.warning?' · '+data.warning:''}`;renderRadar()}catch(e){$('#radar-status').textContent='No se pudo actualizar: '+(e.name==='TimeoutError'?'La fuente demoró demasiado; volvé a intentar.':e.message)+'. Se conservan los datos ya visibles.'}finally{radarLoading=false;$('#refresh-radar').disabled=false}
 }
 
-function renderAll(){refreshSelects();renderDashboard();renderCompanies();renderFootprint(company());renderGap(company());renderBenchmarks(company());renderDemos();$('#company-count').textContent=store.companies.length;refreshV1()}
+function renderAll(){refreshSelects();renderDashboard();renderCompanies();renderFootprint(company());renderGap(company());renderBenchmarks(company());renderDemos();$('#company-count').textContent=store.companies.length;refreshV1();refreshAnalysis()}
 
 function openCompanyDialog(){$('#company-dialog').showModal();$('#company-name').focus()}
 $('#quick-add').onclick=openCompanyDialog;$('#add-company').onclick=openCompanyDialog;
@@ -155,14 +159,14 @@ $('#economics-form').onsubmit=e=>{e.preventDefault();const c=company();if(!c)ret
 $('#demo-form').onsubmit=e=>{e.preventDefault();const c=company();if(!c)return toast('Agregá una empresa primero.');const type=$('#demo-type').value,goal=$('#demo-goal').value.trim();const d={id:uid(),companyId:c.id,title:`${c.name} · ${$('#demo-type').selectedOptions[0].text}`,type,goal,html:demoDocument(c,type,goal),createdAt:new Date().toISOString()};store.demos.unshift(d);c.demoId=d.id;persist();renderAll();toast('Demo generada con datos ficticios.')};
 $('#open-demo').onclick=()=>{$('#demo-full').innerHTML=`<iframe style="width:100%;height:70vh;border:0" sandbox="allow-scripts"></iframe>`;$('#demo-full iframe').srcdoc=currentDemo;$('#demo-dialog').showModal()};
 $('#radar-search').oninput=renderRadar;$('#refresh-radar').onclick=()=>loadRadar(true);
-$('#import-selected').onclick=()=>{const ids=new Set($$('[data-radar-id]:checked').map(n=>n.dataset.radarId));const selected=radar.filter(b=>ids.has(`${b.type}/${b.id}`));let added=0;for(const b of selected){const sourceId=`osm:${b.type}/${b.id}`;if(store.companies.some(c=>c.sourceId===sourceId))continue;store.companies.push({id:uid(),sourceId,name:b.tags.name,sector:b.tags.shop,city:b.tags['addr:city']||'Rivera / Livramento',website:safeUrl(b.tags.website||b.tags['contact:website']),process:'',sourceUrl:`https://www.openstreetmap.org/${b.type}/${b.id}`,createdAt:new Date().toISOString()});added++}persist();renderAll();toast(`${added} empresas agregadas desde OSM.`)};
+$('#import-selected').onclick=()=>{const ids=new Set($$('[data-radar-id]:checked').map(n=>n.dataset.radarId));const selected=radar.filter(b=>ids.has(`${b.type}/${b.id}`));if(!selected.length)return toast('Seleccioná al menos una empresa del radar.');let added=0;for(const b of selected){const sourceId=`osm:${b.type}/${b.id}`;if(store.companies.some(c=>c.sourceId===sourceId))continue;store.companies.push({id:uid(),sourceId,name:b.tags.name,sector:b.tags.shop,city:b.tags['addr:city']||'Rivera / Livramento',website:safeUrl(b.tags.website||b.tags['contact:website']),process:'',sourceUrl:`https://www.openstreetmap.org/${b.type}/${b.id}`,createdAt:new Date().toISOString()});added++}persist();renderAll();toast(`${added} empresas agregadas desde OSM.`)};
 
-function updateKeyState(){const ready=geminiKey.length>=20;$('#gemini-key-state').textContent=ready?'Gemini listo durante esta pestaña':'Sin clave temporal';$('#ai-status').textContent=ready?'Gemini temporal listo':'Conectar Gemini';$('#ai-chip').textContent=ready?'Gemini listo':'Conectar Gemini';$('#run-ai').disabled=!ready&&!$('#run-ai').dataset.serverReady}
-async function loadAIStatus(){try{const r=await fetch('/api/ai/status');const d=await r.json();$('#run-ai').dataset.serverReady=d.configured?'1':'';if(!geminiKey){const text=d.configured?'OpenAI configurado':'Conectar Gemini';$('#ai-status').textContent=text;$('#ai-chip').textContent=text;$('#ai-status').className='chip '+(d.configured?'':'neutral');$('#ai-chip').className='chip '+(d.configured?'':'neutral');$('#run-ai').disabled=!d.configured}else updateKeyState()}catch{$('#ai-status').textContent='Estado no disponible';$('#run-ai').disabled=!geminiKey}}
+function updateKeyState(){const ready=geminiKey.length>=20;$('#gemini-key-state').textContent=ready?'Gemini listo durante esta pestaña':'Sin clave temporal';$('#ai-status').textContent=ready?'Gemini temporal listo':($('#run-ai').dataset.serverReady?'IA conectada en el servidor':'Configurar IA');$('#ai-chip').textContent=ready?'Gemini listo':($('#run-ai').dataset.serverReady?'IA conectada en el servidor':'Configurar IA');$('#run-ai').disabled=!ready&&!$('#run-ai').dataset.serverReady}
+async function loadAIStatus(){try{const r=await fetch('/api/ai/status',{signal:AbortSignal.timeout(10000)});const d=await r.json();if(!r.ok)throw Error(d.error||'Estado no disponible');$('#run-ai').dataset.serverReady=d.configured?'1':'';if(!geminiKey){const text=d.configured?(d.provider==='groq'?'Groq · GPT-OSS conectado':d.provider==='gemini'?'Gemini conectado en el servidor':'OpenAI configurado'):'Configurar IA';$('#ai-status').textContent=text;$('#ai-chip').textContent=text;$('#ai-status').className='chip '+(d.configured?'':'neutral');$('#ai-chip').className='chip '+(d.configured?'':'neutral');$('#run-ai').disabled=!d.configured}else updateKeyState()}catch{$('#ai-status').textContent='Estado no disponible';$('#run-ai').disabled=!geminiKey}}
 $('#gemini-key').oninput=e=>{geminiKey=e.target.value.trim();updateKeyState()};
 $('#clear-gemini-key').onclick=()=>{geminiKey='';$('#gemini-key').value='';updateKeyState();toast('Clave temporal eliminada de la pestaña.')};
 $('#refresh-ai').onclick=loadAIStatus;
-$('#run-ai').onclick=async()=>{const c=company();if(!c)return toast('Agregá una empresa primero.');$('#ai-output').textContent='Investigando fuentes públicas y preparando el diagnóstico…';$('#run-ai').disabled=true;try{const headers={'Content-Type':'application/json'};if(geminiKey)headers['X-Pulso-Gemini-Key']=geminiKey;const r=await fetch('/api/ai/analyze',{method:'POST',headers,body:JSON.stringify({company:c,provider:geminiKey?'gemini':'openai'})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo ejecutar');$('#ai-output').textContent=d.analysis||'Sin resultado'}catch(e){$('#ai-output').textContent=e.message}finally{updateKeyState()}};
+$('#run-ai').onclick=()=>$('#ai-output [data-ar-run]')?.click();
 
 renderAll();renderBenchmarks(company());loadAIStatus();
 
@@ -175,5 +179,6 @@ const operations=initOperations({getStore:()=>store,getCompany:()=>company(),set
 renderDashboard=operations.dashboard;renderCompanies=operations.companies;
 refreshLab=initLab({getStore:()=>store,getCompany:()=>company(),persist,toast});
 renderAll();
+refreshAnalysis=initResearch({root:$('#ai-output'),getCompany:()=>company(),getCompanies:()=>store.companies,setCompany:id=>setActive(id),save:persist,toast}).render;
 initSync({onReload:()=>location.reload(),toast});
 setView('command');

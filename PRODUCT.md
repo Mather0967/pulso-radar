@@ -32,3 +32,13 @@ Límites por espacio: 1000 empresas, 100 laboratorios (500 registros cada uno), 
 ## Desarrollo
 
 `node scripts/build.mjs` y `node --test tests/*.test.mjs`. Servidor local: `node scripts/dev.mjs`. Para probar identidad local de forma explícita, `PULSO_LOCAL_AUTH=1`; este ajuste sólo existe en el adaptador de desarrollo y no en el Worker publicado. No exponer el servidor de desarrollo fuera de loopback. La publicación se realiza con el flujo de Sites y el ID existente en `.openai/hosting.json`.
+
+## Informe de empresa (octubre de 2026)
+
+El Asistente IA usa Groq GPT-OSS con `browser_search` para investigar la empresa, candidatos de redes sociales, dos casos multinacionales y riesgos con prevención y controles del piloto. Cada afirmación requiere referencias; los perfiles sin una fuente con la URL exacta se omiten y se marcan como faltantes. La identidad sigue pendiente cuando los metadatos no respaldan la coincidencia. El contenido generado requiere revisión humana.
+
+`POST /api/ai/research` crea un trabajo; `GET /api/ai/research/:id` consulta su estado. Se mantiene un trabajo activo por sesión de proyecto y se conservan los informes anteriores ante fallos. La consulta envía solamente los datos identificatorios y del proceso; las finanzas se calculan en código. Si la búsqueda responde en prosa se hace una segunda llamada sin búsqueda para convertir la evidencia a JSON, conservando la procedencia original. Ambas llamadas consumen cuota del proveedor.
+
+Los escenarios conservador, base y optimista tienen supuestos editables. Horas liberadas × costo de hora representa capacidad; sólo la proporción indicada como reducción real de gasto se contabiliza como ahorro efectivo. La contribución adicional aplica conversión y margen a oportunidades recuperadas. El cambio mensual descuenta el costo recurrente; la curva de doce meses descuenta la implementación. Los valores desconocidos quedan pendientes, y se conservan los resultados negativos. Hay exportación CSV y JSON.
+
+La validación automática cubre cálculos, valores desconocidos, límites, referencias, perfiles sin fuente, normalización de prosa, trabajos asincrónicos y aislamiento por proyecto. La disponibilidad de investigación web depende de la cuota de Groq; los tests usan respuestas simuladas y no demuestran disponibilidad del servicio.

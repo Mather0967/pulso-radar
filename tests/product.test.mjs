@@ -28,11 +28,11 @@ test('todos los flujos generan apps autónomas con formulario, persistencia y ca
  for(const type of Object.keys(LAB_TYPES)){
   const lab={id:'lab1',title:'Mi lab',type,rows:sampleRows(type),sample:true};assert.equal(validateLab(lab),lab);
   const html=labDocument(lab);assert.match(html,/form id="entry"/);assert.match(html,/localStorage/);assert.match(html,/postMessage/);assert.match(html,/connect-src 'none'/);assert.match(html,/Exportar datos JSON/);
-  const script=html.match(/<script>([\s\S]*)<\/script>/)[1];assert.doesNotThrow(()=>new Function(script));
+  const script=html.match(/<script(?: nonce="[^"]*")?>([\s\S]*)<\/script>/)[1];assert.doesNotThrow(()=>new Function(script));
  }
 });
 test('los laboratorios escapan datos y CSV, conservan valores y rechazan inventario inválido',()=>{
  const lab={id:'lab1',title:'</script><script>alert(1)</script>',type:'inventory',rows:[{id:'r1',title:'=SUM(A1)',quantity:2,amount:20}]};
- const html=labDocument(lab);assert.equal((html.match(/<script>/g)||[]).length,1);assert.doesNotThrow(()=>new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]));assert.match(labCSV(lab),/'=SUM/);
+ const html=labDocument(lab);assert.equal((html.match(/<script(?: nonce="[^"]*")?>/g)||[]).length,1);assert.doesNotThrow(()=>new Function(html.match(/<script(?: nonce="[^"]*")?>([\s\S]*)<\/script>/)[1]));assert.match(labCSV(lab),/'=SUM/);
  assert.throws(()=>validateLab({...lab,rows:[{id:'x',title:'Producto',quantity:-1}]}));assert.throws(()=>validateLab({...lab,rows:[...lab.rows,...lab.rows]}));
 });
