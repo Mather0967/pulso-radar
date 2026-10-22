@@ -8,7 +8,7 @@ export function wireEvidenceAssistant({root,tab,records,cases,getKey,configure,a
  const output=panel.querySelector('.assistant-output');
  const buttons=[...panel.querySelectorAll('[data-assist]')];
  buttons.forEach(button=>button.onclick=async()=>{
-  const key=getKey();if(!key||key.length<20){try{const status=await fetch('/api/ai/status',{signal:AbortSignal.timeout(10000)});const config=await status.json();if(!status.ok||!config.configured||!['gemini','groq'].includes(config.provider))throw Error();}catch{toast('Configurá Gemini en el servidor o usá una clave temporal.');configure();return;}}
+  const key=getKey();if(!key||key.length<20){try{const status=await fetch('/api/ai/status',{signal:AbortSignal.timeout(10000)});const config=await status.json();if(!status.ok||!config.configured||!['nvidia','gemini','groq'].includes(config.provider))throw Error();}catch{toast('Configurá NVIDIA, Groq o Gemini en el servidor.');configure();return;}}
   const mode=button.dataset.assist;
   let selected=tab==='cases'?cases.map(r=>({...r,kind:'case'})):records.map(r=>({...r,kind:'evidence'}));
   if(mode==='extract')selected=selected.filter(r=>r.id===panel.querySelector('[data-ai-original]').value);

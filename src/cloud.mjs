@@ -14,7 +14,7 @@ export function validateWorkspace(input){
  const raw=JSON.stringify({portfolio:p,evidence});
  if(raw.length>3000000)throw new Error('El espacio supera 3 MB. Exportá un respaldo y archivá registros antiguos.');
  if(/"(?:__proto__|prototype|constructor)"\s*:/.test(raw))throw new Error('El respaldo contiene claves no admitidas.');
- if(/"(?:geminiKey|apiKey|OPENAI_API_KEY|GEMINI_API_KEY|GROQ_API_KEY)"\s*:/i.test(raw))throw new Error('No se admiten claves de API en el respaldo.');
+ if(/"(?:geminiKey|apiKey|OPENAI_API_KEY|GEMINI_API_KEY|GROQ_API_KEY|NVIDIA_API_KEY|TAVILY_API_KEY)"\s*:/i.test(raw))throw new Error('No se admiten claves de API en el respaldo.');
  return JSON.parse(raw);
 }
 export async function workspaceAPI(request,env){

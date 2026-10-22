@@ -43,3 +43,19 @@ cPanel mantiene un clon público de `Mather0967/pulso-radar` en `~/repositories/
 Antes de publicar se compila y se ejecuta toda la suite con el Node 22 de Passenger. `scripts/cpanel-deploy.mjs` sustituye únicamente las rutas de código enumeradas en `managedPaths`, conserva un respaldo previo en `~/pulso-deploy/backups`, conserva datos, credenciales, landing y módulo de sitio, y solicita reinicio de Passenger mediante `tmp/restart.txt`. Un fallo de copia restaura el código anterior. `.cpanel.yml` permite ejecutar el mismo despliegue desde Git Version Control. Los bloqueos evitan ejecuciones simultáneas.
 
 Registro: `~/pulso-deploy/deploy.log`; commit publicado y respaldo: `~/pulso-deploy/status.json`. Para pausar la actualización, desactivar el cron. Para revertir una versión, hacer `git revert` del commit en GitHub y publicar a `main`; la automatización desplegará ese nuevo commit. Una rama de trabajo o PR sin integrar no modifica producción. Si el repositorio se vuelve privado habrá que configurar acceso de sólo lectura antes de reactivar el cron.
+
+## NVIDIA para el prototipo
+
+El proveedor preferido pasa a NVIDIA cuando existe `NVIDIA_API_KEY` en el entorno de Passenger. Modelo predeterminado: `deepseek-ai/deepseek-v4.1-flash`; `NVIDIA_MODEL` permite cambiarlo. Sin esa clave se conserva Groq. Las claves se configuran únicamente en el servidor y quedan fuera de Git, respaldos de cartera y respuestas de estado.
+
+La investigación NVIDIA utiliza una API de búsqueda independiente: `TAVILY_API_KEY`. Hace exactamente dos búsquedas `basic` (empresa/redes y casos/problemas del sector), sin respuestas generadas de Tavily, parámetros automáticos ni extracción adicional. Sólo envía consultas públicas; los supuestos financieros no viajan al modelo ni al buscador. El informe sólo admite fuentes devueltas por Tavily y conserva sus extractos originales. Las coincidencias, referencias y perfiles siguen sujetos a revisión humana. Si faltan fuentes o casos se declara el faltante. Una búsqueda fallida no inicia inferencia NVIDIA.
+
+La opción **Analizar datos aportados** funciona sin Tavily. Declara que no consultó internet y no admite hechos públicos, perfiles ni casos internacionales inventados. Las consultas de evidencia también usan NVIDIA, conservando validación de citas literales.
+
+Presupuesto máximo de salida del informe: 24.576 tokens; entrada de inferencia limitada a 60.000 caracteres para el prototipo. Ese presupuesto es una configuración de Pulso, no una garantía de cuota o disponibilidad de NVIDIA. El informe se ejecuta como trabajo asincrónico con timeout de inferencia de 150 segundos y ventana de consulta de cinco minutos. No hay reintentos, compras de cuota ni fallback automático a otro proveedor tras errores.
+
+Activación: configurar ambas claves, reiniciar Passenger, actualizar el estado de IA y generar un informe real. `GET /api/ai/status` anuncia `nvidiaReady`, `webResearchReady`, modelo y proveedor, nunca secretos. Las pruebas de integración simulan ambos proveedores; no reemplazan esa prueba real.
+
+Documentación de referencia:
+- https://docs.api.nvidia.com/nim/reference/nvidia-deepseek-v4_1-flash-infer
+- https://docs.tavily.com/documentation/api-reference/endpoint/search
