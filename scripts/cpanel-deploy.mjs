@@ -55,6 +55,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(previous?.revision===revision){console.log('No deployment needed: '+revision);process.exit(0)}
  execFileSync(process.execPath,['scripts/build.mjs'],{cwd:repository,stdio:'inherit',timeout:60000});
  const tests=fs.readdirSync(path.join(repository,'tests')).filter(x=>x.endsWith('.test.mjs')).map(x=>'tests/'+x);
- execFileSync(process.execPath,['--test',...tests],{cwd:repository,stdio:'inherit',timeout:120000});
+ execFileSync(process.execPath,['--disable-wasm-trap-handler','--test','--test-concurrency=1',...tests],{cwd:repository,stdio:'inherit',timeout:120000});
  installRelease({repository,target,state,revision});
 }
