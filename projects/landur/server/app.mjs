@@ -3,12 +3,20 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { DomainError } from './ledger.mjs';
+import { exportOperations } from './csv.mjs';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
-
+  ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
+  ['/sw.js', ['sw.js', 'text/javascript; charset=utf-8']],
+  ['/manifest.webmanifest', ['manifest.webmanifest', 'application/manifest+json']],
+  ['/icon.svg', ['icon.svg', 'image/svg+xml']],
+  ['/icon-192.png', ['icon-192.png', 'image/png']],
+  ['/icon-512.png', ['icon-512.png', 'image/png']],
+  ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
 ]);
 const digest = text => createHash('sha256').update(text).digest('hex');
 export function createApp({ ledger, demo = false, password, publicOrigin, insecureCookies = false }) {
@@ -39,7 +47,7 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     ledger.db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?)').run(digest(token),workspace,actor,Date.now()+lifetime*1000,mode);
     res.setHeader('Set-Cookie',`landur_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${lifetime}${insecureCookies ? '' : '; Secure'}`);
   }
-  async function body(req) {
+  async function body(req, limit = 16384) {
     if (!req.headers['content-type']?.startsWith('application/json') || req.headers['x-landur-request'] !== '1')
       throw new DomainError('Se requiere una solicitud JSON de la aplicación.', 415);
     const origin = req.headers.origin;
@@ -48,7 +56,7 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     let size = 0, chunks = [];
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > 16384) throw new DomainError('La solicitud supera el tamaño permitido.', 413);
+      if (size > limit) throw new DomainError('La solicitud supera el tamaño permitido.', 413);
       chunks.push(chunk);
     }
     let value;
@@ -110,8 +118,21 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
         const s = session(req);
         if (!s) throw new DomainError('La sesión venció. Volvé a ingresar.',401);
         if (req.method === 'GET' && url.pathname === '/api/state') return json(res,200,{...ledger.snapshot(s.workspace),demo,actor:s.actor});
+        if (req.method === 'GET' && url.pathname === '/api/export.csv') {
+          res.setHeader('Content-Type','text/csv; charset=utf-8');
+          res.setHeader('Content-Disposition','attachment; filename="landur-operaciones.csv"');
+          return res.end(exportOperations(ledger.snapshot(s.workspace)));
+        }
+        if (req.method === 'POST' && ['/api/import/preview','/api/import/commit'].includes(url.pathname)) {
+          const input = await body(req,131072);
+          const result = url.pathname.endsWith('preview')
+            ? ledger.previewImport(s.workspace,s.actor,input.csv)
+            : ledger.command(s.workspace,s.actor,req.headers['idempotency-key'],{kind:'import',csv:input.csv});
+          return json(res,200,result);
+        }
         if (req.method === 'POST' && url.pathname === '/api/commands') {
           const input = await body(req);
+          if (input.kind === 'import') throw new DomainError('Usá la importación con vista previa.');
           return json(res,200,ledger.command(s.workspace,s.actor,req.headers['idempotency-key'],input));
         }
         throw new DomainError('Ruta no disponible.',404);

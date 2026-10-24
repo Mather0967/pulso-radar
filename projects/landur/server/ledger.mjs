@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID, createHash } from 'node:crypto';
+import { parseImport } from './csv.mjs';
 
 export class DomainError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -101,8 +102,32 @@ export class Ledger {
       return result;
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
+  previewImport(workspace, actor, csv) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try { return this.execute(workspace, actor, {kind:'import', csv}); }
+    finally { this.db.exec('ROLLBACK'); }
+  }
   execute(workspace, actor, input) {
     const { kind } = input;
+    if (kind === 'import') {
+      const rows = parseImport(input.csv), results = [];
+      for (const [index, row] of rows.entries()) {
+        const key = 'csvrow-' + createHash('sha256').update(JSON.stringify([row.source,row.externalId])).digest('hex');
+        const fingerprint = createHash('sha256').update(JSON.stringify(stable(row))).digest('hex');
+        const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace,key);
+        if (previous) {
+          if (previous.fingerprint !== fingerprint) throw new DomainError(`Fila ${index+2}: la referencia existe con otros datos. Revisá la diferencia.`,409);
+          results.push({row:index+2,concept:row.concept,status:'existing',id:JSON.parse(previous.result).id});
+          continue;
+        }
+        let result;
+        try { result = this.execute(workspace, actor, row); }
+        catch (error) { if (error instanceof DomainError) throw new DomainError(`Fila ${index+2}: ${error.message}`,error.status); throw error; }
+        this.db.prepare('INSERT INTO requests VALUES (?,?,?,?)').run(workspace,key,fingerprint,JSON.stringify(result));
+        results.push({row:index+2,concept:row.concept,status:'new',id:result.id});
+      }
+      return {rows:results,created:results.filter(r=>r.status==='new').length,existing:results.filter(r=>r.status==='existing').length};
+    }
     const id = randomUUID();
     if (kind === 'account') {
       const accountKind = input.accountKind;

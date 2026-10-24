@@ -47,7 +47,7 @@ test('demo deshabilitada en instancia privada y datos nunca estáticos',async t=
   const {base,post}=await fixture(t);
   assert.equal((await post('/api/demo')).status,404);
   for(const path of ['/data/landur.sqlite','/.env','/server/ledger.mjs','/../package.json'])assert.equal((await fetch(base+path)).status,404);
-  const page=await fetch(base+'/');assert.equal(page.status,200);assert.match(await page.text(),/aún no está implementada/);
+  const page=await fetch(base+'/');assert.equal(page.status,200);assert.match(await page.text(),/Tu negocio, en claro/);
 });
 test('comandos HTTP persistentes e idempotentes',async t=>{
   const {base,post,login}=await fixture(t);const cookie=await login();const key=randomUUID();
@@ -66,4 +66,21 @@ test('visitantes demo tienen espacios separados',async t=>{
   assert.equal(first.demo,true);assert.notEqual(first.accounts[0].id,second.accounts[0].id);
   const response=await post('/api/commands',{kind:'expense',concept:'Prueba',amount:'10',currency:'UYU',date:'2026-10-24',accountId:first.accounts[0].id},b,{'idempotency-key':randomUUID()});
   assert.equal(response.status,404);
+});
+
+test('recursos PWA públicos sin datos y exportación protegida',async t=>{
+  const {base,login}=await fixture(t);
+  for(const path of ['/app.js','/styles.css','/manifest.webmanifest','/sw.js','/apple-touch-icon.png'])assert.equal((await fetch(base+path)).status,200);
+  const manifest=await(await fetch(base+'/manifest.webmanifest')).json();assert.equal(manifest.display,'standalone');
+  assert.equal((await fetch(base+'/api/export.csv')).status,401);
+  const cookie=await login();const response=await fetch(base+'/api/export.csv',{headers:{cookie}});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+});
+test('vista previa e importación HTTP conservan el aislamiento',async t=>{
+  const {base,post,login}=await fixture(t);const cookie=await login();
+  const csv='kind,date,concept,amount,currency,account_id,due,source,external_id,category\nsale,2026-10-24,Prueba,100,UYU,,,hoja,x-1,Ventas';
+  assert.equal((await post('/api/import/preview',{csv})).status,401);
+  assert.equal((await post('/api/import/preview',{csv},cookie)).status,200);
+  let state=await(await fetch(base+'/api/state',{headers:{cookie}})).json();assert.equal(state.operations.length,0);
+  assert.equal((await post('/api/import/commit',{csv},cookie,{'idempotency-key':randomUUID()})).status,200);
+  state=await(await fetch(base+'/api/state',{headers:{cookie}})).json();assert.equal(state.operations.length,1);
 });

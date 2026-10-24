@@ -6,3 +6,5 @@ backups/
 !.env.example
 *.sqlite*
 playwright-results/
+
+releases/

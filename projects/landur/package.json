@@ -1,6 +1,6 @@
 {
   "name": "landur-finanzas-pwa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,6 +11,12 @@
     "demo": "LANDUR_DEMO=1 node server/index.mjs",
     "test": "node --test tests/*.test.mjs",
     "backup": "node scripts/backup.mjs",
-    "check:host": "node scripts/check-host.mjs"
+    "check:host": "node scripts/check-host.mjs",
+    "test:browser": "node scripts/qa-browser.mjs",
+    "package": "python3 scripts/package-release.py"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "playwright-core": "^1.64.1"
   }
 }

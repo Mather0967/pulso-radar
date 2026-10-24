@@ -7,7 +7,7 @@ Las casillas indican evidencia real, no intención. Prioridades: P0 seguridad/in
 - [x] Ubicación aislada en `projects/landur/`, sin reemplazar Pulso.
 - [x] Brief y plan disponibles en `docs/landur/`.
 - [x] Instrucciones para agentes y registro de decisiones pendientes.
-- [x] Modelo inicial propuesto, aún no validado ni implementado.
+- [x] Modelo inicial documentado y parcialmente implementado; validación del cliente pendiente.
 
 ## Sprint 1 — Base funcional
 
@@ -61,3 +61,19 @@ Al marcar una tarea: agregar fecha, requisito/caso cubierto, referencia a archiv
 - `npm test` en `projects/landur/`: 29 pruebas locales aprobadas del núcleo, HTTP, configuración del hosting, preflight y script de respaldo. Casos sintéticos, no muestras del cliente. Verificar el resultado actualizado en cada cambio.
 - No se marcan días completos: faltan validación de reglas/datos, interfaz PWA, importación, pruebas reales en cPanel/iPhone y controles restantes del plan.
 - El disponible permanece pendiente (`null`). No se implementó reparto 25/30 %, OCR ni ninguna integración fuera de alcance.
+
+## PWA alfa 0.2.0 — avance del sprint 1
+
+- [x] Interfaz móvil/escritorio de las seis vistas prioritarias y configuración mínima, sin tocar Pulso.
+- [x] Formularios conectados a API: cuentas, gastos sin factura, obligaciones/pagos parciales, ventas/cobros con comisión explícita, transferencias y retiros.
+- [x] Manifiesto, iconos, instrucciones iPhone y service worker; solo caché de interfaz pública. Offline bloqueado.
+- [x] Reintento con la misma clave tras perder la respuesta de un guardado; controles de doble envío.
+- [x] CSV propuesto: vista previa sin persistencia, lote atómico, referencias estables, reimportación sin duplicación, conflictos explícitos; exportación con protección contra fórmulas.
+- [x] Guía de cPanel y empaquetado por lista permitida, sin datos ni secretos.
+- [x] 36 pruebas automatizadas locales aprobadas; QA Chromium escritorio/móvil con 18 verificaciones de flujo reportadas por `scripts/qa-browser.mjs`.
+- [ ] Muestras originales de Sheets y aceptación de la plantilla con Rafa/contador.
+- [ ] Preflight y pruebas reales en Namecheap/Passenger.
+- [ ] Safari/iPhone físico: instalación, teclado, cámara (cuando se habiliten adjuntos) y reanudación.
+- [ ] Pendientes del MVP: evidencia adjunta privada, reservas, revisión/corrección/reversión, autenticación definitiva y reglas sin validar.
+
+**No se declara terminado el sprint 1 ni el proyecto.** La interfaz es utilizable para pruebas, pero no sustituye la validación de negocio ni el pentesting. No hay integración bancaria activa, no se fija reinversión y el disponible sigue bloqueado.

@@ -19,7 +19,7 @@ Estado inicial: 24 de octubre de 2026. No se recibieron muestras originales ni p
 | D04 | Reinversión mayorista: 25 % vs. 30 % y excepciones | Rafa | Reparto automático | Fuera del piloto por defecto |
 | D05 | Vendedores, reparto 60/40, ahorro 15 % y excepciones minoristas | Rafa | Reparto automático | No inferir transferencias ejecutadas |
 | D06 | Muestras autorizadas, plantilla CSV y formato de exportación | Rafa + RIVECT; contador si corresponde | Importación real y aceptación de exportación | Una plantilla propuesta; no prometer soporte universal |
-| D07 | Compatibilidad de Namecheap: runtime, SQLite, disco, archivos privados y backups | RIVECT + responsable del proyecto | Despliegue | Usuario indicó Namecheap. Base de desarrollo Node >=22.13/SQLite, pendiente preflight en cPanel; no desplegar si falla |
+| D07 | Compatibilidad de Namecheap: runtime, SQLite, disco, archivos privados y backups | RIVECT + responsable del proyecto | Despliegue | Usuario indicó Namecheap. Base de desarrollo Node >=22.13/SQLite, usuario informa Node actualizado; pendiente preflight en cPanel; no desplegar si falla |
 | D08 | Usuarios, permisos, autenticación y recuperación | Rafa + RIVECT | Acceso real | No reutilizar identidades/sesiones de Pulso por defecto |
 | D09 | Equipo, disponibilidad y fecha de inicio | Responsable del proyecto | Calendario comprometido | Tres sprints relativos de cinco días hábiles |
 | D10 | Alcance, entorno y autorización de pentesting | Titular de infraestructura + RIVECT | Ejecución de pruebas de seguridad | Solo preparación, no pruebas externas |
@@ -30,5 +30,7 @@ Estado inicial: 24 de octubre de 2026. No se recibieron muestras originales ni p
 
 - **24/10/2026 — Usuario:** autoriza comenzar a codificar y aclara que el destino es Namecheap. Se prepara entrada cPanel/Passenger separada de Pulso y documentación del hosting. No amplía alcance financiero.
 - **24/10/2026 — Decisión técnica provisional de implementación:** Node >=22.13 con SQLite integrado, sin dependencias de ejecución. Validado localmente, no en el hosting. No implica aprobar autenticación definitiva ni uso de datos reales. Si el preflight del host falla, se registra el bloqueo antes de cambiar persistencia.
+
+- **24/10/2026 — Usuario:** confirma disponibilidad de Node actualizado y solicita continuar la PWA y entregar una lista de despliegue a cPanel. No autoriza cambios de fórmulas ni elimina las puertas de aceptación/pentesting.
 
 Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efecto sobre alcance/plazo/pruebas y documentos actualizados. Resolver una duda técnica no autoriza cambiar una regla financiera.

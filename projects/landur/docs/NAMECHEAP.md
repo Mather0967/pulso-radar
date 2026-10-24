@@ -4,7 +4,9 @@
 
 **Destino indicado por el usuario: Namecheap.** El repositorio documenta una aplicación Pulso con cPanel, Passenger y Node 22, pero eso no acredita todavía la versión exacta ni la configuración disponible para LANDUR.
 
-El código actual es un primer backend probado localmente. **La interfaz PWA, la recuperación de acceso, los usuarios individuales y la aceptación del piloto siguen pendientes. No está habilitado para operar con datos reales ni se ha desplegado en Namecheap.**
+La versión 0.2.0 incluye backend y PWA alfa probados localmente. **La recuperación de acceso, los usuarios definitivos, adjuntos, reversión y aceptación del piloto siguen pendientes. No está habilitada para operar con datos reales ni se ha desplegado en Namecheap.**
+
+Para ejecutar el despliegue, seguir [SUBIR-A-CPANEL.md](SUBIR-A-CPANEL.md). El usuario confirmó Node actualizado; falta el preflight en el entorno exacto de Passenger.
 
 No modificar `.cpanel.yml`, el cron ni el instalador de Pulso. No publicar esta carpeta como sustituto de Pulso.
 
@@ -55,7 +57,7 @@ Cuando corresponda probar staging:
 6. Ejecutar `npm run check:host` y `npm test` desde la raíz de LANDUR.
 7. Reiniciar esa app en cPanel. Probar el subdominio y las rutas API con datos sintéticos/instancia de prueba separada. No iniciar `npm start` como daemon paralelo a Passenger.
 
-No hay dependencias de ejecución que instalar en este corte. Si se agregan más adelante, mantenerlas dentro de `projects/landur/` y versionar el lockfile correspondiente.
+No hay dependencias de ejecución en este corte. Usar `npm ci --omit=dev` en cPanel con el lockfile versionado; las dependencias de desarrollo Playwright/Chromium no son necesarias en el hosting. No ejecutar QA de navegador en el plan de producción.
 
 ### Variables para el futuro modo privado
 
@@ -119,5 +121,6 @@ Antes del piloto:
 - [ ] Persistencia tras reinicio, cuotas, permisos y bloqueo de SQLite comprobados.
 - [ ] Respaldo privado, restauración y estrategia de retención validados.
 - [ ] Autenticación/recuperación/usuarios definitivos acordados.
-- [ ] Interfaz PWA implementada y probada en iPhone real.
+- [x] Interfaz PWA alfa implementada y probada en Chromium con viewport móvil.
+- [ ] Validación Safari e instalación en iPhone real.
 - [ ] Criterios funcionales y pentesting del roadmap superados.
