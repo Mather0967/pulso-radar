@@ -7,3 +7,7 @@ Ver [PRODUCT.md](PRODUCT.md) para funciones implementadas, persistencia, límite
 Construir: `node scripts/build.mjs`. Pruebas: `node --test tests/*.test.mjs`. Desarrollo: `node scripts/dev.mjs`. El servidor local escucha únicamente en loopback.
 
 Historial: [ROADMAP-V1.md](ROADMAP-V1.md). Este documento histórico describe la primera entrega; PRODUCT.md describe la versión actual.
+
+## Proyecto LANDUR
+
+La PWA financiera de LANDUR se prepara de forma aislada en [`projects/landur/`](projects/landur/README.md). Ver allí el contexto, el plan de tres semanas y las instrucciones para agentes. Esta preparación no modifica la aplicación ni el despliegue de Pulso.
