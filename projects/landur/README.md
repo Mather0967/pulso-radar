@@ -25,7 +25,24 @@ Integraciones automáticas, OCR, recetas, márgenes avanzados, push y escritura 
 
 ## Estado real
 
-**Preparación del proyecto / sprint 1, día 1.** Hay documentación, backlog y propuesta de modelo. Todavía no hay una app LANDUR implementada, stack aprobado, base de datos, autenticación, conectores, despliegue ni pentesting ejecutado. No hay fecha de inicio comprometida.
+**Sprint 1 en desarrollo.** Hay un primer backend Node/SQLite con cuentas, movimientos, gastos, obligaciones, pagos parciales, ventas/cobros, comisiones explícitas, transferencias, retiros, auditoría e idempotencia. Incluye sesiones de operador único para desarrollo y demo sintética aislada. Las reglas abiertas siguen pendientes: el disponible devuelve `null`, sin presentar una estimación como saldo confirmado.
+
+**Todavía no hay interfaz PWA operativa**, importador CSV, comprobantes, recuperación de acceso, usuarios individuales, conciliación avanzada, migraciones versionadas ni conectores. La página inicial solo informa el estado de desarrollo. No se ha desplegado ni probado en Namecheap ni se ha hecho pentesting. No está listo para datos reales.
+
+### Ejecutar y verificar
+
+Desde `projects/landur/`, con Node >=22.13 y `node:sqlite`:
+
+```bash
+npm test
+LANDUR_DEMO=1 npm run check:host
+# Solo para HTTP de desarrollo local; datos sintéticos:
+LANDUR_DEMO=1 LANDUR_INSECURE_LOCAL=1 npm start
+```
+
+El modo privado se niega a arrancar sin contraseña configurada. El servidor escucha en `0.0.0.0:3001` por defecto. No confundir el modo demo con control de acceso para datos reales.
+
+**Destino: Namecheap/cPanel/Passenger.** Leer [configuración y verificaciones del hosting](docs/NAMECHEAP.md). Entrada Passenger: `app.cjs`; código, datos y respaldo separados de Pulso. El runtime exacto del servidor todavía debe verificarse.
 
 Los comandos de desarrollo de la raíz pertenecen a Pulso, no a LANDUR. No ejecutarlos como si levantaran esta aplicación.
 

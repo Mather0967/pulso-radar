@@ -1,6 +1,6 @@
 # Modelo inicial propuesto — pendiente de validación
 
-Diseño del día 1, no esquema implementado. No fija stack ni resuelve las decisiones financieras abiertas. Todas las entidades se restringen al espacio autorizado de LANDUR.
+Diseño inicial del día 1. Existe una implementación parcial en `server/ledger.mjs`; no todas las entidades o transiciones de esta propuesta están implementadas. No fija stack ni resuelve las decisiones financieras abiertas. Todas las entidades se restringen al espacio autorizado de LANDUR.
 
 ## Entidades del piloto
 
@@ -49,4 +49,4 @@ Identificador interno; fuente e identificador externo cuando existan; fechas de 
 9. Saldo desactualizado o moneda distinta: mostrar limitación, no disponible global engañoso.
 10. Acceso indebido: rechazar consulta/modificación de datos y archivos privados.
 
-Cada caso requiere fixtures sintéticos identificados y luego contraste con muestras autorizadas. Estos casos todavía no son pruebas ejecutables ni validaciones completadas.
+Cada caso requiere fixtures sintéticos identificados y luego contraste con muestras autorizadas. Hay pruebas sintéticas ejecutables para parte de estos casos en `tests/ledger.test.mjs`; reversión, reservas y validación con muestras reales siguen pendientes. No interpretar esta lista como una aceptación completada.

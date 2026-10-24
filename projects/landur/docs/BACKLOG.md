@@ -1,6 +1,6 @@
 # Backlog de ejecución — LANDUR
 
-Las casillas indican evidencia real, no intención. Prioridades: P0 seguridad/integridad; P1 operación diaria; P2 mejoras prescindibles. No hay tareas de implementación completadas.
+Las casillas indican evidencia real, no intención. Prioridades: P0 seguridad/integridad; P1 operación diaria; P2 mejoras prescindibles. Hay un primer corte de backend probado; ninguna puerta de sprint se da por aprobada.
 
 ## Preparación realizada
 
@@ -52,3 +52,12 @@ Conectores automáticos, OCR/correo, recetas, recálculo de márgenes, repartos 
 ## Evidencia por tarea
 
 Al marcar una tarea: agregar fecha, requisito/caso cubierto, referencia a archivos/pruebas, resultado y limitaciones. No se acreditan pruebas reales de integración o iPhone mediante mocks o emulación.
+
+## Evidencia de avance — 24/10/2026
+
+- Implementados en `server/ledger.mjs`: cuentas y corte de saldo inicial, movimientos, obligaciones/pagos parciales, ventas/cobros con comisión real explícita, transferencias y retiros; transacciones SQLite, aislamiento por espacio, claves idempotentes, referencias externas y auditoría.
+- Implementados en `server/app.mjs`: API privada con sesión, logout/caducidad, control de origen, JSON acotado y límites de login; demo sintética separada por visitante. Autenticación definitiva y recuperación siguen pendientes.
+- Preparación Namecheap: `app.cjs`, validación de configuración, preflight y copia consistente; documentación en `docs/NAMECHEAP.md`. Sin publicación remota.
+- `npm test` en `projects/landur/`: 29 pruebas locales aprobadas del núcleo, HTTP, configuración del hosting, preflight y script de respaldo. Casos sintéticos, no muestras del cliente. Verificar el resultado actualizado en cada cambio.
+- No se marcan días completos: faltan validación de reglas/datos, interfaz PWA, importación, pruebas reales en cPanel/iPhone y controles restantes del plan.
+- El disponible permanece pendiente (`null`). No se implementó reparto 25/30 %, OCR ni ninguna integración fuera de alcance.
