@@ -6,6 +6,10 @@ Proyecto de RIVECT para Rafael «Rafa» Sánchez, separado de la aplicación Pul
 
 **LANDUR aparece junto a Pulso en «Mis proyectos» y usa el mismo login.** Ruta `/landur/`, permisos independientes `viewer`/`editor`, botón de retorno al portal y almacenamiento separado. Ver [PORTAL-RIVECT.md](docs/PORTAL-RIVECT.md) antes de desplegar. El ZIP y la guía de aplicación independiente anteriores no agregan el proyecto al portal.
 
+## Traspaso para instalación asistida
+
+Para compartir con ChatGPT u otro agente con acceso autorizado a cPanel: [INSTALACION-CPANEL-PARA-CHATGPT.md](docs/INSTALACION-CPANEL-PARA-CHATGPT.md). Es autónomo e indica cómo integrar LANDUR al portal existente, preservar Pulso y validar el despliegue sin usar el ZIP standalone.
+
 ## Empezar aquí
 
 1. Leer el [contexto autónomo y plan de tres semanas](../../docs/landur/LANDUR-BRIEF-Y-SPRINTS-3-SEMANAS-IA.md).
