@@ -48,3 +48,7 @@ El brief aporta los hechos del negocio; el plan de tres semanas limita la entreg
 Trabajar en este proyecto sin alterar Pulso ni su despliegue. No agregar dependencias a la raíz por conveniencia. Validar el stack antes de iniciar la implementación.
 
 Al terminar una tarea: identificar requisito, archivos cambiados, pruebas realmente ejecutadas, resultado y pendientes; actualizar el backlog con evidencia. Si no pudo probarse algo, declararlo expresamente.
+
+## Integración de acceso aprobada
+
+El usuario solicitó que LANDUR aparezca junto a Pulso después del login RIVECT. Ver `docs/PORTAL-RIVECT.md`: es el destino preferido sobre la guía histórica de aplicación separada. Reutilizar la identidad del portal con permisos explícitos por proyecto, no conceder LANDUR por tener Pulso. Mantener datos financieros separados, auditoría por ID de usuario y scope PWA limitado a `/landur/`. Modificar el selector/adaptador y despliegue controlado está autorizado para esta integración; no autoriza cambios en las reglas financieras ni una publicación automática sin la revisión correspondiente.

@@ -1,5 +1,7 @@
 # LANDUR en Namecheap / cPanel / Passenger
 
+> **Cambio de destino solicitado:** LANDUR se integra al portal RIVECT junto a Pulso, con el mismo login. Para ese caso seguir [PORTAL-RIVECT.md](PORTAL-RIVECT.md). Esta guía conserva el procedimiento alternativo de aplicación independiente; **no usar su ZIP para sobrescribir el portal**.
+
 ## Estado y supuestos
 
 **Destino indicado por el usuario: Namecheap.** El repositorio documenta una aplicación Pulso con cPanel, Passenger y Node 22, pero eso no acredita todavía la versión exacta ni la configuración disponible para LANDUR.

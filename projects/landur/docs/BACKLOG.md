@@ -77,3 +77,16 @@ Al marcar una tarea: agregar fecha, requisito/caso cubierto, referencia a archiv
 - [ ] Pendientes del MVP: evidencia adjunta privada, reservas, revisión/corrección/reversión, autenticación definitiva y reglas sin validar.
 
 **No se declara terminado el sprint 1 ni el proyecto.** La interfaz es utilizable para pruebas, pero no sustituye la validación de negocio ni el pentesting. No hay integración bancaria activa, no se fija reinversión y el disponible sigue bloqueado.
+
+## Integración de acceso solicitada por el usuario
+
+- [x] Catálogo `/portal`: tarjetas Pulso/LANDUR según permisos.
+- [x] Misma sesión RIVECT, CSRF y auditoría con usuario real; sin segunda contraseña.
+- [x] Permisos independientes y administración de grants sin borrar accesos anteriores.
+- [x] LANDUR en `/landur/`, manifiesto/service worker limitados al subdirectorio; retorno al portal.
+- [x] Actualización del despliegue controlado para incluir código LANDUR y conservar bases/identidad/landing.
+- [x] 58 pruebas de Pulso/portal y 36 de LANDUR aprobadas; 13 verificaciones de integración Chromium y 18 del modo independiente. Fixtures locales sintéticos, no hosting real.
+- [ ] Publicación en Namecheap y validación de los archivos reales del portal, no disponibles en el checkout.
+- [ ] Procedimiento de respaldo/restauración del conjunto identidad + SQLite en modo portal.
+
+La actualización del acceso fue autorizada expresamente; no se considera terminada la validación de seguridad del sprint 3 ni el piloto financiero.

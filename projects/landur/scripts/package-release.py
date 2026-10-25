@@ -13,7 +13,7 @@ files = [root / name for name in ['app.cjs', 'package.json', 'package-lock.json'
 for directory in ['server', 'public', 'tests']:
     files.extend(p for p in (root / directory).rglob('*') if p.is_file())
 files.extend(root / 'scripts' / name for name in ['backup.mjs', 'check-host.mjs'])
-files.extend(root / 'docs' / name for name in ['SUBIR-A-CPANEL.md', 'NAMECHEAP.md', 'API.md'])
+files.extend(root / 'docs' / name for name in ['SUBIR-A-CPANEL.md', 'NAMECHEAP.md', 'API.md', 'PORTAL-RIVECT.md'])
 for path in files:
     if path.is_symlink() or not path.exists():
         raise SystemExit(f'Unsafe or missing release input: {path}')
@@ -26,6 +26,8 @@ with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
 
 Empezar por [SUBIR-A-CPANEL.md](docs/SUBIR-A-CPANEL.md).
 
+Este ZIP es solo para la app independiente: no agrega LANDUR al portal RIVECT.
+Para login compartido seguir docs/PORTAL-RIVECT.md desde el repositorio completo.
 Este ZIP no contiene datos ni credenciales. Subir su contenido a una aplicación
 Node independiente, no a la raíz pública ni encima de Pulso.
 

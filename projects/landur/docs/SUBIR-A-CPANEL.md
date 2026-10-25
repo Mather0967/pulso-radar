@@ -1,5 +1,7 @@
 # LANDUR PWA — Cómo subirla a Namecheap / cPanel
 
+> **Cambio de destino solicitado:** LANDUR se integra al portal RIVECT junto a Pulso, con el mismo login. Para ese caso seguir [PORTAL-RIVECT.md](PORTAL-RIVECT.md). Esta guía conserva el procedimiento alternativo de aplicación independiente; **no usar su ZIP para sobrescribir el portal**.
+
 Versión 0.2.0 · 24 de octubre de 2026
 
 ## Antes de empezar: qué estás subiendo

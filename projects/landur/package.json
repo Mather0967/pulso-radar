@@ -13,7 +13,8 @@
     "backup": "node scripts/backup.mjs",
     "check:host": "node scripts/check-host.mjs",
     "test:browser": "node scripts/qa-browser.mjs",
-    "package": "python3 scripts/package-release.py"
+    "package": "python3 scripts/package-release.py",
+    "test:portal": "node scripts/qa-portal.mjs"
   },
   "devDependencies": {
     "@sparticuz/chromium": "^153.0.0",

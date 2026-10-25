@@ -2,6 +2,10 @@
 
 Proyecto de RIVECT para Rafael «Rafa» Sánchez, separado de la aplicación Pulso aunque comparte este repositorio.
 
+## Acceso elegido: portal RIVECT
+
+**LANDUR aparece junto a Pulso en «Mis proyectos» y usa el mismo login.** Ruta `/landur/`, permisos independientes `viewer`/`editor`, botón de retorno al portal y almacenamiento separado. Ver [PORTAL-RIVECT.md](docs/PORTAL-RIVECT.md) antes de desplegar. El ZIP y la guía de aplicación independiente anteriores no agregan el proyecto al portal.
+
 ## Empezar aquí
 
 1. Leer el [contexto autónomo y plan de tres semanas](../../docs/landur/LANDUR-BRIEF-Y-SPRINTS-3-SEMANAS-IA.md).
@@ -52,10 +56,10 @@ Los comandos de desarrollo de la raíz pertenecen a Pulso, no a LANDUR. No ejecu
 
 ## Aislamiento
 
-- El código futuro de LANDUR se ubicará en `projects/landur/`.
+- El código financiero de LANDUR se ubica en `projects/landur/`.
 - El contexto y los planes se conservan en `docs/landur/`, sin duplicarlos aquí.
-- No reutilizar datos, sesiones, secretos ni almacenamiento de Pulso sin una decisión explícita.
-- No modificar la aplicación, dependencias ni despliegue de Pulso para implementar LANDUR sin autorización.
+- Por decisión explícita del usuario se reutiliza la identidad del portal, no el almacenamiento financiero de Pulso. Los permisos se asignan por proyecto.
+- La integración autorizada modifica el selector/rutas del portal y el listado de código a desplegar; no modifica la lógica ni los datos de Pulso.
 - No versionar datos financieros reales, credenciales, extractos, comprobantes privados ni respaldos.
 
 La rama de esta sesión es `arena/eab1cd0e-pulso-radar`. No se creó un repositorio adicional.
@@ -72,3 +76,7 @@ La rama de esta sesión es `arena/eab1cd0e-pulso-radar`. No se creó un reposito
 - No se reemplaza prueba en dispositivo real ni pentesting por emulación móvil.
 
 Contrato técnico y plantilla: [API.md](docs/API.md).
+
+## Pruebas de integración con el portal
+
+Desde la raíz, `npm test` ejecuta la regresión de Pulso y el portal. Desde `projects/landur/`, `npm run test:portal` ejecuta la comprobación Chromium con un portal temporal sintético (puerto local 4180 libre). No sustituye el sitio ni la identidad real de Namecheap.

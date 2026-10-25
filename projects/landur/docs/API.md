@@ -1,6 +1,6 @@
 # LANDUR — Contrato inicial de API y CSV
 
-Base: mismo origen que la PWA. JSON, `Cache-Control: no-store`, autenticación mediante cookie propia. Nunca llamar a `localhost` desde el iPhone publicado.
+Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas siguientes (por ejemplo `/landur/api/state`); sesión `rivect_session` y encabezado `X-CSRF-Token` del portal. Las rutas de login/demo standalone no están habilitadas en modo portal. JSON, `Cache-Control: no-store`, autenticación mediante cookie propia. Nunca llamar a `localhost` desde el iPhone publicado.
 
 ## Rutas
 
