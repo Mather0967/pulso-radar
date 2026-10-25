@@ -59,3 +59,13 @@ Activación: configurar ambas claves, reiniciar Passenger, actualizar el estado 
 Documentación de referencia:
 - https://docs.api.nvidia.com/nim/reference/nvidia-deepseek-v4_1-flash-infer
 - https://docs.tavily.com/documentation/api-reference/endpoint/search
+
+## LANDUR en el selector de proyectos
+
+Por solicitud del usuario, `/portal` ahora sirve un catálogo con Pulso y LANDUR según permisos. LANDUR se monta en `/landur/`, usa la sesión RIVECT y guarda sus datos separados en `DATA_DIR/landur/landur.sqlite`. No requiere otra contraseña ni otra aplicación Passenger. Administradores gestionan permisos por proyecto desde el selector; tener Pulso no habilita LANDUR automáticamente.
+
+Se mantiene la landing, el módulo `site.mjs`, la administración y las páginas de acceso del hosting. El HTML previo de `portal.html` se conserva en disco, pero `/portal` pasa a usar la vista versionada de `server/projects.mjs`. No se afirma que los archivos del hosting hayan sido inspeccionados.
+
+El despliegue controlado incluye los módulos de catálogo/adaptador, los recursos del selector y las carpetas runtime de LANDUR; no copia su base ni una demo. Se ejecutan también las pruebas de LANDUR antes de publicar. El cron continúa siguiendo `main`, sin cambios ni activaciones desde esta rama.
+
+Ver [integración y publicación de LANDUR](../projects/landur/docs/PORTAL-RIVECT.md). La guía anterior de subdominio/Node independiente aplica solo a instalaciones aisladas, no a este acceso compartido.

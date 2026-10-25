@@ -7,6 +7,8 @@ import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
 import {projectMethodAllowed} from './access.mjs';
+import {projectAccess,availableProjects,mergeProjectGrants,renderProjectsPage} from './projects.mjs';
+import {createLandurPortal} from './landur.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dataDir=path.resolve(root,process.env.DATA_DIR||'data');
 const store=new AuthStore(dataDir),env={NVIDIA_API_KEY:process.env.NVIDIA_API_KEY||'',NVIDIA_MODEL:process.env.NVIDIA_MODEL||'deepseek-ai/deepseek-v4.1-flash',TAVILY_API_KEY:process.env.TAVILY_API_KEY||'',GROQ_API_KEY:process.env.GROQ_API_KEY||'',GROQ_MODEL:process.env.GROQ_MODEL||'openai/gpt-oss-120b',BUCKET:diskBucket(path.join(dataDir,'pulso')),GEMINI_API_KEY:process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||'',GEMINI_MODEL:process.env.GEMINI_MODEL||'gemini-3.8-flash'};
@@ -16,30 +18,43 @@ const origin=local?'http://localhost:4180':'https://rivect.net';
 const html=async name=>new Response(await readFile(path.join(root,'public',name)),{headers:{'Content-Type':'text/html; charset=utf-8'}});
 const json=(data,status=200)=>Response.json(data,{status});
 const redirect=to=>new Response(null,{status:303,headers:{Location:to}});
-function projectAccess(u){return u?.role==='admin'?'editor':u?.projects?.pulso||null}
+const landur=createLandurPortal({dataDir:path.join(dataDir,'landur')});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  if(!['GET','HEAD'].includes(method)&&req.headers.get('origin')!==origin)return json({error:'Origen no admitido.'},403);
- if(['/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
+ if(['/projects.css','/projects.mjs','/projects-brand.svg','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});
  if(p==='/'&&method==='GET')return html('index.html');
  if(['/login','/activate'].includes(p)&&method==='GET')return html('account.html');
  if(p==='/auth/login'&&method==='POST'){const b=await req.json(),r=await store.login(b.email,b.password,ip);if(r.error)return json({error:r.error},r.status);return new Response(JSON.stringify({user:r.user,csrf:r.csrf}),{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=${r.value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${local?'':'; Secure'}`}})}
  if(p==='/auth/activate'&&method==='POST'){const b=await req.json();try{const r=await store.redeem(b.token,b.name,b.password);return json(r,r.status||200)}catch(e){return json({error:e.message},400)}}
- if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
+ if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/')||p.startsWith('/landur/api/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
  if(!['GET','HEAD'].includes(method)&&req.headers.get('x-csrf-token')!==u.csrf)return json({error:'Sesión no válida. Volvé a iniciar sesión.'},403);
  if(p==='/auth/me'&&method==='GET')return json({user:publicUser(u),csrf:u.csrf});
- if(p==='/auth/logout'&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${local?'':'; Secure'}`}})}
- if(p==='/portal'&&method==='GET')return html('portal.html');
- if(p==='/index.html'&&method==='GET')return redirect('/pulso');
+ if((p==='/auth/logout'||p==='/landur/api/logout')&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${local?'':'; Secure'}`}})}
+ if(p==='/portal'&&method==='GET')return new Response(renderProjectsPage(u),{headers:{'Content-Type':'text/html; charset=utf-8'}});
+ if(p==='/api/projects'&&method==='GET')return json({projects:availableProjects(u)});
+ if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u);
+ if(p==='/index.html'&&method==='GET')return redirect('/portal');
  if(p==='/admin'&&method==='GET')return u.role==='admin'?html('admin.html'):json({error:'Sólo administradores.'},403);
  if(p.startsWith('/api/admin/')){
   if(u.role!=='admin')return json({error:'Sólo administradores.'},403);
   if(['/api/admin/settings','/api/admin/inquiries'].includes(p))return adminSiteAPI(req,{store:siteStore});
+  if(p==='/api/admin/project-access'&&method==='PUT'){
+   const b=await req.json();
+   return store.transact(db=>{
+    const target=db.users.find(x=>x.id===b.id);if(!target)return json({error:'Usuario no encontrado.'},404);
+    if(target.role==='admin')return json({error:'Los administradores tienen acceso a todos los proyectos. Cambiá su rol desde Administración si corresponde.'},400);
+    if(!Object.hasOwn(b,'projects'))return json({error:'Indicá los permisos del proyecto.'},400);
+    let projects;try{projects=mergeProjectGrants(target.projects,{projects:b.projects})}catch(e){return json({error:e.message},400)}
+    target.projects=projects;db.sessions=db.sessions.filter(s=>s.userId!==target.id);
+    return json({saved:true,projects});
+   });
+  }
   if(p==='/api/admin/users'&&method==='GET')return store.transact(db=>json({users:db.users.map(publicUser)}));
-  if(p==='/api/admin/invite'&&method==='POST'){const b=await req.json(),email=String(b.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)return json({error:'Correo no válido.'},400);const access=['viewer','editor'].includes(b.access)?b.access:null;const value=token();return store.transact(db=>{if(db.users.some(x=>x.email===email))return json({error:'El correo ya existe. Editá sus permisos en la lista.'},409);db.invites=db.invites.filter(i=>i.expires>Date.now()&&!i.used&&i.email!==email);db.invites.push({hash:digest(value),email,role:b.role==='admin'?'admin':'member',createdBy:u.id,projects:access?{pulso:access}:{},expires:Date.now()+172800000});return json({url:origin+'/activate#'+value,expires:'48 horas'})})}
-  if(p==='/api/admin/users'&&method==='PUT'){const b=await req.json();return store.transact(db=>{const target=db.users.find(x=>x.id===b.id);if(!target)return json({error:'Usuario no encontrado.'},404);if(b.role!==undefined&&!['admin','member'].includes(b.role))return json({error:'Rol no válido.'},400);const nextRole=b.role??target.role,nextActive=b.active===true;if(target.role==='admin'&&target.active&&(!nextActive||nextRole!=='admin')&&!db.users.some(x=>x.id!==target.id&&x.role==='admin'&&x.active))return json({error:'Debe quedar al menos un administrador activo.'},400);target.role=nextRole;target.active=nextActive;target.projects=['viewer','editor'].includes(b.access)?{pulso:b.access}:{};db.sessions=db.sessions.filter(s=>s.userId!==target.id);if(!target.active||target.role!=='admin')db.invites=db.invites.filter(i=>i.createdBy!==target.id||i.used);return json({saved:true,selfChanged:target.id===u.id})})}
+  if(p==='/api/admin/invite'&&method==='POST'){const b=await req.json(),email=String(b.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)return json({error:'Correo no válido.'},400);let projects;try{projects=mergeProjectGrants({},b)}catch(e){return json({error:e.message},400)}const value=token();return store.transact(db=>{if(db.users.some(x=>x.email===email))return json({error:'El correo ya existe. Editá sus permisos en la lista.'},409);db.invites=db.invites.filter(i=>i.expires>Date.now()&&!i.used&&i.email!==email);db.invites.push({hash:digest(value),email,role:b.role==='admin'?'admin':'member',createdBy:u.id,projects,expires:Date.now()+172800000});return json({url:origin+'/activate#'+value,expires:'48 horas'})})}
+  if(p==='/api/admin/users'&&method==='PUT'){const b=await req.json();return store.transact(db=>{const target=db.users.find(x=>x.id===b.id);if(!target)return json({error:'Usuario no encontrado.'},404);if(b.role!==undefined&&!['admin','member'].includes(b.role))return json({error:'Rol no válido.'},400);if(b.active!==undefined&&typeof b.active!=='boolean')return json({error:'Estado no válido.'},400);let projects;try{projects=mergeProjectGrants(target.projects,b)}catch(e){return json({error:e.message},400)}const nextRole=b.role??target.role,nextActive=b.active??target.active;if(target.role==='admin'&&target.active&&(!nextActive||nextRole!=='admin')&&!db.users.some(x=>x.id!==target.id&&x.role==='admin'&&x.active))return json({error:'Debe quedar al menos un administrador activo.'},400);target.role=nextRole;target.active=nextActive;target.projects=projects;db.sessions=db.sessions.filter(s=>s.userId!==target.id);if(!target.active||target.role!=='admin')db.invites=db.invites.filter(i=>i.createdBy!==target.id||i.used);return json({saved:true,selfChanged:target.id===u.id})})}
   return json({error:'Ruta no encontrada.'},404)
  }
  const access=projectAccess(u);if(!access)return json({error:'No tenés permiso para este proyecto.'},403);
@@ -63,5 +78,5 @@ export function createServer(){return http.createServer(async(req,res)=>{try{
  const r=await route(request,req.socket.remoteAddress);
  const secure={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};if(!local)secure['Strict-Transport-Security']='max-age=31536000';
  res.writeHead(r.status,{...secure,...Object.fromEntries(r.headers)});res.end(req.method==='HEAD'?undefined:Buffer.from(await r.arrayBuffer()));
- }catch(e){console.error('Request failed:',e.message);res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'No se pudo completar la operación.'}))}})}
+ }catch(e){console.error('Request failed:',e.message);res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'No se pudo completar la operación.'}))}}).on('close',()=>landur.close())}
 if(process.env.RIVECT_TEST!=='1')createServer().listen(process.env.PORT||4180,()=>console.log('RIVECT portal listo'));

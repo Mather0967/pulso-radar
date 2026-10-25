@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 // Only these code paths are managed. Portal content, data and environment stay on the host.
-export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js'];
+export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js','server/projects.mjs','server/landur.mjs','public/projects.css','public/projects.mjs','public/projects-brand.svg','projects/landur/server','projects/landur/public'];
 export function installRelease({repository,target,state,revision}){
  if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid deployment revision');
  for(const p of ['server/site.mjs','public/index.html','data'])if(!fs.existsSync(path.join(target,p)))throw Error('Existing portal required: '+p);
@@ -56,5 +56,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  execFileSync(process.execPath,['scripts/build.mjs'],{cwd:repository,stdio:'inherit',timeout:60000});
  const tests=fs.readdirSync(path.join(repository,'tests')).filter(x=>x.endsWith('.test.mjs')).map(x=>'tests/'+x);
  execFileSync(process.execPath,['--disable-wasm-trap-handler','--test','--test-concurrency=1',...tests],{cwd:repository,stdio:'inherit',timeout:120000});
+ const landurTests=fs.readdirSync(path.join(repository,'projects/landur/tests')).filter(x=>x.endsWith('.test.mjs')).map(x=>'tests/'+x);
+ execFileSync(process.execPath,['--test',...landurTests],{cwd:path.join(repository,'projects/landur'),stdio:'inherit',timeout:120000});
  installRelease({repository,target,state,revision});
 }
