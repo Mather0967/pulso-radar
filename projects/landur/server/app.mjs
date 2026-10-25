@@ -34,8 +34,18 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     ledger.db.prepare("DELETE FROM sessions WHERE mode='private'").run();
   }
   const mode = demo ? 'demo' : 'private';
+  // Embedded synthetic previews may run with third-party cookies blocked.
+  // Header credentials are accepted ONLY by the explicitly enabled demo instance.
+  function requestToken(req) {
+    const cookie = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('landur_session='))?.slice(15);
+    return demo && typeof req.headers['x-landur-demo-session'] === 'string'
+      ? req.headers['x-landur-demo-session'] : cookie;
+  }
+  const cookieAttributes = demo && !insecureCookies
+    ? 'HttpOnly; SameSite=None; Secure; Partitioned; Path=/'
+    : `HttpOnly; SameSite=Strict; Path=/${insecureCookies ? '' : '; Secure'}`;
   function session(req) {
-    const token = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('landur_session='))?.slice(15);
+    const token = requestToken(req);
     if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
     return ledger.db.prepare('SELECT * FROM sessions WHERE hash=? AND expires>? AND mode=?').get(digest(token), Date.now(), mode);
   }
@@ -45,7 +55,8 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     const token = randomBytes(32).toString('hex');
     const lifetime = demo ? 7 * 86400 : 8 * 3600;
     ledger.db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?)').run(digest(token),workspace,actor,Date.now()+lifetime*1000,mode);
-    res.setHeader('Set-Cookie',`landur_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${lifetime}${insecureCookies ? '' : '; Secure'}`);
+    res.setHeader('Set-Cookie',`landur_session=${token}; ${cookieAttributes}; Max-Age=${lifetime}`);
+    return token;
   }
   async function body(req, limit = 16384) {
     if (!req.headers['content-type']?.startsWith('application/json') || req.headers['x-landur-request'] !== '1')
@@ -84,19 +95,23 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
         if (url.pathname === '/api/logout') {
           const s = session(req);
           if (s) ledger.db.prepare('DELETE FROM sessions WHERE hash=?').run(s.hash);
-          res.setHeader('Set-Cookie',`landur_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${insecureCookies ? '' : '; Secure'}`);
+          res.setHeader('Set-Cookie', demo && !insecureCookies ? [
+            `landur_session=; ${cookieAttributes}; Max-Age=0`,
+            'landur_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0'
+          ] : `landur_session=; ${cookieAttributes}; Max-Age=0`);
           return json(res,200,{ok:true});
         }
         if (url.pathname === '/api/demo') {
           if (!demo) throw new DomainError('Modo demostración deshabilitado.',404);
           const existing = session(req);
+          let demoToken = existing ? requestToken(req) : null;
           if (!existing) {
             if (ledger.db.prepare('SELECT COUNT(*) n FROM workspaces').get().n >= 500) throw new DomainError('Límite de espacios de demostración alcanzado.',429);
             const workspace = randomUUID();
             ledger.seed(workspace);
-            setSession(res,workspace,'Visitante demo');
+            demoToken = setSession(res,workspace,'Visitante demo');
           }
-          return json(res,200,{ok:true});
+          return json(res,200,{ok:true,demoToken});
         }
         if (demo) throw new DomainError('Esta instancia solo admite datos sintéticos.',400);
         const address = req.socket.remoteAddress || 'unknown';

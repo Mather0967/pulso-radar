@@ -84,3 +84,29 @@ test('vista previa e importación HTTP conservan el aislamiento',async t=>{
   assert.equal((await post('/api/import/commit',{csv},cookie,{'idempotency-key':randomUUID()})).status,200);
   state=await(await fetch(base+'/api/state',{headers:{cookie}})).json();assert.equal(state.operations.length,1);
 });
+
+test('demo embebida funciona sin cookies; token aislado e invalidado al salir',async t=>{
+  const {base,post}=await fixture(t,{demo:true});
+  const a=await(await post('/api/demo')).json();const b=await(await post('/api/demo')).json();
+  assert.match(a.demoToken,/^[a-f0-9]{64}$/);assert.notEqual(a.demoToken,b.demoToken);
+  const headers={'X-Landur-Demo-Session':a.demoToken};
+  const first=await(await fetch(base+'/api/state',{headers})).json();
+  const second=await(await fetch(base+'/api/state',{headers:{'X-Landur-Demo-Session':b.demoToken}})).json();
+  assert.notEqual(first.accounts[0].id,second.accounts[0].id);
+  assert.equal((await fetch(base+'/api/export.csv',{headers})).status,200);
+  assert.equal((await post('/api/logout',{},'',headers)).status,200);
+  assert.equal((await fetch(base+'/api/state',{headers})).status,401);
+  assert.equal((await fetch(base+'/api/state',{headers:{'X-Landur-Demo-Session':b.demoToken}})).status,200);
+});
+test('modo privado ignora credenciales por encabezado de demo',async t=>{
+  const {base,login}=await fixture(t);const cookie=await login();
+  const actualPrivateToken=cookie.slice('landur_session='.length);
+  assert.equal((await fetch(base+'/api/state',{headers:{'X-Landur-Demo-Session':actualPrivateToken}})).status,401);
+  assert.equal((await fetch(base+'/api/state',{headers:{cookie}})).status,200);
+});
+test('solo la demo HTTPS usa cookie particionada para el visor embebido',async t=>{
+  const {post}=await fixture(t,{demo:true,insecureCookies:false,publicOrigin:'https://preview.example'});
+  const response=await post('/api/demo',{},'',{origin:'https://preview.example'});
+  const cookie=response.headers.get('set-cookie');
+  assert.match(cookie,/HttpOnly/);assert.match(cookie,/Secure/);assert.match(cookie,/SameSite=None/);assert.match(cookie,/Partitioned/);
+});

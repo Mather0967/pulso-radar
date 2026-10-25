@@ -20,24 +20,30 @@ const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${pat
 const labels = {expense:'Gasto pagado',obligation:'Obligación',payment:'Pago',sale:'Venta',collection:'Cobro',commission:'Comisión',transfer:'Transferencia',withdrawal:'Retiro personal',account:'Cuenta'};
 const viewLabels = {home:'Inicio',moves:'Movimientos',accounts:'Cuentas',expenses:'Egresos',sales:'Ventas',pending:'Pendientes',settings:'Configuración'};
 const viewIcons = {home:'home',moves:'moves',accounts:'accounts',expenses:'expense',sales:'sales',pending:'pending',settings:'settings'};
-let state = null, session = null, view = 'home', unit = '', query = '', filter = '', loadedAt = null, busy = false, pendingRequest = null, updateWorker = null, timer, authEpoch = 0;
+let state = null, session = null, view = 'home', unit = '', query = '', filter = '', loadedAt = null, busy = false, pendingRequest = null, updateWorker = null, timer, authEpoch = 0, demoToken = null;
 const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const fmt = (cents, currency = unit) => new Intl.NumberFormat('es-UY',{style:'currency',currency:currency || 'UYU',minimumFractionDigits:2}).format(cents/100);
 const dateFmt = date => date ? new Intl.DateTimeFormat('es-UY',{day:'2-digit',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z')) : 'Sin fecha';
 const decimal = cents => `${Math.trunc(cents/100)}.${String(cents%100).padStart(2,'0')}`;
 const pill = (text, cls='gray') => `<span class="pill ${cls}">${escape(text)}</span>`;
 function toast(message) { clearTimeout(timer); $('#toast').textContent=message;$('#toast').hidden=false;timer=setTimeout(()=>$('#toast').hidden=true,6000); }
+// Memory-only fallback for Arena's embedded, synthetic demo. Never stored in
+// localStorage/sessionStorage, URLs, Cache Storage or used for the private portal.
+const demoHeaders = () => !portalMode && session?.demo && demoToken
+  ? {'X-Landur-Demo-Session':demoToken} : {};
 async function api(path, input, key) {
   if (!navigator.onLine) throw new Error('Sin conexión. No se guardó ningún cambio.');
   let response;
   try { response = await fetch(endpoint(path), {method:input === undefined ? 'GET':'POST',cache:'no-store',credentials:'same-origin',
-    headers:input === undefined ? {} : {'Content-Type':'application/json','X-Landur-Request':'1',...(session?.csrf?{'X-CSRF-Token':session.csrf}:{}),...(key?{'Idempotency-Key':key}:{})},
+    headers:input === undefined ? demoHeaders() : {...demoHeaders(),'Content-Type':'application/json','X-Landur-Request':'1',...(session?.csrf?{'X-CSRF-Token':session.csrf}:{}),...(key?{'Idempotency-Key':key}:{})},
     ...(input === undefined ? {} : {body:JSON.stringify(input)}),signal:AbortSignal.timeout(20000)}); }
   catch { const error=new Error(input===undefined?'No pudimos conectar con el servidor.':'No se pudo confirmar la respuesta. Reintentá con este mismo formulario para no duplicar la operación.');error.uncertain=input!==undefined;throw error; }
   let data;
   try { data=await response.json(); }
   catch { const error=new Error(input===undefined?'El servidor devolvió una respuesta incompleta.':'La respuesta quedó incompleta. Reintentá este mismo registro para verificar el resultado sin duplicarlo.');error.uncertain=input!==undefined;throw error; }
-  if (!response.ok) { const error=new Error(data.error || 'No se pudo completar la operación.');error.status=response.status;error.uncertain=input!==undefined&&response.status>=500;if(response.status===401 && path!=='/api/login')lock('Tu sesión venció. Volvé a ingresar.');throw error; }
+  if (!response.ok) { const error=new Error(data.error || 'No se pudo completar la operación.');error.status=response.status;error.uncertain=input!==undefined&&response.status>=500;if(response.status===401 && path!=='/api/login'){demoToken=null;lock('Tu sesión venció. Volvé a ingresar.');}throw error; }
+  if(path==='/api/demo' && !portalMode && session?.demo && /^[a-f0-9]{64}$/.test(data.demoToken || ''))demoToken=data.demoToken;
+  if(path==='/api/logout')demoToken=null;
   return data;
 }
 async function refresh() {
@@ -200,7 +206,7 @@ function importDialog(){
 }
 async function logout(){
   if(busy)return;const demo=session?.demo;
-  try{await api('/api/logout',{});if(portalMode){location.assign('/login');return;}session={authenticated:false,demo};lock('Sesión cerrada.');}
+  try{await api('/api/logout',{});if(portalMode){location.assign('/login');return;}session={authenticated:false,demo};view='home';query='';filter='';unit='';lock('Sesión cerrada.');}
   catch{lock('No se pudo confirmar el cierre en el servidor. Reconectá y cerrá sesión antes de dejar este dispositivo.');}
 }
 function install(){openDialog('LANDUR en tu iPhone','Instalación desde Safari, con conexión HTTPS.',`<div class="dialog-body"><ol class="install-steps"><li>Abrí el enlace de LANDUR directamente en <strong>Safari</strong>, no dentro de otra aplicación.</li><li>Tocá <strong>Compartir</strong> y luego <strong>Agregar a pantalla de inicio</strong>.</li><li>Confirmá el nombre LANDUR y tocá <strong>Agregar</strong>.</li><li>Abrí el icono e ingresá a tu espacio.</li></ol><p class="form-note">Necesitás conexión para ver o registrar operaciones. Sin conexión se muestra una pantalla bloqueada: nunca se simula un guardado. La instalación debe verificarse en el iPhone real.</p></div>`);}
@@ -223,7 +229,7 @@ document.addEventListener('click',async e=>{
     case 'menu':openDialog('Tu espacio','Elegí una sección.',`<div class="dialog-body settings-stack">${['accounts','expenses','sales','settings'].map(k=>`<button class="secondary" data-view="${k}">${icon(viewIcons[k])} ${viewLabels[k]}</button>`).join('')}</div>`);break;
     case 'import':importDialog();break;
     case 'export':{
-      try{const r=await fetch(endpoint('/api/export.csv'),{cache:'no-store',credentials:'same-origin'});if(!r.ok){if(r.status===401)lock('La sesión venció.');throw new Error('No se pudo exportar.');}download(await r.text(),'landur-operaciones.csv','text/csv;charset=utf-8');toast('CSV de todas las monedas exportado. Guardalo en un lugar privado.');}catch(error){toast(error.message);}break;
+      try{const r=await fetch(endpoint('/api/export.csv'),{cache:'no-store',credentials:'same-origin',headers:demoHeaders()});if(!r.ok){if(r.status===401)lock('La sesión venció.');throw new Error('No se pudo exportar.');}download(await r.text(),'landur-operaciones.csv','text/csv;charset=utf-8');toast('CSV de todas las monedas exportado. Guardalo en un lugar privado.');}catch(error){toast(error.message);}break;
     }
     case 'update':if(busy||modal.open){toast('Terminá o cerrá el formulario antes de actualizar.');return;}updateWorker?.postMessage('ACTIVATE_UPDATE');break;
   }

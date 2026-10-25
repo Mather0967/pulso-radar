@@ -90,3 +90,12 @@ Al marcar una tarea: agregar fecha, requisito/caso cubierto, referencia a archiv
 - [ ] Procedimiento de respaldo/restauración del conjunto identidad + SQLite en modo portal.
 
 La actualización del acceso fue autorizada expresamente; no se considera terminada la validación de seguridad del sprint 3 ni el piloto financiero.
+
+## Corrección de vista previa Arena (puerto 3001)
+
+- [x] Demo embebida independiente de cookies de terceros: cookie HTTPS particionada y sesión alternativa solo en memoria para datos sintéticos.
+- [x] Modo privado conserva cookie HttpOnly/Secure/SameSite=Strict y rechaza la credencial de demo por encabezado. Portal RIVECT sin cambios.
+- [x] Regresión en iframe con todas las cookies eliminadas: entrada, registro, exportación, logout y reingreso.
+- [x] 39 pruebas de LANDUR aprobadas tras agregar aislamiento, revocación y rechazo de encabezados demo en modo privado.
+
+Sin ampliación funcional ni cambios de fórmulas. No se infiere que esto valide todos los navegadores de los usuarios ni el hosting real.

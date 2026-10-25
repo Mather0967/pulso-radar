@@ -80,3 +80,9 @@ Contrato técnico y plantilla: [API.md](docs/API.md).
 ## Pruebas de integración con el portal
 
 Desde la raíz, `npm test` ejecuta la regresión de Pulso y el portal. Desde `projects/landur/`, `npm run test:portal` ejecuta la comprobación Chromium con un portal temporal sintético (puerto local 4180 libre). No sustituye el sitio ni la identidad real de Namecheap.
+
+## Vista previa embebida de Arena
+
+La demo sintética admite cookies particionadas HTTPS y una alternativa de sesión en memoria cuando el visor bloquea cookies de terceros. Esta alternativa solo funciona con `LANDUR_DEMO=1`; no autentica usuarios del portal ni del modo privado. El identificador no se guarda en localStorage, sessionStorage, URLs ni caché. Si todas las cookies están bloqueadas, recargar la página puede abrir una demo nueva: no usar datos reales.
+
+Regresión específica: `npm run test:preview` prueba un iframe de otro sitio con todas las cookies suprimidas, incluyendo registros, exportación, logout y reingreso.
