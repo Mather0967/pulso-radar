@@ -35,4 +35,8 @@ Estado inicial: 24 de octubre de 2026. No se recibieron muestras originales ni p
 
 - **24/10/2026 — Usuario:** solicita que LANDUR aparezca como proyecto junto a Pulso al iniciar sesión. Se autoriza integrar el selector y el acceso del portal. Se implementa `/landur/` con la sesión existente, permisos independientes y base separada. Sustituye la preferencia anterior por otra aplicación/subdominio; no cambia cálculos, alcance financiero ni criterios de salida.
 
+- **26/10/2026 — Usuario:** solicita dictado por voz para registrar operaciones y pedir que continúen el backend y la seguridad. La voz entra como complemento del teclado en los campos de texto libre (concepto, categoría y nombre de cuenta); los importes y las fechas se siguen tipeando porque el reconocimiento de números no es fiable en un registro financiero. Requiere Permissions-Policy con microphone igual a self. El dictado solo llena un campo de texto: no transforma datos ni calcula importes, y la validación sigue siendo del lado del servidor. No cambia reglas financieras, alcance ni puertas de aceptación.
+- **26/10/2026 — Usuario:** pide endurecer backend y seguridad. Se corrigen cinco hallazgos de la auditoría estática sin tocar reglas de negocio: límite de acceso por cliente (antes global por la IP del socket), scrypt asíncrono, validación del header Host, purgado de espacios demo sin sesión viva y formato decimal de importes negativos. Cada corrección queda cubierta por pruebas nuevas. No modifica importes, cálculos, auditoría ni aislamiento por espacio.
+
+
 Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efecto sobre alcance/plazo/pruebas y documentos actualizados. Resolver una duda técnica no autoriza cambiar una regla financiera.

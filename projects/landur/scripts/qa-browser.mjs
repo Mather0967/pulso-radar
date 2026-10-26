@@ -21,19 +21,22 @@ const errors=[];
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(url);await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+  await page.goto(url);await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   await page.screenshot({path:'data/qa/desktop.png',fullPage:true});
   const read=()=>page.evaluate(async()=>await(await fetch('/api/state')).json());
   const initial=await read();assert.equal(initial.demo,true);
   // Paid expense with double submit. Both events reach the handler in one task.
   await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
+  // Dictación: el botón existe y arranca en reposo. No se simula voz en CI.
+  assert.equal(await page.getByRole('button',{name:'Dictar Concepto'}).count(),1);
+  assert.equal(await page.getByRole('button',{name:'Dictar Concepto'}).getAttribute('aria-pressed'),'false');
   await page.locator('[name=concept]').fill('Gasto QA sin comprobante');
   await page.locator('[name=amount]').fill('125,50');
   await page.locator('[name=accountId]').selectOption(initial.accounts[0].id);
   await page.locator('#operation-form').evaluate(f=>{f.requestSubmit();f.requestSubmit();});
   await page.locator('#modal').waitFor({state:'hidden'});
   assert.equal((await read()).operations.filter(o=>o.concept==='Gasto QA sin comprobante').length,1);
-  await page.reload();await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   assert.equal((await read()).operations.filter(o=>o.concept==='Gasto QA sin comprobante').length,1);
   // Saved on server, response lost: retry MUST reuse the same idempotency key.
   let lost=false;
@@ -90,13 +93,13 @@ try{
   await page.getByRole('button',{name:'Cerrar diálogo',exact:true}).click();
   // Cache contains shell only. Offline reload cannot disclose finances.
   await page.evaluate(async()=>await navigator.serviceWorker.ready);
-  await page.reload();await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   const cached=await page.evaluate(async()=>{const all=[];for(const name of await caches.keys())for(const request of await(await caches.open(name)).keys())all.push(new URL(request.url).pathname);return all;});
   assert.ok(cached.includes('/'));assert.ok(!cached.some(p=>p.startsWith('/api/')));
   assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
   await context.setOffline(true);await page.reload();await page.locator('#login-form').waitFor();
   assert.equal(await page.getByText('Santander',{exact:true}).count(),0);
-  await context.setOffline(false);await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+  await context.setOffline(false);await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByRole('button',{name:'Explorar demostración'}).waitFor();
   assert.equal(await page.evaluate(async()=>(await fetch('/api/state')).status),401);
   const privateLedger=new Ledger();
@@ -119,5 +122,5 @@ try{
     assert.equal(await privatePage.getByText('Cuenta sintética privada',{exact:true}).count(),0);
   }finally{await privateContext.close();await new Promise(resolve=>privateServer.close(resolve));privateLedger.close();}
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
+  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));ledger.close();}

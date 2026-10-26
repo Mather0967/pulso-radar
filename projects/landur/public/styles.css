@@ -4,3 +4,178 @@
 @media(max-width:760px){.sidebar{display:none}.shell{margin-left:0}.topbar{height:64px;padding:env(safe-area-inset-top) 19px 0}.mobile-logo{display:block;font-size:23px}.breadcrumb,.top-date{display:none}.top-actions{gap:10px}.demo-bar{padding:9px 18px;font-size:9px;line-height:1.6}.page{padding:25px 18px calc(95px + env(safe-area-inset-bottom))}.heading{align-items:flex-start;margin-bottom:23px;gap:12px}.heading h1{font-size:27px;letter-spacing:-1px}.heading p{font-size:11px;max-width:280px}.heading .eyebrow{font-size:9px}.heading>.primary{display:none}.summary-grid{gap:10px;margin-bottom:20px}.stat{padding:17px 14px;min-height:140px;border-radius:10px}.stat-value{font-size:25px;margin-top:20px}.stat-value.pending{font-size:20px}.stat-label{font-size:10px}.stat-note{font-size:9px}.main-grid{display:flex;flex-direction:column;gap:19px}.main-grid>*{width:100%}.card-head{padding:19px 18px 16px}.account-list{padding:0 18px 3px}.activity-card{margin-top:19px}.table .hide-mobile{display:none}.table td,.table th{padding:13px 14px}.table th{font-size:9px}.concept-button{font-size:11px;max-width:170px}.table td:last-child{font-size:11px}.table .op-icon{display:none}.mobile-nav{position:fixed;bottom:0;left:0;right:0;background:#fcfdf9f5;border-top:1px solid #e0e7d7;display:grid;grid-template-columns:repeat(5,1fr);padding:8px 5px calc(9px + env(safe-area-inset-bottom));z-index:25;backdrop-filter:blur(15px)}.mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;background:transparent;gap:5px;font-size:9px;min-height:45px;color:#8b977e}.mobile-nav button.active{color:#3c6332;font-weight:650}.mobile-nav svg{height:20px;width:20px}.mobile-nav .register svg{background:var(--ink);color:#dbeaa4;width:35px;height:35px;padding:8px;border-radius:10px}.mobile-nav .register{gap:2px;color:#415f35}.page-footer{font-size:8px;display:block;line-height:2}.page-footer .flex{margin-bottom:5px}.accounts-grid{grid-template-columns:1fr}.account-card{padding:20px}.toolbar .search{min-width:0;width:100%;flex:1}.toolbar .flex{flex-wrap:wrap}.toolbar{gap:10px}.login{grid-template-columns:1fr}.login-brand{padding:35px 28px}.login-brand h1{font-size:38px;letter-spacing:-1.5px;margin-top:25px}.login-brand p{font-size:12px;margin-top:15px}.login-brand footer{display:none}.login-main{padding:28px}.toast{bottom:95px;width:max-content;max-width:calc(100vw - 32px);font-size:12px}.form-grid{gap:13px}.dialog-body{padding:20px}.dialog-head{padding:20px}.dialog-footer{padding:16px 20px 20px}.field input,.field select{font-size:16px}.offline-bar,.update-bar{padding:10px 18px;font-size:11px}.notice-card{margin-top:14px}.audit-row{flex-direction:column;gap:5px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 .portal-back{display:flex;align-items:center;justify-content:space-between;padding:11px 40px;background:#11222c;color:#dbeaa4;font-size:11px;text-decoration:none;min-height:40px}.portal-access{color:#c7d1bc;border:1px solid #546051;border-radius:5px;padding:3px 8px}@media(max-width:760px){.portal-back{padding:10px 19px}}
+/* LANDUR · capa de diseño — parte final de este archivo.
+   Sujeto: control financiero privado de un comercio, consultado con frecuencia desde el iPhone.
+   Estructura: superficie oscura de encabezado sobre contenido claro; acento menta.
+   Una sola pieza valiente, la tarjeta de saldo. El resto, disciplinado.
+   Sin serif de alto contraste ni etiquetas en mayúsculas sobre cada título.
+   Contraste medido sobre el render; texto normal por encima de 4,5:1. */
+
+:root{
+  --carbon:#16211d; --carbon-soft:#223029;
+  --papel:#f5f7f6; --superficie:#ffffff; --hundido:#edf2f0;
+  --tinta:#1b2a25; --secundario:#56655f;
+  --linea:#e2e8e5; --linea-suave:#eef2f0;
+  --menta:#5fd9ae; --verde:#2b8a6b;
+  --positivo:#2b8a6b; --negativo:#bf4a3c; --ambar:#8a6412; --azul:#3a6a86;
+  --sobre-carbon:#b9ccc4;
+  --gradiente:linear-gradient(135deg,#6fe1b6 0%,#3bbb8f 52%,#2fa87f 100%);
+  --fuente:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
+  --radio:18px; --radio-peq:12px; --radio-chip:10px;
+  --sombra:0 1px 2px rgba(16,32,26,.05),0 10px 26px -14px rgba(16,32,26,.20);
+  --sombra-alta:0 2px 4px rgba(16,32,26,.06),0 22px 46px -20px rgba(16,32,26,.32);
+  font-family:var(--fuente); color:var(--tinta); background:var(--papel); font-synthesis:none;
+}
+body{background:var(--papel);-webkit-font-smoothing:antialiased}
+
+/* Titulares: el rótulo en mayúsculas se retiró; el título se sostiene solo */
+.heading .eyebrow{display:none}
+.heading h1{font-family:inherit;font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-.022em;color:var(--tinta);text-wrap:balance}
+.heading p{font-size:13px;line-height:1.65;color:var(--secundario);max-width:64ch;margin-top:10px}
+
+/* Barra lateral */
+.sidebar{background:var(--carbon)}
+.brand small{color:var(--sobre-carbon);font-size:11px}
+.workspace{border-color:#2e4038;border-radius:var(--radio-peq);background:var(--carbon-soft)}
+.workspace small{color:var(--sobre-carbon);font-size:11px}
+.nav-label{color:#93aaa1;font-size:11px}
+.nav-button{color:#cfe0d9;font-size:13px;border-radius:var(--radio-peq)}
+.nav-button.active{background:var(--menta);color:#0e2a20;font-weight:700}
+.nav-count{background:#2c3d35;color:var(--menta);font-size:11px;border-radius:999px}
+.sidebar-note{color:var(--sobre-carbon);font-size:12px;line-height:1.65}
+.rivect{color:#93aaa1;font-size:11px}
+
+/* Barra superior y avisos */
+.topbar{background:var(--superficie);border-bottom-color:var(--linea)}
+.breadcrumb{color:var(--secundario);font-size:12px}
+.breadcrumb strong{color:var(--tinta);font-weight:600}
+.top-date{color:var(--secundario);font-size:12px}
+.icon-btn{border-radius:var(--radio-peq);border-color:var(--linea);color:var(--tinta);background:var(--superficie)}
+.avatar{background:var(--hundido);border-color:var(--linea);color:var(--tinta);font-weight:700}
+.demo-bar{background:#e6f7ef;color:#1d5340;font-size:12px;border-bottom-color:#d3efe2}
+
+/* Botones */
+.primary,.secondary,.text-btn{font-size:12px;font-weight:600;border-radius:999px}
+.primary{background:var(--gradiente);color:#0b2a20;min-height:44px;border:none;box-shadow:0 6px 16px -8px rgba(47,168,127,.7)}
+.primary:hover{filter:brightness(1.04)}
+.secondary{border-color:var(--linea);color:var(--tinta);min-height:44px;background:var(--superficie);border-radius:var(--radio-peq)}
+.secondary:hover{background:var(--hundido)}
+.text-btn{color:var(--verde)}
+
+/* Cifras: la tarjeta de saldo es la pieza protagonista */
+.summary-grid{gap:14px}
+.stat{border-radius:var(--radio);border:1px solid var(--linea);background:var(--superficie);box-shadow:var(--sombra);padding:20px 18px}
+.stat.dark{background:var(--gradiente);border:none;color:#0b2a20;box-shadow:var(--sombra-alta)}
+.stat-label{font-size:12px;color:var(--secundario);font-weight:600}
+.dark .stat-label{color:#0f3f2d}
+.stat-value{font-size:32px;font-weight:700;letter-spacing:-.03em;margin:18px 0 10px;font-variant-numeric:tabular-nums}
+.dark .stat-value{color:#08241a}
+.stat-note{font-size:12px;line-height:1.5;color:var(--secundario)}
+.dark .stat-note{color:#0f4530}
+.stat-value.pending{font-size:22px;color:var(--secundario);font-weight:600}
+.stat-link{font-size:12px;color:#0f4530}
+
+/* Superficies */
+.card{border-radius:var(--radio);border:1px solid var(--linea);background:var(--superficie);box-shadow:var(--sombra)}
+.card h2{font-size:15px;font-weight:700;letter-spacing:-.012em;color:var(--tinta)}
+.card-head p{font-size:12px;color:var(--secundario);margin-top:5px}
+.card-foot{font-size:12px;color:var(--secundario);border-top-color:var(--linea-suave)}
+.account-row{border-top-color:var(--linea-suave)}
+.account-logo{border-radius:var(--radio-chip)}
+.account-name{font-size:13px;font-weight:600}
+.account-sub{font-size:12px;color:var(--secundario);margin-top:4px}
+.account-amount{font-size:14px;font-weight:700}
+.pill{font-size:11px;font-weight:600;border-radius:999px}
+.pill.green{background:#e2f6ec;color:var(--positivo)}
+.pill.amber{background:#f8efdc;color:var(--ambar)}
+.pill.gray{background:var(--hundido);color:#4b5a54}
+.pill.blue{background:#e7eff4;color:var(--azul)}
+
+/* Obligaciones y avisos */
+.obligation-row{border-top-color:var(--linea-suave);padding:16px 0}
+.date-tile{border-color:var(--linea);border-radius:var(--radio-chip);color:var(--verde);background:#eefaf4}
+.date-tile b{font-size:16px;font-weight:700}
+.date-tile small{font-size:11px}
+.obligation-body strong{font-size:13px;font-weight:600;color:var(--tinta)}
+.obligation-body p{font-size:12px;color:var(--secundario)}
+.obligation-right b{font-size:13px}
+.mini-button{font-size:12px;border:1px solid #cfeadd;border-radius:var(--radio-peq);color:var(--verde);min-height:32px;background:#f2fbf7}
+.notice-card{border:1px solid #d7eee3;background:#effaf4;color:#1d4c3a;border-radius:var(--radio);padding:18px}
+.notice-card h3{font-size:13px;font-weight:700}
+.notice-card p{font-size:12px;color:#2c5b49;line-height:1.7}
+
+/* Tabla */
+.table{font-size:13px}
+.table th{font-size:12px;color:var(--secundario);font-weight:600;text-transform:none;letter-spacing:0;background:var(--hundido);border-color:var(--linea)}
+.table td{border-bottom-color:var(--linea-suave)}
+.concept-button{font-size:13px;font-weight:600}
+.concept-sub{font-size:12px;color:var(--secundario);font-weight:400}
+.amount{font-size:13px;font-weight:700}
+.amount.positive{color:var(--positivo)}
+.amount.negative{color:var(--negativo)}
+.op-icon{background:var(--hundido);color:#556761;border-radius:var(--radio-chip)}
+.page-footer{font-size:12px;color:var(--secundario);line-height:1.6}
+
+/* Vistas y estados vacíos */
+.account-card{border-radius:var(--radio);border:1px solid var(--linea);box-shadow:var(--sombra)}
+.account-card h2{font-size:17px}
+.account-card dt{font-size:12px;color:var(--secundario)}
+.account-card dd{font-size:13px}
+.empty{font-size:13px;color:var(--secundario)}
+.empty h2{font-size:20px;font-weight:700;color:var(--tinta);margin-bottom:8px}
+.rule-item strong{font-size:13px;color:var(--tinta)}
+.rule-item p{font-size:12px;color:var(--secundario);line-height:1.7}
+.settings-stack .card p{font-size:13px;color:var(--secundario);line-height:1.7}
+.audit-row{font-size:12px}
+.import-row{font-size:12px}
+.install-steps{font-size:14px;color:#1d4c3a}
+
+/* Acceso: mismo lenguaje que la tarjeta de saldo */
+.login-brand{background:var(--carbon)}
+.login-brand h1{font-family:inherit;font-size:38px;font-weight:700;letter-spacing:-.03em;line-height:1.08}
+.login-brand p{font-size:14px;color:var(--sobre-carbon);line-height:1.7}
+.login-brand footer{color:#93aaa1;font-size:11px}
+.login-box h2{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.login-box p{font-size:13px;color:var(--secundario)}
+.login-box .footnote{font-size:12px;color:var(--secundario);line-height:1.6}
+.loading p{font-size:13px;color:var(--secundario)}
+
+/* Diálogos y formularios */
+dialog{border-radius:22px;border:none;box-shadow:var(--sombra-alta)}
+.dialog-head h2{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.dialog-head p{font-size:12px;color:var(--secundario)}
+.field{font-size:12px;font-weight:600}
+.field input,.field select,.field textarea{border:1px solid var(--linea);border-radius:var(--radio-peq);font-size:15px;color:var(--tinta);background:var(--superficie)}
+.field small{font-size:12px;color:var(--secundario)}
+.form-note{background:var(--hundido);color:#33544a;font-size:12px;border-radius:var(--radio-peq);line-height:1.65}
+.error{color:var(--negativo)}
+.check{font-size:13px}
+.details dt,.detail-note{font-size:12px;color:var(--secundario)}
+.details dd{font-size:13px}
+.toast{background:var(--carbon);color:#eaf4f0;border-radius:var(--radio-peq);font-size:13px}
+
+/* Foco visible en todos los controles, no solo en botones */
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #3bbb8f;outline-offset:2px}
+
+/* Dictación: el botón vive dentro del campo y no altera el orden del formulario */
+.field{position:relative}
+.field input[type=text]{padding-right:44px}
+.dictate{position:absolute;right:10px;bottom:8px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--linea);border-radius:var(--radio-chip);background:var(--superficie);color:var(--secundario);cursor:pointer;padding:0}
+.dictate:hover{color:var(--tinta);border-color:#c5d2cd}
+.dictate svg{width:16px;height:16px}
+.dictate.recording{color:var(--negativo);border-color:var(--negativo);background:#fdf1ef;animation:pulse 1.2s ease-in-out infinite}
+.dictate:focus-visible{outline:3px solid #3bbb8f;outline-offset:2px}
+@keyframes pulse{50%{opacity:.55}}
+
+/* Móvil: esta capa carga al final, así que hay que reiterar los tamaños.
+   16px en campos evita el zoom automático de Safari en iPhone. */
+@media(max-width:760px){
+  .heading h1{font-size:26px}
+  .heading p{font-size:12px;max-width:none}
+  .stat-value{font-size:27px}
+  .stat-value.pending{font-size:20px}
+  .login-brand h1{font-size:32px}
+  .page-footer{font-size:11px}
+  .field input,.field select,.field textarea,.search{font-size:16px}
+  .mobile-nav button{font-size:11px}
+}

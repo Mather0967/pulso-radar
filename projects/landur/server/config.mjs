@@ -38,5 +38,9 @@ export function configuration(env = process.env, root = applicationRoot) {
   const port = Number(env.PORT || 3001);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT debe ser un puerto válido.');
   return { production, demo, dataDir, publicOrigin: origin, password: env.LANDUR_PASSWORD,
-    insecureCookies: env.LANDUR_INSECURE_LOCAL === '1', host: env.HOST || '0.0.0.0', port };
+    insecureCookies: env.LANDUR_INSECURE_LOCAL === '1', host: env.HOST || '0.0.0.0', port,
+    // Detrás de Passenger/Apache habilita X-Forwarded-For para limitar por IP real.
+    trustProxy: env.LANDUR_TRUST_PROXY === '1',
+    // Orígenes extra aceptados cuando no hay LANDUR_PUBLIC_ORIGIN (desarrollo multipuerto).
+    allowedHosts: (env.LANDUR_ALLOWED_HOSTS || '').split(',').map(s => s.trim()).filter(Boolean) };
 }

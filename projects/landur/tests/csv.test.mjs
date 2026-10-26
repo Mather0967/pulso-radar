@@ -37,3 +37,10 @@ test('exportación conserva referencias, neutraliza fórmulas y no mezcla totale
   const result=exportOperations(ledger.snapshot('test'));
   assert.match(result,/'=HYPERLINK/);assert.match(result,/'@source/);assert.match(result,/"100.00"/);assert.match(result,/"USD"/);
 });
+test('la exportación formatea importes negativos sin romper el decimal',()=>{
+  const rows=exportOperations({operations:[{id:'o1',kind:'expense',date:'2026-10-24',concept:'Ajuste',currency:'UYU',amount:-12345,applied:-200,source:'manual',external_id:null,related_id:null,category:null,due:null}]});
+  // El guion inicial también dispara el guard anti-fórmulas, que antepone un apóstrofo.
+  assert.ok(rows.includes(`"'-123.45"`));
+  assert.ok(rows.includes(`"'-2.00"`));
+  assert.ok(!rows.includes('.-'));
+});

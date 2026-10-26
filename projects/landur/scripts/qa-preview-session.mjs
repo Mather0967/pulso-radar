@@ -31,7 +31,7 @@ try{
  const page=await context.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message);});
  await page.goto(`http://localhost:${parent.address().port}`);
  const frame=page.frameLocator('#preview');
- await frame.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor({timeout:10000});
+ await frame.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor({timeout:10000});
  assert.ok(demoToken);assert.equal((await context.cookies()).length,0);
  await frame.getByRole('button',{name:'Registrar operación',exact:true}).click();
  await frame.locator('[name=concept]').fill('Gasto sintético sin cookies');await frame.locator('[name=amount]').fill('15');
@@ -47,7 +47,7 @@ try{
  const oldToken=demoToken;
  await frame.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await frame.getByRole('button',{name:'Explorar demostración'}).waitFor();
  assert.equal((await fetch(child+'/api/state',{headers:{'X-Landur-Demo-Session':oldToken}})).status,401);
- await frame.locator('#login-form').evaluate(f=>f.requestSubmit());await frame.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor({timeout:10000});
+ await frame.locator('#login-form').evaluate(f=>f.requestSubmit());await frame.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor({timeout:10000});
  assert.notEqual(demoToken,oldToken);
  assert.deepEqual(errors,[]);
  console.log('OK: iframe cross-site SIN cookies: explorar, registrar, exportar, cerrar sesión y volver a explorar. Token solo en memoria; controles privados intactos.');

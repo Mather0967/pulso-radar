@@ -1,7 +1,10 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomBytes, randomUUID, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, createHash, scrypt, timingSafeEqual } from 'node:crypto';
+// scrypt síncrono detiene el event loop: un intento de acceso congela también las lecturas financieras de otros usuarios.
+const scryptKey = (password, salt, size = 64) => new Promise((resolve, reject) =>
+  scrypt(password, salt, size, (error, key) => error ? reject(error) : resolve(key)));
 import { DomainError } from './ledger.mjs';
 import { exportOperations } from './csv.mjs';
 
@@ -19,10 +22,11 @@ const assets = new Map([
   ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
 ]);
 const digest = text => createHash('sha256').update(text).digest('hex');
-export function createApp({ ledger, demo = false, password, publicOrigin, insecureCookies = false }) {
+export function createApp({ ledger, demo = false, password, publicOrigin, insecureCookies = false, trustProxy = false, allowedHosts = [] }) {
   if (!demo && (typeof password !== 'string' || password.length < 16)) throw new Error('El modo privado requiere LANDUR_PASSWORD de al menos 16 caracteres.');
   if (password && password.length > 256) throw new Error('La contraseña no debe superar 256 caracteres.');
-  const salt = randomBytes(32), passwordHash = password ? scryptSync(password, salt, 64) : null;
+  const salt = randomBytes(32), passwordHash = password ? scryptKey(password, salt) : null;
+  passwordHash?.catch(() => {});
   const attempts = new Map();
   ledger.db.exec(`CREATE TABLE IF NOT EXISTS sessions (
     hash TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, expires INTEGER NOT NULL, mode TEXT NOT NULL
@@ -61,6 +65,8 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
   async function body(req, limit = 16384) {
     if (!req.headers['content-type']?.startsWith('application/json') || req.headers['x-landur-request'] !== '1')
       throw new DomainError('Se requiere una solicitud JSON de la aplicación.', 415);
+    // Un Host inyectado no puede suplantar el origen esperado.
+    if (!hostAllowed(req.headers.host)) throw new DomainError('Origen no autorizado.', 403);
     const origin = req.headers.origin;
     const expected = publicOrigin || `${insecureCookies ? 'http' : 'https'}://${req.headers.host}`;
     if ((origin && origin !== expected) || req.headers['sec-fetch-site'] === 'cross-site') throw new DomainError('Origen no autorizado.', 403);
@@ -75,12 +81,46 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new DomainError('Se requiere un objeto JSON.');
     return value;
   }
+  const loopbackHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+  const normalizeHost = host => typeof host === 'string' && host ? host.replace(/:\d+$/, '').toLowerCase() : '';
+  const extraHosts = new Set([].concat(allowedHosts || []).filter(Boolean).map(normalizeHost));
+  const originHost = publicOrigin ? normalizeHost(new URL(publicOrigin).host) : null;
+  // Sin LANDUR_PUBLIC_ORIGIN solo se acepta loopback o una lista explícita.
+  const hostAllowed = host => { const name = normalizeHost(host); return !!name && (name === originHost || loopbackHosts.has(name) || extraHosts.has(name)); };
+  // Detrás de Passenger/Apache el socket siempre es el proxy: sin confianza explícita
+  // no se lee X-Forwarded-For, para que nadie evada el límite suplantando la IP.
+  const ATTEMPT_WINDOW = 15 * 60 * 1000, ATTEMPT_LIMIT = 8, ATTEMPT_KEYS = 5000, GLOBAL_WINDOW = 60 * 1000, GLOBAL_LIMIT = 60;
+  let globalFrom = 0, globalCount = 0;
+  function clientKey(req) {
+    if (trustProxy) {
+      const hops = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (hops.length) return hops[hops.length - 1];
+    }
+    return req.socket.remoteAddress || 'unknown';
+  }
+  function throttle(key) {
+    const now = Date.now();
+    for (const [ip, value] of attempts) if (now > value.until) attempts.delete(ip);
+    // Que la tabla se llene no puede convertirse en un bloqueo para todos: se descartan las más antiguas.
+    if (attempts.size >= ATTEMPT_KEYS)
+      for (const [ip] of [...attempts].sort((a, b) => a[1].until - b[1].until).slice(0, attempts.size - ATTEMPT_KEYS + 1)) attempts.delete(ip);
+    if (now - globalFrom >= GLOBAL_WINDOW) { globalFrom = now; globalCount = 0; }
+    if (++globalCount > GLOBAL_LIMIT) throw new DomainError('Demasiados intentos. Intentá más tarde.', 429);
+    const attempt = attempts.get(key) || { count: 0, until: now + ATTEMPT_WINDOW };
+    if (attempt.count >= ATTEMPT_LIMIT) throw new DomainError('Demasiados intentos. Esperá 15 minutos.', 429);
+    attempt.count++; attempts.set(key, attempt);
+  }
+  async function matchesPassword(candidate) {
+    try { return timingSafeEqual(await scryptKey(candidate, salt), await passwordHash); }
+    catch { return false; }
+  }
   const json = (res, status, payload) => { res.writeHead(status, { 'Content-Type':'application/json; charset=utf-8' }); res.end(JSON.stringify(payload)); };
   return createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','same-origin');
-    res.setHeader('Permissions-Policy','camera=(self), microphone=(), geolocation=()');
+    // El micrófono habilitado solo para este origen permite la dictación del formulario.
+    res.setHeader('Permissions-Policy','camera=(self), microphone=(self), geolocation=()');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'");
     if (!demo) { res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',res.getHeader('Content-Security-Policy')+"; frame-ancestors 'none'"); }
     if (publicOrigin?.startsWith('https://')) res.setHeader('Strict-Transport-Security','max-age=31536000');
@@ -106,24 +146,21 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
           const existing = session(req);
           let demoToken = existing ? requestToken(req) : null;
           if (!existing) {
-            if (ledger.db.prepare('SELECT COUNT(*) n FROM workspaces').get().n >= 500) throw new DomainError('Límite de espacios de demostración alcanzado.',429);
+            // Los espacios demo sin sesión activa ocupaban disco hasta el tope y
+          // después bloqueaban a todo visitante nuevo con 429.
+          ledger.purgeDemoWorkspaces();
+          if (ledger.db.prepare('SELECT COUNT(*) n FROM workspaces').get().n >= 500) throw new DomainError('Límite de espacios de demostración alcanzado.',429);
             const workspace = randomUUID();
             ledger.seed(workspace);
             demoToken = setSession(res,workspace,'Visitante demo');
           }
           return json(res,200,{ok:true,demoToken});
         }
-        if (demo) throw new DomainError('Esta instancia solo admite datos sintéticos.',400);
-        const address = req.socket.remoteAddress || 'unknown';
-        const now = Date.now();
-        for (const [ip, value] of attempts) if (now > value.until) attempts.delete(ip);
-        if (attempts.size > 1000) throw new DomainError('Demasiados intentos. Intentá más tarde.',429);
-        const attempt = attempts.get(address) || {count:0,until:now+15*60*1000};
-        if (attempt.count >= 8) throw new DomainError('Demasiados intentos. Esperá 15 minutos.',429);
-        attempt.count++; attempts.set(address,attempt);
-        if (typeof input.password !== 'string' || input.password.length > 256 || !timingSafeEqual(scryptSync(input.password,salt,64),passwordHash))
+        if (demo) throw new DomainError('Esta instancia solo admite datos sintéticos.',400);        const key = clientKey(req);
+        throttle(key);
+        if (typeof input.password !== 'string' || input.password.length > 256 || !(await matchesPassword(input.password)))
           throw new DomainError('No se pudo iniciar sesión.',401);
-        attempts.delete(address);
+        attempts.delete(key);
         const previous = session(req);
         if (previous) ledger.db.prepare('DELETE FROM sessions WHERE hash=?').run(previous.hash);
         setSession(res,'landur','Rafa');

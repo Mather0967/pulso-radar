@@ -22,7 +22,7 @@ try{
  await page.goto(fixture.base+'/portal');await page.getByRole('link',{name:'Abrir LANDUR'}).waitFor();
  assert.equal(await page.getByRole('link',{name:'Abrir Pulso'}).count(),1);
  await page.screenshot({path:'data/qa/portal-desktop.png',fullPage:true});
- await page.getByRole('link',{name:'Abrir LANDUR'}).click();await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+ await page.getByRole('link',{name:'Abrir LANDUR'}).click();await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
  assert.equal(await page.locator('[name=password]').count(),0);
  assert.equal(await page.getByRole('link',{name:'← Mis proyectos'}).count(),1);
  await page.getByRole('button',{name:'Agregar mi primera cuenta'}).click();
@@ -52,7 +52,7 @@ try{
  const {context:onlyPulso}=await login('pulso'),restricted=await onlyPulso.newPage();await restricted.goto(fixture.base+'/portal');
  assert.equal(await restricted.getByRole('link',{name:'Abrir LANDUR'}).count(),0);assert.equal(await restricted.getByRole('link',{name:'Abrir Pulso'}).count(),1);
  assert.equal((await onlyPulso.request.get(fixture.base+'/landur/api/state')).status(),403);
- await page.goto(fixture.base+'/landur/');await page.getByRole('heading',{name:'Tu negocio, en claro.'}).waitFor();
+ await page.goto(fixture.base+'/landur/');await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.waitForURL('**/login');
  assert.equal((await admin.request.get(fixture.base+'/auth/me')).status(),401);assert.equal((await admin.request.get(fixture.base+'/landur/api/state')).status(),401);
  assert.deepEqual(errors,[]);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
+import { connect } from 'node:net';
 import { Ledger } from '../server/ledger.mjs';
 import { createApp } from '../server/app.mjs';
 const password='synthetic-test-secret-only';
@@ -47,7 +48,7 @@ test('demo deshabilitada en instancia privada y datos nunca estáticos',async t=
   const {base,post}=await fixture(t);
   assert.equal((await post('/api/demo')).status,404);
   for(const path of ['/data/landur.sqlite','/.env','/server/ledger.mjs','/../package.json'])assert.equal((await fetch(base+path)).status,404);
-  const page=await fetch(base+'/');assert.equal(page.status,200);assert.match(await page.text(),/Tu negocio, en claro/);
+  const page=await fetch(base+'/');assert.equal(page.status,200);assert.match(await page.text(),/Control financiero/);
 });
 test('comandos HTTP persistentes e idempotentes',async t=>{
   const {base,post,login}=await fixture(t);const cookie=await login();const key=randomUUID();
@@ -109,4 +110,64 @@ test('solo la demo HTTPS usa cookie particionada para el visor embebido',async t
   const response=await post('/api/demo',{},'',{origin:'https://preview.example'});
   const cookie=response.headers.get('set-cookie');
   assert.match(cookie,/HttpOnly/);assert.match(cookie,/Secure/);assert.match(cookie,/SameSite=None/);assert.match(cookie,/Partitioned/);
+});
+// fetch no permite falsificar Host; para eso se habla HTTP a mano con el servidor.
+function rawRequest(base, hostHeader, body) {
+  const { hostname, port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const socket = connect(Number(port), hostname, () => socket.write([
+      'POST /api/login HTTP/1.1',
+      `Host: ${hostHeader}`,
+      'Content-Type: application/json',
+      'X-Landur-Request: 1',
+      `Content-Length: ${Buffer.byteLength(body)}`,
+      'Connection: close',
+      '',
+      body
+    ].join('\r\n')));
+    let data = '';
+    socket.on('data', chunk => data += chunk);
+    socket.on('end', () => resolve(data));
+    socket.on('error', reject);
+  });
+}
+
+test('límite de acceso por cliente: una tabla llena no bloquea a todos',async t=>{
+  const {post}=await fixture(t,{trustProxy:true});
+  for(let i=0;i<8;i++)assert.equal((await post('/api/login',{password:'wrong'},'',{'x-forwarded-for':'203.0.113.10'})).status,401);
+  assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'203.0.113.10'})).status,429);
+  assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'203.0.113.11'})).status,200);
+});
+
+test('sin confianza explícita, X-Forwarded-For no evita el límite',async t=>{
+  const {post}=await fixture(t);
+  for(let i=0;i<8;i++)assert.equal((await post('/api/login',{password:'wrong'},'',{'x-forwarded-for':`198.51.100.${i}`})).status,401);
+  assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'198.51.100.99'})).status,429);
+});
+
+test('escrituras con Host falsificado rechazadas',async t=>{
+  const {base}=await fixture(t,{publicOrigin:'https://landur.example.com'});
+  const payload=JSON.stringify({password});
+  const forged = await rawRequest(base,'evil.example.com',payload);
+  assert.ok(forged.startsWith('HTTP/1.1 403'), forged.slice(0, 40));
+  const honest = await rawRequest(base,'landur.example.com',payload);
+  assert.ok(honest.startsWith('HTTP/1.1 200'), honest.slice(0, 40));
+});
+
+test('la demo purga espacios sin sesión viva y conserva el espacio privado',async t=>{
+  const {ledger,post}=await fixture(t,{demo:true});
+  assert.equal((await post('/api/demo')).status,200);
+  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM workspaces WHERE demo=1').get().n,1);
+  ledger.db.exec('UPDATE sessions SET expires=0');
+  assert.equal((await post('/api/demo')).status,200);
+  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM workspaces WHERE demo=1').get().n,1);
+  ledger.workspace('landur');ledger.db.exec('UPDATE sessions SET expires=0');await post('/api/demo');
+  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM workspaces WHERE id=?').get('landur').n,1);
+});
+
+test('cabecera de permisos habilita el micrófono solo para este origen',async t=>{
+  const {base}=await fixture(t);
+  const policy=(await fetch(base+'/')).headers.get('permissions-policy');
+  assert.ok(policy.includes('microphone=(self)'), policy);
+  assert.ok(!policy.includes('microphone=()'), policy);
 });

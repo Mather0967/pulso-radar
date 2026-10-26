@@ -70,6 +70,26 @@ export class Ledger {
     `);
   }
   workspace(id, demo = false) { this.db.prepare('INSERT OR IGNORE INTO workspaces VALUES (?,?)').run(id, Number(demo)); }
+  // Libera los espacios demo cuyas sesiones vencieron. Nunca toca el espacio privado.
+  purgeDemoWorkspaces() {
+    // Solo cuenta una sesión vencida; las filas vencidas quedan en la tabla hasta el próximo alta.
+    const ids = this.db.prepare('SELECT id FROM workspaces WHERE demo=1 AND id NOT IN (SELECT workspace FROM sessions WHERE expires>?)').all(Date.now()).map(row => row.id);
+    if (!ids.length) return 0;
+    const list = ids.map(() => '?').join(',');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare(`DELETE FROM audit WHERE workspace IN (${list})`).run(...ids);
+      this.db.prepare(`DELETE FROM requests WHERE workspace IN (${list})`).run(...ids);
+      this.db.prepare(`DELETE FROM applications WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list})) OR target IN (SELECT id FROM operations WHERE workspace IN (${list}))`).run(...ids, ...ids);
+      this.db.prepare(`DELETE FROM obligations WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list}))`).run(...ids);
+      this.db.prepare(`DELETE FROM entries WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list})) OR account IN (SELECT id FROM accounts WHERE workspace IN (${list}))`).run(...ids, ...ids);
+      this.db.prepare(`DELETE FROM operations WHERE workspace IN (${list})`).run(...ids);
+      this.db.prepare(`DELETE FROM accounts WHERE workspace IN (${list})`).run(...ids);
+      const removed = this.db.prepare(`DELETE FROM workspaces WHERE id IN (${list})`).run(...ids).changes;
+      this.db.exec('COMMIT');
+      return removed;
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
   audit(workspace, actor, action, entity) {
     this.db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?)').run(randomUUID(), workspace, actor, action, entity, new Date().toISOString());
   }

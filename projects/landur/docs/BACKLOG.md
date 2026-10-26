@@ -99,3 +99,32 @@ La actualización del acceso fue autorizada expresamente; no se considera termin
 - [x] 39 pruebas de LANDUR aprobadas tras agregar aislamiento, revocación y rechazo de encabezados demo en modo privado.
 
 Sin ampliación funcional ni cambios de fórmulas. No se infiere que esto valide todos los navegadores de los usuarios ni el hosting real.
+
+## Pulido de interfaz — sistema tipográfico, contraste y copy operativo
+
+- [x] Capa de diseño integrada al final de `public/styles.css`: tokens de color, escala legible, serif del sistema para titulares y cifras con `tabular-nums`. Se integró en ese archivo porque `server/app.mjs` sirve los recursos desde un mapa fijo de assets; un archivo nuevo no se servía. Sin cambios de backend.
+- [x] Contraste medido sobre el render real en Chromium, no estimado: mínimo **5,32:1** en 17 pares de texto. `.stat-note` pasó de 9px y 3,3:1 a 12px y 6,0:1; `.concept-sub` de 9px y 2,9:1 a 12px y 6,0:1.
+- [x] Escala mínima: 12px para texto funcional (notas, botones, avisos, tabla); 11px solo en micro-etiquetas en mayúsculas.
+- [x] Copy operativo en las seis vistas, pantalla de acceso, estado vacío, aviso de instalación y barra lateral; se retiraron los eslóganes de landing.
+- [x] Título de la aplicación y color de fondo del manifiesto alineados al papel nuevo.
+- [x] Expectativas de prueba y selectores de QA actualizados en 9 puntos, al dejar de compartir acceso e inicio el mismo titular.
+- [x] Pruebas ejecutadas: 39. Resultado: **35 aprobadas y 4 fallas previas de entorno Windows** (enlaces simbólicos, preflight y respaldo con `PORT`), reproducidas idénticamente sobre `HEAD` limpio y sin relación con este cambio.
+- [x] QA de navegador con el Chrome del sistema: 18 verificaciones aprobadas (panel, doble envío, persistencia en servidor, reintento idempotente, pago parcial, vista previa/reimportación de CSV, marcado escapado, descarga, navegación móvil, alta de cuenta, sin desborde horizontal, caché solo de interfaz, bloqueo offline, logout y flujo privado). Capturas en `data/qa/`, ignoradas por Git.
+- [ ] Revisión visual humana y ajuste de escala si hace falta.
+- [ ] Validación en iPhone/Safari real y en modo instalado.
+
+No se tocó el backend ni las reglas financieras. No se declara terminado el sprint 2: faltan la revisión visual del usuario, la prueba en iPhone físico y el pentesting del sprint 3.
+## Endurecimiento del backend y dictado por voz
+
+- [x] Límite de acceso por cliente: se indexaba por la IP del socket, que detrás de Passenger o Apache es el proxy, así que ocho intentos fallidos bloqueaban a todos. La clave ahora es por cliente, lee X-Forwarded-For solo con confianza explícita (LANDUR_TRUST_PROXY=1) y la ventana global ya no convierte una tabla llena en bloqueo general.
+- [x] scrypt asíncrono: un intento de acceso ya no detiene el event loop ni las lecturas financieras de otros usuarios.
+- [x] Validación de Host: sin LANDUR_PUBLIC_ORIGIN solo se acepta loopback o LANDUR_ALLOWED_HOSTS. Un Host inyectado ya no supera el chequeo de origen.
+- [x] Purgado de espacios demo sin sesión viva, respetando el orden de claves foráneas y sin tocar el espacio privado.
+- [x] Formato decimal de importes negativos en la exportación CSV y en el cliente.
+- [x] Dictado por voz en concepto, categoría y nombre de cuenta; importes y fechas siguen a mano. Permissions-Policy habilita el micrófono solo para este origen y el diálogo lo detiene al cerrarse.
+- [x] Pruebas: 45 en total y 41 aprobadas. Se agregaron 6: límite por cliente, anti-suplantación de X-Forwarded-For, Host falsificado mediante socket crudo, purgado demo, cabecera de permisos y decimal negativo. Las 4 restantes son las fallas de entorno Windows ya conocidas.
+- [x] QA de navegador con el Chrome del sistema: 19 verificaciones en verde, incluida la dictación, que se verifica en reposo porque no se simula voz.
+- [ ] El dictado se validó en el camino de error (permiso denegado), no con voz real.
+- [ ] El límite por IP real requiere configurar LANDUR_TRUST_PROXY=1 en el servidor; sin esa variable sigue limitando por la IP del socket.
+
+Sin cambios de reglas financieras, importes, cálculos ni aislamiento por espacio. No se declara completado el pentesting del sprint 3.

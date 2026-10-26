@@ -48,6 +48,6 @@ export function csvCell(value) {
 }
 export function exportOperations(state) {
   const header=['id','tipo','fecha','concepto','moneda','importe','aplicado','origen','referencia_externa','operacion_relacionada','categoria','vencimiento'];
-  const decimal = n => `${Math.trunc(n / 100)}.${String(n % 100).padStart(2,'0')}`;
+  const decimal = n => { const sign = n < 0 ? '-' : '', abs = Math.abs(n); return `${sign}${Math.trunc(abs / 100)}.${String(abs % 100).padStart(2, '0')}`; };
   return '\uFEFF' + [header,...state.operations.map(o => [o.id,o.kind,o.date,o.concept,o.currency,decimal(o.amount),decimal(o.applied),o.source,o.external_id,o.related_id,o.category,o.due])].map(row=>row.map(csvCell).join(',')).join('\r\n');
 }
