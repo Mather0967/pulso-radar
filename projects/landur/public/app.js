@@ -74,7 +74,8 @@ function lock(message='') {
   });
 }
 const selectedOps = () => state.operations.filter(o=>!unit || o.currency===unit);
-const outstanding = kind => selectedOps().filter(o=>o.kind===kind && o.amount>o.applied);
+// Una operación revertida conserva su contra-asiento en el saldo, pero deja de ser un pendiente.
+const outstanding = kind => selectedOps().filter(o=>o.kind===kind && o.amount>o.applied && !o.reversed_by);
 function navButton(key){return `<button class="nav-button ${view===key?'active':''}" data-view="${key}" ${view===key?'aria-current="page"':''}>${icon(viewIcons[key])}<span>${viewLabels[key]}</span>${key==='pending'?`<span class="nav-count">${outstanding('obligation').length+outstanding('sale').length+2}</span>`:''}</button>`;}
 function render() {
   if(!state)return;
@@ -108,10 +109,15 @@ function home(){
 function accountRow(a){return `<div class="account-row"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div><div><div class="account-name">${escape(a.name)}</div><div class="account-sub">${a.verified?'Apertura verificada':'Apertura sin verificar'} · ${dateFmt(a.cutoff)}</div></div><div class="account-amount">${fmt(a.balance,a.currency)}<div class="account-sub">${a.accessible?'Fondos accesibles':'Acceso restringido'}</div></div></div>`;}
 function accounts(){return `<div class="toolbar"><p class="muted">Monedas separadas. Sin conversiones automáticas.</p><button class="secondary" data-form="account">${icon('plus')} Agregar cuenta</button></div><div class="accounts-grid">${state.accounts.filter(a=>!unit||a.currency===unit).map(a=>`<article class="card account-card"><div class="flex spread"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div>${pill(a.verified?'Apertura verificada':'Sin verificar',a.verified?'green':'amber')}</div><h2>${escape(a.name)}</h2><p class="muted eyebrow">${a.currency} · ${a.kind==='bank'?'Cuenta bancaria':a.kind==='cash'?'Efectivo':'Billetera digital'}</p><div class="stat-value">${fmt(a.balance,a.currency)}</div><dl><dt>Saldo inicial al inicio del ${dateFmt(a.cutoff)}</dt><dd>${fmt(a.opening,a.currency)}</dd><dt>Accesibilidad declarada</dt><dd>${a.accessible?'Fondos accesibles':'Fondos restringidos'}</dd><dt>Identificador para importación CSV</dt><dd><code>${escape(a.id)}</code></dd></dl><button class="text-btn" data-account="${a.id}">Ver movimientos ${icon('arrow')}</button></article>`).join('') || '<div class="card empty">Todavía no hay cuentas en esta moneda.</div>'}</div>`;}
 function filteredOps(){return selectedOps().filter(o=>(view!=='expenses'||['expense','obligation','payment','commission'].includes(o.kind))&&(view!=='sales'||['sale','collection'].includes(o.kind))&&(!filter||o.kind===filter)&&(!query||[o.concept,o.source,o.external_id].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())));}
-function opStatus(o){if(['sale','obligation'].includes(o.kind))return o.applied===o.amount?pill(o.kind==='sale'?'Cobrado':'Pagado','green'):pill(o.applied?'Parcial':'Pendiente','amber');return pill(o.kind==='transfer'?'Entre cuentas':'Registrado',o.kind==='transfer'?'blue':'gray');}
+function opStatus(o){
+  if(o.reversed_by)return pill('Revertido','gray');
+  if(o.kind==='reversal')return pill('Reversión','gray');
+  if(['sale','obligation'].includes(o.kind))return o.applied===o.amount?pill(o.kind==='sale'?'Cobrado':'Pagado','green'):pill(o.applied?'Parcial':'Pendiente','amber');
+  return pill(o.kind==='transfer'?'Entre cuentas':'Registrado',o.kind==='transfer'?'blue':'gray');
+}
 function table(ops,compact=false){
   if(!ops.length)return '<div class="empty">Todavía no hay operaciones para mostrar.<br>Registrá una operación o cambiá los filtros.</div>';
-  return `<div class="table-scroll"><table class="table"><thead><tr><th>Concepto / origen</th>${compact?'':'<th class="hide-mobile">Fecha</th>'}<th class="hide-mobile">Estado</th><th>Importe</th></tr></thead><tbody>${ops.map(o=>`<tr><td><div class="concept-cell"><div class="op-icon">${icon(o.kind==='collection'?'down':o.kind==='transfer'?'moves':o.kind==='sale'?'sales':'up')}</div><button class="concept-button" data-operation="${o.id}">${escape(o.concept)}<span class="concept-sub">${labels[o.kind]} · ${escape(o.source)}</span></button></div></td>${compact?'':`<td class="hide-mobile muted">${dateFmt(o.date)}</td>`}<td class="hide-mobile">${opStatus(o)}</td><td class="amount ${o.kind==='collection'?'positive':['expense','payment','withdrawal'].includes(o.kind)?'negative':''}">${fmt(o.amount,o.currency)}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-scroll"><table class="table"><thead><tr><th>Concepto / origen</th>${compact?'':'<th class="hide-mobile">Fecha</th>'}<th class="hide-mobile">Estado</th><th>Importe</th></tr></thead><tbody>${ops.map(o=>`<tr><td><div class="concept-cell"><div class="op-icon">${icon(o.kind==='collection'?'down':o.kind==='transfer'?'moves':o.kind==='sale'?'sales':'up')}</div><button class="concept-button" data-operation="${o.id}">${escape(o.concept)}<span class="concept-sub">${labels[o.kind]} · ${escape(o.source)}</span></button></div></td>${compact?'':`<td class="hide-mobile muted">${dateFmt(o.date)}</td>`}<td class="hide-mobile">${opStatus(o)}</td><td class="amount ${o.reversed_by?'reversed':o.kind==='collection'?'positive':['expense','payment','withdrawal'].includes(o.kind)?'negative':''}">${fmt(o.amount,o.currency)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function obligations(ops,receivable=false){return ops.length?`<div class="obligation-list">${ops.map(o=>`<div class="obligation-row"><div class="date-tile"><b>${(o.due||o.date).slice(-2)}</b><small>${new Intl.DateTimeFormat('es-UY',{month:'short',timeZone:'UTC'}).format(new Date((o.due||o.date)+'T12:00:00Z'))}</small></div><div class="obligation-body"><strong>${escape(o.concept)}</strong><p>${receivable?'Venta del ':o.due<today()?'Venció el ':'Vence el '}${dateFmt(o.due||o.date)}${o.applied?' · pago parcial':''}</p></div><div class="obligation-right"><b>${fmt(o.amount-o.applied,o.currency)}</b><button class="mini-button" data-pay="${o.id}" data-type="${receivable?'collection':'payment'}">${receivable?'Registrar cobro':'Registrar pago'}</button></div></div>`).join('')}</div>`:'<div class="empty">Sin pendientes en esta moneda.</div>';}
 function pending(){return `<div class="main-grid"><div class="settings-stack"><section class="card"><div class="card-head"><h2>Obligaciones por pagar</h2>${pill(outstanding('obligation').length,'amber')}</div>${obligations(outstanding('obligation').sort((a,b)=>a.due.localeCompare(b.due)))}</section><section class="card"><div class="card-head"><h2>Ventas por cobrar</h2>${pill(outstanding('sale').length,'blue')}</div>${obligations(outstanding('sale'),true)}</section></div><section class="card"><div class="card-head"><h2>Decisiones pendientes</h2>${icon('info')}</div><div class="rule-list"><div class="rule-item"><strong>Disponible y reservas</strong><p>Validar qué compromisos reducen el disponible y cómo evitar descuentos duplicados. El cálculo permanece bloqueado.</p></div><div class="rule-item"><strong>Reinversión mayorista: 25 % o 30 %</strong><p>Los ejemplos difieren. No hay un porcentaje automático hasta confirmar las reglas con Rafa.</p></div><div class="rule-item"><strong>Calidad de la información</strong><p>${state.accounts.filter(a=>!a.verified).length} cuentas con apertura sin verificar. Los saldos actuales se reconstruyen a partir de los registros; no son una consulta bancaria en vivo.</p></div></div></section></div>`;}
@@ -294,7 +300,35 @@ function detail(id){
   const entries=state.entries.filter(e=>e.operation===id);
   const related=state.operations.filter(x=>x.related_id===id || x.id===o.related_id);
   const pair=(label,value)=>`<div><dt>${label}</dt><dd>${escape(value)}</dd></div>`;
-  openDialog(labels[o.kind],o.concept,`<div class="dialog-body"><dl class="details">${pair('Importe',fmt(o.amount,o.currency))}${pair('Fecha',o.date)}${pair('Origen',o.source)}${pair('Referencia externa',o.external_id||'Sin referencia externa')}${pair('Categoría',o.category||'Sin categoría')}${pair('Vencimiento',o.due||'No aplica')}${['sale','obligation'].includes(o.kind)?pair('Pendiente',fmt(o.amount-o.applied,o.currency)):''}<div class="wide"><dt>Identificador</dt><dd>${escape(o.id)}</dd></div></dl><p class="detail-note">Movimientos de cuenta</p>${entries.map(e=>`<div class="account-row"><span>${escape(state.accounts.find(a=>a.id===e.account)?.name)}</span><strong class="account-amount">${fmt(e.amount,o.currency)}</strong></div>`).join('')||'<p class="detail-note">Este registro no mueve dinero por sí mismo.</p>'}${related.length?`<p class="detail-note">Operaciones vinculadas</p>${related.map(r=>`<div class="account-row"><button class="concept-button" data-operation="${r.id}">${escape(r.concept)}<span class="concept-sub">${labels[r.kind]}</span></button><span class="account-amount">${fmt(r.amount,r.currency)}</span></div>`).join('')}`:''}<p class="detail-note">Los registros se conservan con trazabilidad. La corrección/reversión auditada todavía no está habilitada en esta alfa.</p></div>`,state.access!=='viewer'&&['sale','obligation'].includes(o.kind)&&o.amount>o.applied?`<div class="dialog-footer"><button class="primary" data-pay="${o.id}" data-type="${o.kind==='sale'?'collection':'payment'}">Registrar ${o.kind==='sale'?'cobro':'pago'}</button></div>`:'');
+  const actions=[];
+  if(state.access!=='viewer'&&!o.reversed_by&&['sale','obligation'].includes(o.kind)&&o.amount>o.applied)
+    actions.push(`<button class="primary" data-pay="${o.id}" data-type="${o.kind==='sale'?'collection':'payment'}">Registrar ${o.kind==='sale'?'cobro':'pago'}</button>`);
+  if(state.access!=='viewer'&&!o.reversed_by&&o.kind!=='reversal')
+    actions.push(`<button class="secondary" data-revert="${o.id}">Revertir…</button>`);
+  openDialog(labels[o.kind],o.concept,`<div class="dialog-body"><dl class="details">${pair('Importe',fmt(o.amount,o.currency))}${pair('Fecha',o.date)}${pair('Origen',o.source)}${pair('Referencia externa',o.external_id||'Sin referencia externa')}${pair('Categoría',o.category||'Sin categoría')}${pair('Vencimiento',o.due||'No aplica')}${['sale','obligation'].includes(o.kind)?pair('Pendiente',fmt(o.amount-o.applied,o.currency)):''}<div class="wide"><dt>Identificador</dt><dd>${escape(o.id)}</dd></div></dl><p class="detail-note">Movimientos de cuenta</p>${entries.map(e=>`<div class="account-row"><span>${escape(state.accounts.find(a=>a.id===e.account)?.name)}</span><strong class="account-amount">${fmt(e.amount,o.currency)}</strong></div>`).join('')||'<p class="detail-note">Este registro no mueve dinero por sí mismo.</p>'}${related.length?`<p class="detail-note">Operaciones vinculadas</p>${related.map(r=>`<div class="account-row"><button class="concept-button" data-operation="${r.id}">${escape(r.concept)}<span class="concept-sub">${labels[r.kind]}</span></button><span class="account-amount">${fmt(r.amount,r.currency)}</span></div>`).join('')}`:''}<p class="detail-note">Los registros se conservan con trazabilidad. La corrección/reversión auditada todavía no está habilitada en esta alfa.</p></div>`,actions.length?`<div class="dialog-footer">${actions.join('')}</div>`:'');
+}
+// Reversión desde la interfaz: dice en voz alta qué va a pasar y no borra nada.
+// La clave idempotente se genera una sola vez, para que reintentar no cree otra.
+function revertDialog(id){
+  const o=state.operations.find(x=>x.id===id);if(!o)return;
+  let key=null;
+  openDialog('Revertir operación','Se registra el contra-asiento; no se borra nada.',`<div class="dialog-body"><p class="form-note">Se va a registrar una <strong>reversión</strong> vinculada a «${escape(o.concept)}» por ${fmt(o.amount,o.currency)}, con fecha de hoy. La operación original no se edita ni se elimina: queda marcada como revertida y sigue siendo consultable.</p><p class="detail-note">Si algo se apoya en esta operación —un cobro, un pago, una comisión— primero hay que revertir eso. El servidor lo rechaza si no está resuelto.</p><p class="error" id="revert-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="revert-confirm">Registrar reversión</button></div>`);
+  const button=$('#revert-confirm');
+  button.onclick=async()=>{
+    if(busy)return;busy=true;button.disabled=true;$('#revert-error').textContent='';
+    key=key||crypto.randomUUID();
+    try{
+      await api('/api/commands',{kind:'reversal',operationId:o.id,date:today()},key);
+      modal.close();modal.innerHTML='';
+      try{await refresh();toast('Reversión registrada. La operación original queda en el historial.');}
+      catch{lock('La reversión se guardó, pero no se pudo actualizar la vista. Reconectá antes de registrar otra operación.');}
+    }catch(error){
+      if($('#revert-error'))$('#revert-error').textContent=error.message;
+      if(!error.uncertain)key=null;
+      button.disabled=false;
+      button.textContent=key&&error.uncertain?'Reintentar la misma reversión':'Registrar reversión';
+    }finally{busy=false;}
+  };
 }
 function download(contents,filename,type){const url=URL.createObjectURL(new Blob([contents],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function importDialog(){
@@ -333,6 +367,7 @@ document.addEventListener('click',async e=>{
   if(b.dataset.view){view=b.dataset.view;query='';filter='';modal.close();render();window.scrollTo(0,0);return;}
   if(b.dataset.form){form(b.dataset.form);return;}
   if(b.dataset.pay){form(b.dataset.type,b.dataset.pay);return;}
+  if(b.dataset.revert){revertDialog(b.dataset.revert);return;}
   if(b.dataset.operation){detail(b.dataset.operation);return;}
   if(b.dataset.account){const a=state.accounts.find(a=>a.id===b.dataset.account);const ids=new Set(state.entries.filter(e=>e.account===a.id).map(e=>e.operation));openDialog(a.name,`Saldo registrado: ${fmt(a.balance,a.currency)}`,`<div class="dialog-body">${table(state.operations.filter(o=>ids.has(o.id)))}</div>`);return;}
   switch(b.dataset.action){

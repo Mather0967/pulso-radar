@@ -32,6 +32,20 @@ function stable(value) {
   return value;
 }
 
+// Esquema versionado con `PRAGMA user_version`. Cada paso se aplica una sola vez y
+// dentro de una transacción: si falla, la base queda como estaba. La versión 1 es el
+// esquema original del constructor (creado con IF NOT EXISTS), así que el mismo punto
+// de partida sirve para una base nueva y para una que ya existía sin marca de versión.
+const MIGRATIONS = [
+  () => {},
+  db => {
+    const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(entry => entry.name === column);
+    // `ADD COLUMN IF NOT EXISTS` no existe en SQLite: la comprobación es explícita.
+    if (!has('operations', 'reversed_by')) db.exec('ALTER TABLE operations ADD COLUMN reversed_by TEXT');
+    if (!has('operations', 'reversed_at')) db.exec('ALTER TABLE operations ADD COLUMN reversed_at TEXT');
+    if (!has('applications', 'reversed')) db.exec('ALTER TABLE applications ADD COLUMN reversed INTEGER NOT NULL DEFAULT 0');
+  }
+];
 export class Ledger {
   constructor(filename = ':memory:') {
     this.db = new DatabaseSync(filename);
@@ -68,6 +82,19 @@ export class Ledger {
         result TEXT NOT NULL, PRIMARY KEY(workspace, key)
       );
     `);
+    this.migrate();
+  }
+  migrate() {
+    let current = this.db.prepare('PRAGMA user_version').get().user_version;
+    while (current < MIGRATIONS.length) {
+      this.db.exec('BEGIN IMMEDIATE');
+      try {
+        MIGRATIONS[current](this.db);
+        this.db.exec(`PRAGMA user_version = ${current + 1}`);
+        this.db.exec('COMMIT');
+      } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+      current++;
+    }
   }
   workspace(id, demo = false) { this.db.prepare('INSERT OR IGNORE INTO workspaces VALUES (?,?)').run(id, Number(demo)); }
   // Libera los espacios demo cuyas sesiones vencieron. Nunca toca el espacio privado.
@@ -103,7 +130,40 @@ export class Ledger {
     if (!op) throw new DomainError('No se encontró la operación asociada.', 404);
     return op;
   }
-  applied(id) { return this.db.prepare('SELECT COALESCE(SUM(amount),0) n FROM applications WHERE target=?').get(id).n; }
+  applied(id) { return this.db.prepare('SELECT COALESCE(SUM(amount),0) n FROM applications WHERE target=? AND reversed=0').get(id).n; }
+  // Reversión auditada: no borra ni edita la operación original. Registra un
+  // contra-asiento vinculado por `related_id`, marca el original y deja constancia en
+  // la auditoría. Respeta las dependencias: si algo se apoya en la operación, primero
+  // hay que revertir eso, para que ningún saldo quede huérfano ni duplicado.
+  reverse(workspace, actor, input) {
+    const day = date(input.date);
+    const original = this.db.prepare('SELECT * FROM operations WHERE workspace=? AND id=?').get(workspace, String(input.operationId ?? ''));
+    if (!original) throw new DomainError('No se encontró la operación a revertir.', 404);
+    if (original.kind === 'reversal') throw new DomainError('Una reversión no se revierte: registrá una operación nueva con el dato correcto.');
+    if (original.reversed_by) throw new DomainError('Esa operación ya fue revertida.', 409);
+    if ((original.kind === 'sale' || original.kind === 'obligation') && this.applied(original.id) > 0)
+      throw new DomainError('Primero revertí los cobros o pagos aplicados a esta operación.', 409);
+    const dependents = this.db.prepare("SELECT id FROM operations WHERE workspace=? AND related_id=? AND reversed_by IS NULL AND kind NOT IN ('reversal','commission')").all(workspace, original.id);
+    if (dependents.length) throw new DomainError('Primero revertí las operaciones asociadas a esta.', 409);
+    // La comisión nació de este mismo cobro y no tiene sentido por separado: se revierte junto.
+    const commissions = this.db.prepare("SELECT * FROM operations WHERE workspace=? AND related_id=? AND reversed_by IS NULL AND kind='commission'").all(workspace, original.id);
+    const id = this.insertReversal(workspace, original, day);
+    for (const commission of commissions) this.insertReversal(workspace, commission, day);
+    this.audit(workspace, actor, 'reversal.created', id);
+    return { id, reversed: original.id, commissions: commissions.length };
+  }
+  insertReversal(workspace, original, day) {
+    const id = randomUUID();
+    this.db.prepare('INSERT INTO operations (id,workspace,kind,concept,date,currency,amount,source,external_id,related_id,category,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+      id, workspace, 'reversal', `Reversión: ${original.concept}`.slice(0, 180), day, original.currency,
+      original.amount, original.source, null, original.id, original.category, new Date().toISOString());
+    for (const entry of this.db.prepare('SELECT account, amount FROM entries WHERE operation=?').all(original.id))
+      this.db.prepare('INSERT INTO entries (id,operation,account,amount) VALUES (?,?,?,?)').run(randomUUID(), id, entry.account, -entry.amount);
+    // Una aplicación revertida deja de reducir el pendiente de su destino.
+    this.db.prepare('UPDATE applications SET reversed=1 WHERE operation=?').run(original.id);
+    this.db.prepare('UPDATE operations SET reversed_by=?, reversed_at=? WHERE id=?').run(id, new Date().toISOString(), original.id);
+    return id;
+  }
   command(workspace, actor, key, input) {
     if (typeof key !== 'string' || !/^[\w-]{16,100}$/.test(key)) throw new DomainError('Falta una clave de operación válida.');
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new DomainError('La operación no es válida.');
@@ -149,6 +209,7 @@ export class Ledger {
       return {rows:results,created:results.filter(r=>r.status==='new').length,existing:results.filter(r=>r.status==='existing').length};
     }
     const id = randomUUID();
+    if (kind === 'reversal') return this.reverse(workspace, actor, input);
     if (kind === 'account') {
       const accountKind = input.accountKind;
       if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
@@ -200,13 +261,13 @@ export class Ledger {
       }
     }
     const due = kind === 'obligation' ? date(input.due) : null;
-    this.db.prepare('INSERT INTO operations VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(id, workspace, kind, concept, day, unit, amount, source, external, target?.id ?? null, category, new Date().toISOString());
+    this.db.prepare('INSERT INTO operations (id,workspace,kind,concept,date,currency,amount,source,external_id,related_id,category,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(id, workspace, kind, concept, day, unit, amount, source, external, target?.id ?? null, category, new Date().toISOString());
     for (const [account, value] of entries) this.db.prepare('INSERT INTO entries VALUES (?,?,?,?)').run(randomUUID(), id, account, value);
     if (due) this.db.prepare('INSERT INTO obligations VALUES (?,?,?)').run(randomUUID(), id, due);
-    if (target) this.db.prepare('INSERT INTO applications VALUES (?,?,?,?)').run(randomUUID(), id, target.id, amount);
+    if (target) this.db.prepare('INSERT INTO applications (id,operation,target,amount) VALUES (?,?,?,?)').run(randomUUID(), id, target.id, amount);
     if (commission) {
       const commissionId = randomUUID();
-      this.db.prepare('INSERT INTO operations VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(commissionId, workspace, 'commission', `Comisión: ${concept}`, day, unit, commission, source, null, id, 'Comisiones', new Date().toISOString());
+      this.db.prepare('INSERT INTO operations (id,workspace,kind,concept,date,currency,amount,source,external_id,related_id,category,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(commissionId, workspace, 'commission', `Comisión: ${concept}`, day, unit, commission, source, null, id, 'Comisiones', new Date().toISOString());
     }
     this.audit(workspace, actor, `${kind}.created`, id);
     return { id };
@@ -215,20 +276,23 @@ export class Ledger {
     const accounts = this.db.prepare(`SELECT a.*, a.opening + COALESCE(SUM(e.amount),0) balance FROM accounts a
       LEFT JOIN entries e ON e.account=a.id WHERE a.workspace=? GROUP BY a.id ORDER BY a.rowid`).all(workspace);
     const operations = this.db.prepare(`SELECT o.*, b.due,
-      (SELECT COALESCE(SUM(p.amount),0) FROM applications p WHERE p.target=o.id) applied
+      (SELECT COALESCE(SUM(p.amount),0) FROM applications p WHERE p.target=o.id AND p.reversed=0) applied
       FROM operations o LEFT JOIN obligations b ON b.operation=o.id
       WHERE o.workspace=? ORDER BY o.date DESC, o.rowid DESC`).all(workspace);
     const entries = this.db.prepare(`SELECT e.* FROM entries e JOIN operations o ON e.operation=o.id WHERE o.workspace=?`).all(workspace);
     const currencies = [...new Set([...accounts, ...operations].map(a => a.currency))];
     const totals = currencies.map(unit => {
       const ops = operations.filter(o => o.currency === unit);
-      const byKind = (...kinds) => ops.filter(o => kinds.includes(o.kind)).reduce((s,o) => s+o.amount,0);
+      // Una operación revertida conserva su contra-asiento en el saldo, pero deja de
+      // contar como gasto, venta o deuda vigente.
+      const live = ops.filter(o => !o.reversed_by && o.kind !== 'reversal');
+      const byKind = (...kinds) => live.filter(o => kinds.includes(o.kind)).reduce((s,o) => s+o.amount,0);
       return {
         currency: unit,
         balance: accounts.filter(a => a.currency === unit).reduce((s,a) => s+a.balance,0),
         verifiedAccessible: accounts.filter(a => a.currency === unit && a.verified && a.accessible).reduce((s,a) => s+a.balance,0),
-        payable: ops.filter(o => o.kind === 'obligation').reduce((s,o) => s+o.amount-o.applied,0),
-        receivable: ops.filter(o => o.kind === 'sale').reduce((s,o) => s+o.amount-o.applied,0),
+        payable: live.filter(o => o.kind === 'obligation').reduce((s,o) => s+o.amount-o.applied,0),
+        receivable: live.filter(o => o.kind === 'sale').reduce((s,o) => s+o.amount-o.applied,0),
         sales: byKind('sale'), expenses: byKind('expense', 'obligation', 'commission'),
         withdrawals: byKind('withdrawal'), available: null,
       };

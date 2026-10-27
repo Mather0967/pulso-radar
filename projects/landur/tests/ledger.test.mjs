@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { Ledger, money } from '../server/ledger.mjs';
 
 function fixture(t) {
@@ -110,4 +111,116 @@ test('persistencia y restauración de copia consistente', t => {
   db.db.prepare('VACUUM INTO ?').run(backup);db.close();
   db=new Ledger(file);assert.deepEqual(db.snapshot('demo'),expected);db.close();
   db=new Ledger(backup);assert.deepEqual(db.snapshot('demo'),expected);db.close();
+});
+test('una base anterior se migra en el lugar sin perder datos', t => {
+  const dir=mkdtempSync(join(tmpdir(),'landur-migrate-')),file=join(dir,'test.sqlite');
+  t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  // Base creada por una versión previa: sin marca de versión y sin las columnas nuevas.
+  const legacy=new DatabaseSync(file);
+  legacy.exec(`CREATE TABLE workspaces (id TEXT PRIMARY KEY, demo INTEGER NOT NULL);
+    CREATE TABLE accounts (id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id), name TEXT NOT NULL,
+      kind TEXT NOT NULL, currency TEXT NOT NULL, opening INTEGER NOT NULL CHECK(opening >= 0),
+      cutoff TEXT NOT NULL, verified INTEGER NOT NULL, accessible INTEGER NOT NULL);
+    CREATE TABLE operations (id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id), kind TEXT NOT NULL,
+      concept TEXT NOT NULL, date TEXT NOT NULL, currency TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount > 0),
+      source TEXT NOT NULL, external_id TEXT, related_id TEXT, category TEXT, created_at TEXT NOT NULL);
+    CREATE TABLE entries (id TEXT PRIMARY KEY, operation TEXT NOT NULL REFERENCES operations(id),
+      account TEXT NOT NULL REFERENCES accounts(id), amount INTEGER NOT NULL CHECK(amount != 0));
+    CREATE TABLE obligations (id TEXT PRIMARY KEY, operation TEXT NOT NULL REFERENCES operations(id), due TEXT NOT NULL);
+    CREATE TABLE applications (id TEXT PRIMARY KEY, operation TEXT NOT NULL REFERENCES operations(id),
+      target TEXT NOT NULL REFERENCES operations(id), amount INTEGER NOT NULL CHECK(amount > 0));
+    CREATE TABLE audit (id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
+      actor TEXT NOT NULL, action TEXT NOT NULL, entity TEXT NOT NULL, at TEXT NOT NULL);
+    CREATE TABLE requests (workspace TEXT NOT NULL REFERENCES workspaces(id), key TEXT NOT NULL, fingerprint TEXT NOT NULL,
+      result TEXT NOT NULL, PRIMARY KEY(workspace, key));
+    INSERT INTO workspaces VALUES ('a',0);
+    INSERT INTO operations VALUES ('vieja','a','expense','Anterior a la migración','2026-10-24','UYU',1000,'manual',NULL,NULL,NULL,'2026-10-24T00:00:00.000Z');
+  `);
+  legacy.close();
+  const ledger=new Ledger(file);
+  try {
+    assert.equal(ledger.db.prepare('PRAGMA user_version').get().user_version,2);
+    const state=ledger.snapshot('a');
+    assert.equal(state.operations.length,1,'los datos anteriores se conservan');
+    assert.equal(state.operations[0].concept,'Anterior a la migración');
+    assert.equal(state.operations[0].reversed_by,null);
+  } finally { ledger.close(); }
+  // Reabrir no vuelve a migrar ni duplica columnas.
+  const again=new Ledger(file);
+  try {
+    assert.equal(again.db.prepare('PRAGMA user_version').get().user_version,2);
+    assert.equal(again.db.prepare('PRAGMA table_info(operations)').all().filter(c=>c.name==='reversed_by').length,1);
+    assert.equal(again.db.prepare('PRAGMA table_info(applications)').all().filter(c=>c.name==='reversed').length,1);
+  } finally { again.close(); }
+});
+test('revertir un gasto devuelve el dinero y lo saca del resultado', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account(),amount:'1250'})).id;
+  assert.equal(ledger.snapshot('a').totals[0].balance,6000000-125000);
+  assert.equal(ledger.snapshot('a').totals[0].expenses,125000);
+  const reversal=run({kind:'reversal',operationId:expense,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.totals[0].balance,6000000,'el contra-asiento devuelve el saldo');
+  assert.equal(state.totals[0].expenses,0,'el gasto revertido deja de contar');
+  const original=state.operations.find(o=>o.id===expense);
+  assert.equal(original.reversed_by,reversal.id);assert.ok(original.reversed_at,'queda la marca de cuándo');
+  assert.equal(original.concept,'Prueba sintética','la original no se edita ni se borra');
+  const compensating=state.operations.find(o=>o.id===reversal.id);
+  assert.equal(compensating.kind,'reversal');assert.equal(compensating.related_id,expense);
+  assert.equal(state.audit[0].action,'reversal.created');
+});
+test('no se revierte dos veces, ni una reversión', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account(),amount:'100'})).id;
+  const reversal=run({kind:'reversal',operationId:expense,date:'2026-10-25'}).id;
+  assert.throws(()=>run({kind:'reversal',operationId:expense,date:'2026-10-25'}),/ya fue revertida/);
+  assert.throws(()=>run({kind:'reversal',operationId:reversal,date:'2026-10-25'}),/no se revierte/);
+  assert.equal(ledger.snapshot('a').operations.filter(o=>o.kind==='reversal').length,1);
+});
+test('una deuda con pagos aplicados exige revertir el pago primero', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const obligation=run(op('obligation',{amount:'1000',due:'2026-10-28'})).id;
+  const payment=run(op('payment',{amount:'400',accountId:account(),targetId:obligation})).id;
+  assert.equal(ledger.snapshot('a').totals[0].payable,60000);
+  assert.throws(()=>run({kind:'reversal',operationId:obligation,date:'2026-10-25'}),/Primero revertí los cobros o pagos/);
+  run({kind:'reversal',operationId:payment,date:'2026-10-25'});
+  assert.equal(ledger.snapshot('a').totals[0].payable,100000,'revertir el pago restaura el pendiente');
+  run({kind:'reversal',operationId:obligation,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.totals[0].payable,0);
+  assert.equal(state.totals[0].balance,6000000,'todo vuelve al punto de partida');
+  assert.equal(state.totals[0].expenses,0);
+});
+test('revertir un cobro restaura el pendiente y deshace la comisión', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const wallet=account({name:'Billetera',accountKind:'wallet',opening:'0'});
+  const sale=run(op('sale',{amount:'3200'})).id;
+  const collection=run(op('collection',{amount:'3200',accountId:wallet,targetId:sale,commission:'331.20'})).id;
+  assert.equal(ledger.snapshot('a').totals[0].receivable,0);
+  assert.equal(ledger.snapshot('a').accounts.find(a=>a.id===wallet).balance,320000-33120);
+  run({kind:'reversal',operationId:collection,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.totals[0].receivable,320000,'la venta vuelve a quedar pendiente');
+  assert.equal(state.accounts.find(a=>a.id===wallet).balance,0,'la billetera vuelve a cero');
+  assert.equal(state.totals[0].expenses,0,'la comisión revertida deja de contar');
+  assert.equal(state.operations.filter(o=>o.kind==='reversal').length,2,'el cobro y su comisión se revierten juntos');
+});
+test('revertir una transferencia devuelve ambos saldos sin crear resultado', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const bank=account(), cash=account({name:'Caja',accountKind:'cash',opening:'0'});
+  const transfer=run(op('transfer',{accountId:bank,toAccountId:cash,amount:'2800'})).id;
+  run({kind:'reversal',operationId:transfer,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.accounts.find(a=>a.id===bank).balance,6000000);
+  assert.equal(state.accounts.find(a=>a.id===cash).balance,0);
+  assert.equal(state.totals[0].expenses,0);assert.equal(state.totals[0].sales,0);
+});
+test('una venta sin cobros se revierte y deja de contarse', t => {
+  const {ledger,run,op}=fixture(t);
+  const sale=run(op('sale',{amount:'8600'})).id;
+  assert.equal(ledger.snapshot('a').totals[0].sales,860000);
+  run({kind:'reversal',operationId:sale,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.totals[0].sales,0);assert.equal(state.totals[0].receivable,0);
+  assert.equal(state.operations.find(o=>o.id===sale).reversed_by!==null,true);
 });

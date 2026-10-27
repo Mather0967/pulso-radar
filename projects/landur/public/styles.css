@@ -201,3 +201,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px soli
   .voice-start{width:100%}
   .voice-panel{padding:14px}
 }
+
+/* Reversión: lo revertido sigue visible, tachado, para que no parezca que nunca existió. */
+.amount.reversed{color:var(--secundario);text-decoration:line-through}
+

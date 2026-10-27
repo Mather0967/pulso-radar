@@ -188,3 +188,21 @@ test('cabecera de permisos habilita el micrófono solo para este origen',async t
   assert.ok(policy.includes('microphone=(self)'), policy);
   assert.ok(!policy.includes('microphone=()'), policy);
 });
+
+test('la reversión por HTTP es idempotente y no se repite',async t=>{
+  const {base,post,login}=await fixture(t);const cookie=await login();
+  await post('/api/commands',{kind:'account',name:'Caja',accountKind:'cash',currency:'UYU',opening:'500',cutoff:'2026-10-01',verified:true,accessible:true},cookie,{'idempotency-key':randomUUID()});
+  const account=(await(await fetch(base+'/api/state',{headers:{cookie}})).json()).accounts[0].id;
+  const created=await post('/api/commands',{kind:'expense',concept:'Reversible',amount:'100',currency:'UYU',date:'2026-10-24',accountId:account},cookie,{'idempotency-key':randomUUID()});
+  const operationId=(await created.json()).id;
+  const body={kind:'reversal',operationId,date:'2026-10-25'},key=randomUUID();
+  assert.equal((await post('/api/commands',body,cookie,{'idempotency-key':key})).status,200);
+  const replay=await post('/api/commands',body,cookie,{'idempotency-key':key});
+  assert.equal((await replay.json()).replayed,true,'reintentar la misma clave no crea otra reversión');
+  assert.equal((await post('/api/commands',body,cookie,{'idempotency-key':randomUUID()})).status,409);
+  assert.equal((await post('/api/commands',{kind:'reversal',operationId},cookie,{'idempotency-key':randomUUID()})).status,400);
+  const state=await(await fetch(base+'/api/state',{headers:{cookie}})).json();
+  assert.equal(state.operations.filter(o=>o.kind==='reversal').length,1);
+  assert.equal(state.totals[0].expenses,0);
+  assert.equal(state.totals[0].balance,50000);
+});

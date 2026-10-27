@@ -147,3 +147,18 @@ Sin cambios de reglas financieras, importes, cálculos ni aislamiento por espaci
 - [ ] La importación no tiene límite propio: cada vista previa toma un bloqueo de escritura y hace hasta 200 inserciones que después revierte. Un cliente con sesión válida podría amplificarlo. Umbral sugerido antes de publicar: 30 llamadas por minuto por sesión.
 
 Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se declara completado el pentesting del sprint 3.
+
+## Corrección auditada y esquema versionado
+
+- [x] **Fallo propio que rompía producción, corregido y publicado primero.** El montaje del portal (`namecheap/server/landur.mjs`) mantiene su propia lista de recursos, separada de la del servidor autónomo. Al agregar `voice.mjs` solo a una de las dos, la importación de `app.js` respondía 404 en `/landur/` y la aplicación entera quedaba en pantalla en blanco: un módulo que no carga detiene todo el archivo. Se agregó a la lista del portal.
+- [x] Regresión para que no vuelva a pasar: `tests/landur-assets.test.mjs` deriva los recursos necesarios de los propios artefactos (`index.html`, los `import` de `app.js` y la lista `SHELL` del service worker) y exige que **las dos** superficies los sirvan. Verificado quitando la línea a propósito: falla nombrando `/landur/voice.mjs`.
+- [x] Esquema versionado con `PRAGMA user_version`: pasos ordenados, cada uno dentro de una transacción, aplicados una sola vez. La versión 1 es el esquema original, así que una base ya existente se migró en el lugar sin perder datos (probado con una base creada a mano con el esquema anterior).
+- [x] Reversión auditada. No borra ni edita: registra un contra-asiento vinculado por `related_id`, invierte los movimientos de cuenta, marca el original con `reversed_by`/`reversed_at` y lo deja visible y consultable.
+- [x] Dependencias respetadas, sin inventar reglas: una deuda o venta con cobros/pagos aplicados exige revertir esos cobros/pagos primero; una operación con dependientes vivos se rechaza; la comisión de un cobro se revierte junto con él, porque nació de esa misma operación; una reversión no se revierte.
+- [x] Los totales distinguen lo revertido: el contra-asiento cancela el saldo, pero la operación revertida deja de contar como gasto, venta o deuda vigente, y su aplicación revertida deja de reducir el pendiente de destino. Sin esto, revertir habría duplicado importes.
+- [x] La interfaz muestra el estado «Revertido», tacha el importe y ofrece revertir con una confirmación que explica que se registra un contra-asiento en lugar de borrar.
+- [x] Pruebas: 79 en total y 76 aprobadas. Se agregaron 8: migración de una base anterior, revertir gasto, doble reversión, deuda con pagos aplicados, cobro con comisión, transferencia, venta sin cobros y la reversión por HTTP con reintento idempotente.
+- [x] QA de navegador: 23 verificaciones, con la reversión de punta a punta incluida. QA del portal: 13 verificaciones en verde.
+- [ ] El pentesting del sprint 3 sigue sin completarse y sin verificación por una persona distinta de quien implementó. Un escaneo propio no lo reemplaza.
+
+Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se declara completado el pentesting del sprint 3.

@@ -99,6 +99,27 @@ try{
   await page.locator('[name=amount]').fill('100');await page.locator('[name=accountId]').selectOption(initial.accounts[0].id);
   await page.locator('#operation-form [type=submit]').click();await page.locator('#modal').waitFor({state:'hidden'});
   assert.equal((await read()).operations.find(o=>o.id===obligation.id).applied,10000);
+  // Reversión auditada: no borra nada, deja contra-asiento y devuelve el saldo.
+  await page.locator('.sidebar [data-view=moves]').click();
+  const reversible=(await read()).operations.find(o=>o.concept==='Gasto QA sin comprobante');
+  const beforeUyu=(await read()).totals.find(t=>t.currency==='UYU').balance;
+  await page.locator(`[data-operation="${reversible.id}"]`).click();
+  await page.getByRole('button',{name:'Revertir…'}).click();
+  await page.getByRole('button',{name:'Registrar reversión'}).click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  const after=await read();
+  const reversal=after.operations.find(o=>o.kind==='reversal'&&o.related_id===reversible.id);
+  assert.ok(reversal,'debe existir el contra-asiento');
+  assert.equal(after.operations.find(o=>o.id===reversible.id).reversed_by,reversal.id,'la original queda marcada, no borrada');
+  assert.equal(after.operations.find(o=>o.id===reversible.id).concept,'Gasto QA sin comprobante');
+  assert.ok(after.audit.some(a=>a.action==='reversal.created'),'la reversión queda auditada');
+  assert.equal(after.totals.find(t=>t.currency==='UYU').balance,beforeUyu+reversible.amount,'el contra-asiento devuelve el saldo');
+  assert.ok(await page.getByText('Revertido',{exact:true}).count()>0,'la tabla muestra el estado revertido');
+  // Una operación ya revertida no ofrece revertirse otra vez.
+  await page.locator(`[data-operation="${reversible.id}"]`).click();
+  assert.equal(await page.getByRole('button',{name:'Revertir…'}).count(),0,'no se ofrece revertir lo ya revertido');
+  await page.getByRole('button',{name:'Cerrar diálogo'}).click();
+  assert.equal((await read()).operations.filter(o=>o.kind==='reversal').length,1,null,'no se crea una segunda reversión');
   // Import preview + commit + repeated upload; also prove CSV markup stays inert.
   await page.locator('.sidebar [data-view=settings]').click();
   const csv='kind,date,concept,amount,currency,account_id,due,source,external_id,category\nsale,2026-10-24,<img src=x onerror=alert(1)>,50,UYU,,,QA,QA-CSV-01,Ventas';
@@ -165,5 +186,5 @@ try{
     assert.equal(await privatePage.getByText('Cuenta sintética privada',{exact:true}).count(),0);
   }finally{await privateContext.close();await new Promise(resolve=>privateServer.close(resolve));privateLedger.close();}
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation','voice-full-invoice','voice-refuses-unknown-amount','voice-panel-fits-mobile'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
+  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation','voice-full-invoice','voice-refuses-unknown-amount','voice-panel-fits-mobile','audited-reversal'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));ledger.close();}

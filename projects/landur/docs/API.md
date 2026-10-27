@@ -27,10 +27,11 @@ Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen per
 - `payment`: campos comunes y `accountId`, `targetId` (obligación pendiente).
 - `collection`: campos comunes y `accountId`, `targetId` (venta pendiente), `commission` explícita.
 - `transfer`: campos comunes y `accountId`, `toAccountId` de igual moneda.
+- `reversal`: `operationId`, `date`. Registra el contra-asiento de una operación existente. No borra ni edita la original: la marca como revertida, invierte sus movimientos de cuenta, desactiva su aplicación si la tenía y, cuando corresponde, revierte también la comisión del cobro. Se rechaza si ya fue revertida, si es una reversión, o si algo se apoya en ella sin revertir.
 
 Importes de entrada como strings decimales, sin miles, hasta dos decimales; respuesta monetaria en unidades menores enteras. Monedas admitidas técnicamente: UYU, USD y BRL, separadas sin conversión. Esto no confirma cuáles usa LANDUR en producción.
 
-Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección/reversión todavía no está habilitada.
+Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección se hace revirtiendo y registrando de nuevo, nunca editando el registro original: la historia se conserva y cada reversión queda auditada con su autor y su fecha.
 
 ## Plantilla CSV propuesta
 
