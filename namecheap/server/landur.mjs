@@ -6,7 +6,8 @@ import { projectAccess } from './projects.mjs';
 
 const publicAssets = new Map([
   ['/', ['index.html','text/html; charset=utf-8']], ['/index.html',['index.html','text/html; charset=utf-8']],
-  ['/app.js',['app.js','text/javascript; charset=utf-8']], ['/styles.css',['styles.css','text/css; charset=utf-8']],
+  ['/app.js',['app.js','text/javascript; charset=utf-8']], ['/voice.mjs',['voice.mjs','text/javascript; charset=utf-8']],
+  ['/styles.css',['styles.css','text/css; charset=utf-8']],
   ['/sw.js',['sw.js','text/javascript; charset=utf-8']], ['/manifest.webmanifest',['manifest.webmanifest','application/manifest+json']],
   ['/icon.svg',['icon.svg','image/svg+xml']], ['/icon-192.png',['icon-192.png','image/png']],
   ['/icon-512.png',['icon-512.png','image/png']], ['/apple-touch-icon.png',['apple-touch-icon.png','image/png']]
