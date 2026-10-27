@@ -9,7 +9,8 @@ import { Ledger } from '../server/ledger.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 function fixture(t) {
   const dir=mkdtempSync(join(tmpdir(),'landur-hosting-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
-  const env={...process.env,NODE_ENV:'production',LANDUR_DEMO:'0',LANDUR_PASSWORD:'synthetic-test-secret-only',LANDUR_PUBLIC_ORIGIN:'https://landur.example.com',LANDUR_DATA_DIR:join(dir,'private'),LANDUR_BACKUP_DIR:join(dir,'backups'),LANDUR_INSECURE_LOCAL:'0'};
+  // Un PORT heredado del shell de desarrollo no debe filtrarse al preflight ni al respaldo.
+  const env={...process.env,PORT:'3001',NODE_ENV:'production',LANDUR_DEMO:'0',LANDUR_PASSWORD:'synthetic-test-secret-only',LANDUR_PUBLIC_ORIGIN:'https://landur.example.com',LANDUR_DATA_DIR:join(dir,'private'),LANDUR_BACKUP_DIR:join(dir,'backups'),LANDUR_INSECURE_LOCAL:'0'};
   return {dir,env};
 }
 test('preflight producción usa una base temporal y no deja artefactos',t=>{

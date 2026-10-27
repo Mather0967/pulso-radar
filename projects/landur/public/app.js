@@ -1,3 +1,5 @@
+import { parseSpokenInvoice } from './voice.mjs';
+
 const BASE = new URL('./', import.meta.url).pathname;
 const endpoint = path => BASE + path.replace(/^\//, '');
 const portalMode = document.documentElement.dataset.portal === 'true';
@@ -126,8 +128,10 @@ function select(label,name,options,wide=false){return `<label class="field ${wid
 // importes y fechas se tipean a mano porque el reconocimiento de números no es fiable.
 // Chrome delega el reconocimiento en su proveedor: requiere conexión y, en producción, HTTPS.
 const SPEECH = window.SpeechRecognition || window.webkitSpeechRecognition;
-let dictation = null;
+let dictation = null, invoiceRecognition = null;
 function stopDictation(){
+  // El dictado de factura completa se corta con el mismo cierre del diálogo.
+  if(invoiceRecognition){const current=invoiceRecognition;invoiceRecognition=null;try{current.stop();}catch{}}
   if(!dictation)return;
   const current=dictation;dictation=null;
   current.button.classList.remove('recording');
@@ -172,12 +176,67 @@ function attachDictation(root){
     input.after(button);
   }
 }
-function form(kind='expense',targetId){
+// Dictado de la factura completa: una sola frase llena varios campos. El resultado
+// se muestra siempre antes de aplicarse, porque un importe mal escuchado es un error
+// contable. Los campos se completan; guardar sigue siendo una acción aparte.
+function wireVoice(formEl,kind){
+  const start=$('#voice-start'),resultBox=$('#voice-result');
+  if(!start||!resultBox)return;
+  if(!SPEECH){start.disabled=true;start.textContent='Este navegador no permite dictar';return;}
+  let recognition=null,listening=false;
+  const reset=()=>{listening=false;start.classList.remove('recording');start.innerHTML=`${icon('mic')} Dictar la factura`;};
+  start.addEventListener('click',()=>{
+    if(listening){try{recognition?.stop();}catch{}return;}
+    stopDictation();
+    recognition=new SPEECH();
+    recognition.lang='es-UY';recognition.interimResults=false;recognition.continuous=false;
+    invoiceRecognition=recognition;
+    listening=true;start.classList.add('recording');start.textContent='Escuchando… tocá para detener';
+    recognition.onresult=event=>{
+      const said=[...event.results].map(result=>result[0].transcript).join(' ').trim();
+      if(said)showSpokenInvoice(resultBox,formEl,kind,said);
+    };
+    recognition.onerror=event=>{
+      toast(event.error==='not-allowed'||event.error==='service-not-allowed'
+        ? 'Permití el micrófono en los ajustes del navegador para dictar.'
+        : 'No se pudo dictar. Escribí los campos a mano.');
+    };
+    recognition.onend=()=>{if(invoiceRecognition!==recognition)return;invoiceRecognition=null;reset();};
+    try{recognition.start();}catch{invoiceRecognition=null;reset();toast('No se pudo iniciar el micrófono.');}
+  });
+}
+function showSpokenInvoice(resultBox,formEl,kind,said){
+  const parsed=parseSpokenInvoice(said,{today:today(),currency:formEl.elements.currency?.value||unit});
+  const rows=[['Tipo',parsed.kind&&parsed.kind!==kind?`Cambiar a ${labels[parsed.kind].toLowerCase()}`:labels[kind]],
+    ['Concepto',parsed.concept||'Sin reconocer'],
+    ['Importe',parsed.cents?fmt(parsed.cents,parsed.currency||unit):'Sin reconocer'],
+    ['Fecha',parsed.date?dateFmt(parsed.date):'La de hoy']];
+  if(parsed.due)rows.push(['Vencimiento',dateFmt(parsed.due)]);
+  const usable=!!(parsed.concept||parsed.cents);
+  resultBox.innerHTML=`<div class="voice-result"><p class="voice-said">«${escape(said)}»</p><dl class="voice-fields">${rows.map(([key,value])=>`<div><dt>${escape(key)}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>${parsed.warnings.map(w=>`<p class="voice-warning">${escape(w)}</p>`).join('')}<div class="voice-actions"><button type="button" class="primary" id="voice-apply" ${usable?'':'disabled'}>Usar estos datos</button><button type="button" class="text-btn" id="voice-discard">Descartar</button></div><p class="voice-hint">Nada se guardó todavía. Revisá el importe: el dictado puede confundir cifras.</p></div>`;
+  $('#voice-discard').onclick=()=>{resultBox.innerHTML='';};
+  $('#voice-apply').onclick=()=>applySpoken(formEl,kind,parsed);
+}
+function applySpoken(formEl,kind,parsed){
+  // Cambiar el tipo obliga a reconstruir el formulario, porque cambian sus campos.
+  if(parsed.kind&&parsed.kind!==kind){form(parsed.kind,undefined,parsed);return;}
+  if(parsed.concept&&formEl.elements.concept)formEl.elements.concept.value=parsed.concept;
+  if(parsed.amountText&&formEl.elements.amount)formEl.elements.amount.value=parsed.amountText;
+  if(parsed.date&&formEl.elements.date)formEl.elements.date.value=parsed.date;
+  if(parsed.due&&formEl.elements.due)formEl.elements.due.value=parsed.due;
+  if(parsed.currency&&formEl.elements.currency&&formEl.elements.currency.value!==parsed.currency){
+    formEl.elements.currency.value=parsed.currency;
+    formEl.elements.currency.dispatchEvent(new Event('change'));
+  }
+  $('#voice-result').innerHTML='';
+  toast('Campos completados desde el dictado. Revisá el importe antes de guardar.');
+}
+function form(kind='expense',targetId,prefill=null){
   if(!state)return;
   if(state.access==='viewer'){toast('Tu acceso es de solo lectura.');return;}
   pendingRequest=null;
   const target=state.operations.find(o=>o.id===targetId);
-  const currency=target?.currency||unit;
+  const currency=prefill?.currency||target?.currency||unit;
   const currencies=`<option value="">Elegir moneda</option>${['UYU','USD','BRL'].map(c=>`<option value="${c}" ${c===currency?'selected':''}>${c}</option>`).join('')}`;
   let fields=select('Tipo de registro','kind',Object.entries(labels).filter(([k])=>k!=='commission').map(([k,v])=>`<option value="${k}" ${kind===k?'selected':''}>${v}</option>`).join(''),true);
   if(kind==='account'){
@@ -188,11 +247,11 @@ function form(kind='expense',targetId){
     fields+=field('Fecha de corte','cutoff','date',today(),false,'required');
     fields+='<p class="form-note">El saldo inicial se interpreta al inicio del día indicado. No cargues nuevamente movimientos anteriores al corte. Una cuenta nueva no es un ingreso.</p><label class="check"><input name="verified" type="checkbox">Verifiqué este saldo inicial contra su fuente.</label><label class="check"><input name="accessible" type="checkbox">El dinero de esta cuenta está accesible.</label>';
   }else{
-    fields+=field('Concepto','concept','text',target?`${kind==='payment'?'Pago':'Cobro'} · ${target.concept}`:'',true,'required maxlength="180" placeholder="¿A qué corresponde?" data-dictate');
-    fields+=field(kind==='collection'?'Cobro bruto':'Importe','amount','text',target?decimal(target.amount-target.applied):'',false,'required inputmode="decimal" placeholder="0,00"');
+    fields+=field('Concepto','concept','text',prefill?.concept||(target?`${kind==='payment'?'Pago':'Cobro'} · ${target.concept}`:''),true,'required maxlength="180" placeholder="¿A qué corresponde?" data-dictate');
+    fields+=field(kind==='collection'?'Cobro bruto':'Importe','amount','text',prefill?.amountText||(target?decimal(target.amount-target.applied):''),false,'required inputmode="decimal" placeholder="0,00"');
     fields+=select('Moneda','currency',currencies);
-    fields+=field('Fecha de operación','date','date',today(),false,'required');
-    if(kind==='obligation')fields+=field('Vencimiento','due','date',today(),false,'required');
+    fields+=field('Fecha de operación','date','date',prefill?.date||today(),false,'required');
+    if(kind==='obligation')fields+=field('Vencimiento','due','date',prefill?.due||today(),false,'required');
     else fields+=field('Categoría (opcional)','category','text','',false,'maxlength="60" placeholder="Ej.: materiales" data-dictate');
     if(['expense','transfer','withdrawal','payment','collection'].includes(kind))fields+=select(kind==='collection'?'Cuenta de destino':'Cuenta de origen','accountId',accountOptions(currency),true);
     if(kind==='transfer')fields+=select('Cuenta de destino','toAccountId',accountOptions(currency),true);
@@ -200,9 +259,13 @@ function form(kind='expense',targetId){
     if(kind==='collection')fields+=field('Comisión real de este cobro','commission','text','',true,'required inputmode="decimal" placeholder="0 solo si confirmaste que no hubo comisión"');
     fields+=`<p class="form-note">${{expense:'Registra un gasto ya pagado y la salida de dinero. Si todavía debés pagarlo, elegí Obligación. No se requiere factura; los adjuntos se incorporarán después.',obligation:'Registra un gasto y una deuda pendiente. No mueve dinero hasta registrar el pago.',sale:'Registra la venta, no un ingreso de caja. El cobro se asocia en un paso separado.',payment:'Reduce la deuda pendiente y el saldo de la cuenta. No registra el gasto otra vez.',collection:'Asocia el cobro a la venta. A la cuenta entra el bruto menos la comisión real indicada.',transfer:'Mueve fondos entre dos cuentas propias de igual moneda. No crea ingreso ni gasto.',withdrawal:'Dinero retirado por el titular. No se clasifica como gasto operativo.'}[kind]}</p>`;
   }
-  openDialog('Registrar operación','Los cambios se guardan únicamente en el servidor.',`<form id="operation-form"><div class="dialog-body"><div class="form-grid">${fields}</div><p class="error" id="form-error" role="alert"></p></div><div class="dialog-footer"><button type="button" class="secondary" data-action="close">Cancelar</button><button type="submit" class="primary">Guardar registro ${icon('check')}</button></div></form>`);
+  const voicePanel=['expense','obligation','sale'].includes(kind)
+    ? `<div class="voice-panel"><button type="button" class="voice-start" id="voice-start">${icon('mic')} Dictar la factura</button><p class="voice-hint">Ejemplo: «factura de proveedor de materiales por 4.200 pesos del 24 de octubre».</p><p class="voice-privacy">El navegador puede enviar el audio a su proveedor de reconocimiento. Si el dato es reservado, escribilo a mano.</p><div id="voice-result"></div></div>`
+    : '';
+  openDialog('Registrar operación','Los cambios se guardan únicamente en el servidor.',`<form id="operation-form"><div class="dialog-body">${voicePanel}<div class="form-grid">${fields}</div><p class="error" id="form-error" role="alert"></p></div><div class="dialog-footer"><button type="button" class="secondary" data-action="close">Cancelar</button><button type="submit" class="primary">Guardar registro ${icon('check')}</button></div></form>`);
   const f=$('#operation-form');
   attachDictation(f);
+  if(voicePanel)wireVoice(f,kind);
   f.elements.kind.addEventListener('change',e=>form(e.target.value));
   f.elements.currency.addEventListener('change',e=>{
     for(const name of ['accountId','toAccountId'])if(f.elements[name])f.elements[name].innerHTML=accountOptions(e.target.value);

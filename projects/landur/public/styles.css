@@ -179,3 +179,25 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px soli
   .field input,.field select,.field textarea,.search{font-size:16px}
   .mobile-nav button{font-size:11px}
 }
+/* Dictado de la factura completa. El panel vive arriba del formulario y dice qué
+   va a pasar antes de que se toque el micrófono, incluido el destino del audio. */
+.voice-panel{display:grid;gap:11px;padding:16px;margin-bottom:19px;border:1px solid var(--linea);border-radius:var(--radio-peq);background:var(--hundido);grid-column:1/-1}
+.voice-start{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:46px;padding:11px 17px;border:1px solid var(--linea);border-radius:var(--radio-chip);background:var(--superficie);color:var(--tinta);font-size:13px;font-weight:600}
+.voice-start:hover:not(:disabled){border-color:#c5d2cd}
+.voice-start svg{width:17px;height:17px}
+.voice-start.recording{border-color:var(--negativo);background:#fdf1ef;color:var(--negativo);animation:pulse 1.2s ease-in-out infinite}
+.voice-start:focus-visible{outline:3px solid #3bbb8f;outline-offset:2px}
+.voice-hint{font-size:12px;line-height:1.6;color:var(--secundario)}
+.voice-privacy{font-size:11px;line-height:1.55;color:var(--secundario);opacity:.85}
+.voice-result{display:grid;gap:12px;padding:15px;border:1px solid var(--linea);border-radius:var(--radio-peq);background:var(--superficie)}
+.voice-said{font-size:13px;font-style:italic;line-height:1.55;color:var(--tinta);overflow-wrap:anywhere}
+.voice-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}
+.voice-fields dt{font-size:11px;color:var(--secundario);margin-bottom:4px}
+.voice-fields dd{margin:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.voice-warning{padding:9px 11px;border-radius:var(--radio-chip);background:#fdf6e7;color:var(--ambar);font-size:12px;line-height:1.55}
+.voice-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+@media(max-width:760px){
+  .voice-fields{grid-template-columns:1fr}
+  .voice-start{width:100%}
+  .voice-panel{padding:14px}
+}

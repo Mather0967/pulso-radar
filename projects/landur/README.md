@@ -37,6 +37,8 @@ Integraciones automáticas, OCR, recetas, márgenes avanzados, push y escritura 
 
 **PWA alfa operativa:** Inicio, Movimientos, Cuentas, Egresos, Ventas, Pendientes y Configuración, con formularios conectados al servidor, importación CSV con vista previa, exportación, instalación mediante manifiesto/iconos y service worker de recursos públicos. No se cachea información financiera ni se permite escribir offline.
 
+**Dictado de la factura completa:** una frase llena tipo, concepto, importe, moneda, fecha y vencimiento. El resultado se muestra con la transcripción literal antes de aplicarse y nada se guarda hasta confirmar. Un importe que el reconocimiento no entiende deja el campo como estaba y se avisa: el dictado nunca inventa una cifra. Chrome delega el audio en su proveedor de reconocimiento, así que exige conexión y, en producción, HTTPS.
+
 **Pendientes:** comprobantes adjuntos, reservas operativas, corrección/reversión auditada, recuperación de acceso y usuarios definitivos, conciliación avanzada, migraciones versionadas y validación de reglas/datos reales. No se ha desplegado ni probado en Namecheap, en Safari/iPhone real ni se ha hecho pentesting. Es una alfa para pruebas, no está habilitada para datos reales.
 
 ### Ejecutar y verificar
@@ -74,8 +76,8 @@ La rama de esta sesión es `arena/eab1cd0e-pulso-radar`. No se creó un reposito
 
 ## Verificación de este corte
 
-- 36 pruebas unitarias/integración locales: núcleo monetario, API privada, configuración, respaldos, CSV atómico e idempotencia.
-- QA de navegador con Chromium: escritorio y viewport 390×844, registros, doble envío, pérdida de respuesta después de guardar, pago parcial, CSV repetido, exportación, escape de texto, cuentas, persistencia, caché pública, bloqueo offline, logout y login privado.
+- 71 pruebas unitarias/integración locales: núcleo monetario, API privada, configuración, respaldos, CSV atómico, idempotencia, endurecimiento de la importación y parser del dictado. Tres fallan por límites de Windows (enlace simbólico sin Developer Mode, ruta POSIX esperada y `chmod 0600` no aplicable); las tres se reproducen sobre `HEAD` limpio.
+- QA de navegador con Chromium: escritorio y viewport 390×844, registros, doble envío, pérdida de respuesta después de guardar, pago parcial, CSV repetido, exportación, escape de texto, cuentas, persistencia, caché pública, bloqueo offline, logout, login privado y factura dictada de punta a punta con un reconocedor simulado.
 - Capturas locales en `data/qa/`, fuera de Git. Dependencias de navegador son solo de desarrollo.
 - No se reemplaza prueba en dispositivo real ni pentesting por emulación móvil.
 

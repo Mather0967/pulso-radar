@@ -39,7 +39,8 @@ export function configuration(env = process.env, root = applicationRoot) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT debe ser un puerto válido.');
   return { production, demo, dataDir, publicOrigin: origin, password: env.LANDUR_PASSWORD,
     insecureCookies: env.LANDUR_INSECURE_LOCAL === '1', host: env.HOST || '0.0.0.0', port,
-    // Detrás de Passenger/Apache habilita X-Forwarded-For para limitar por IP real.
+    // Fuerza la lectura de X-Forwarded-For para un proxy que no sea local.
+    // Con Passenger/Apache el par ya es loopback y se confía sin configurar nada.
     trustProxy: env.LANDUR_TRUST_PROXY === '1',
     // Orígenes extra aceptados cuando no hay LANDUR_PUBLIC_ORIGIN (desarrollo multipuerto).
     allowedHosts: (env.LANDUR_ALLOWED_HOSTS || '').split(',').map(s => s.trim()).filter(Boolean) };

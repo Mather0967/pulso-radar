@@ -125,6 +125,25 @@ No se tocó el backend ni las reglas financieras. No se declara terminado el spr
 - [x] Pruebas: 45 en total y 41 aprobadas. Se agregaron 6: límite por cliente, anti-suplantación de X-Forwarded-For, Host falsificado mediante socket crudo, purgado demo, cabecera de permisos y decimal negativo. Las 4 restantes son las fallas de entorno Windows ya conocidas.
 - [x] QA de navegador con el Chrome del sistema: 19 verificaciones en verde, incluida la dictación, que se verifica en reposo porque no se simula voz.
 - [ ] El dictado se validó en el camino de error (permiso denegado), no con voz real.
-- [ ] El límite por IP real requiere configurar LANDUR_TRUST_PROXY=1 en el servidor; sin esa variable sigue limitando por la IP del socket.
+- [x] El límite por IP real **ya no requiere configurar nada**: cuando el par del socket es del propio host se lee `X-Forwarded-For`. Resuelto en la sección siguiente.
 
 Sin cambios de reglas financieras, importes, cálculos ni aislamiento por espacio. No se declara completado el pentesting del sprint 3.
+
+## Proxy por defecto, ataque a la importación y factura dictada
+
+- [x] El límite de acceso detrás de Passenger/Apache dejó de depender de una variable de entorno. Si el par del socket es del propio host (`127.0.0.1`, `::1`, `::ffff:127.0.0.1`) se lee `X-Forwarded-For` y se toma el último salto, que es el que agrega el proxy inmediato. Un cliente directo nunca llega desde loopback, así que no puede falsear su IP. `LANDUR_TRUST_PROXY=1` queda solo como excepción para un proxy que no sea local.
+- [x] La derivación de la clave de cliente es una función pura exportada (`clientAddress`) y se prueba con 8 casos, incluidos un par público y uno de red privada, que no se confían.
+- [x] Ataque autorizado a la importación CSV convertido en regresión permanente: 12 casos con payloads reales (comillas desbalanceadas, columnas de más y de menos, 201 filas, encabezado cambiado, importes `1e3`/`-5`/`0`/`12.345`/`1.234,56`, lote con una fila inválida, referencia repetida con otros datos, fórmula de hoja de cálculo, NUL, sin sesión, origen cruzado, sin encabezado propio y `kind=import` por `/api/commands`). **No se encontró escritura parcial ni evasión**: el lote es atómico, la vista previa no persiste y la exportación neutraliza la fórmula.
+- [x] El único fallo del ataque fue del propio ataque: la fila marcada «columnas de más» tenía 10 columnas y `extra` caía en `category`, que es válida. Se corrigió el payload, no el servidor.
+- [x] Aislamiento de las pruebas de hosting: el `PORT` del shell de desarrollo se filtraba al preflight y al respaldo, que fallaban por un puerto inválido. La fixture ahora fija `PORT` y esa falla salió de la línea base.
+- [x] Dictado de la factura completa: una frase llena tipo, concepto, importe, moneda, fecha y vencimiento. El parser es una función pura (`public/voice.mjs`) que no toca el DOM; entiende cifras con palabras (`mil doscientos`), separador de miles es-UY, fechas relativas, largas y cortas, y monedas habladas.
+- [x] Garantía explícita: **el dictado no completa ningún campo que no haya entendido y no guarda nada por sí solo**. Se muestra la transcripción literal, se aplica solo al confirmar y un importe no reconocido deja el campo como estaba, con aviso.
+- [x] Los acentos se conservan: el texto se pliega sin cambiar la longitud, así el concepto se recorta del original. Regresión cubierta: `"Ñ"` se plegaba a `"N"`.
+- [x] Regresión cubierta: `"12.500"` sin contexto se leía como `12` y guardaba 12,00.
+- [x] Pruebas: 71 en total y 68 aprobadas. Se agregaron 26: 13 del parser de voz, 12 del ataque a la importación y la derivación de cliente. Las 3 restantes son las fallas de entorno Windows ya conocidas (enlace simbólico sin Developer Mode, ruta POSIX esperada y `chmod 0600` no aplicable).
+- [x] QA de navegador con el Chrome del sistema: 22 verificaciones en verde. Se agregaron tres: factura completa dictada de punta a punta con un reconocedor simulado, negativa a pisar un importe no reconocido y ajuste del panel al ancho de iPhone.
+- [ ] El reconocimiento de voz real no se probó: el QA simula la transcripción, no el servicio. Chrome delega el audio en su proveedor.
+- [ ] El tope global de accesos (60/min) protege el costo de scrypt, pero un ataque sostenido puede demorar el acceso del titular. Es una denegación de servicio, no una fuga, y no se resuelve sin un bypass fuera de banda (lista de IPs o segundo factor).
+- [ ] La importación no tiene límite propio: cada vista previa toma un bloqueo de escritura y hace hasta 200 inserciones que después revierte. Un cliente con sesión válida podría amplificarlo. Umbral sugerido antes de publicar: 30 llamadas por minuto por sesión.
+
+Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se declara completado el pentesting del sprint 3.

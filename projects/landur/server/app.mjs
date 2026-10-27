@@ -13,6 +13,7 @@ const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/voice.mjs', ['voice.mjs', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/sw.js', ['sw.js', 'text/javascript; charset=utf-8']],
   ['/manifest.webmanifest', ['manifest.webmanifest', 'application/manifest+json']],
@@ -22,6 +23,18 @@ const assets = new Map([
   ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
 ]);
 const digest = text => createHash('sha256').update(text).digest('hex');
+// El proxy del propio host (Passenger/Apache) siempre conecta desde loopback, así que
+// ahí X-Forwarded-For es confiable y se toma el último salto: el que agrega el proxy
+// inmediato. Un cliente directo nunca llega desde loopback y no puede falsearla.
+const loopback = /^(::1|::ffff:127\.0\.0\.1|127(?:\.\d{1,3}){3})$/;
+export function isLocalPeer(peer) {
+  return typeof peer === 'string' && loopback.test(peer.replace(/^\[|\]$/g, ''));
+}
+export function clientAddress({ peer, forwarded, trustProxy = false } = {}) {
+  const hops = String(forwarded ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  if (hops.length && (trustProxy || isLocalPeer(peer))) return hops[hops.length - 1];
+  return typeof peer === 'string' && peer ? peer : 'unknown';
+}
 export function createApp({ ledger, demo = false, password, publicOrigin, insecureCookies = false, trustProxy = false, allowedHosts = [] }) {
   if (!demo && (typeof password !== 'string' || password.length < 16)) throw new Error('El modo privado requiere LANDUR_PASSWORD de al menos 16 caracteres.');
   if (password && password.length > 256) throw new Error('La contraseña no debe superar 256 caracteres.');
@@ -87,17 +100,9 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
   const originHost = publicOrigin ? normalizeHost(new URL(publicOrigin).host) : null;
   // Sin LANDUR_PUBLIC_ORIGIN solo se acepta loopback o una lista explícita.
   const hostAllowed = host => { const name = normalizeHost(host); return !!name && (name === originHost || loopbackHosts.has(name) || extraHosts.has(name)); };
-  // Detrás de Passenger/Apache el socket siempre es el proxy: sin confianza explícita
-  // no se lee X-Forwarded-For, para que nadie evada el límite suplantando la IP.
   const ATTEMPT_WINDOW = 15 * 60 * 1000, ATTEMPT_LIMIT = 8, ATTEMPT_KEYS = 5000, GLOBAL_WINDOW = 60 * 1000, GLOBAL_LIMIT = 60;
   let globalFrom = 0, globalCount = 0;
-  function clientKey(req) {
-    if (trustProxy) {
-      const hops = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
-      if (hops.length) return hops[hops.length - 1];
-    }
-    return req.socket.remoteAddress || 'unknown';
-  }
+  const clientKey = req => clientAddress({ peer: req.socket.remoteAddress, forwarded: req.headers['x-forwarded-for'], trustProxy });
   function throttle(key) {
     const now = Date.now();
     for (const [ip, value] of attempts) if (now > value.until) attempts.delete(ip);

@@ -21,6 +21,15 @@ const errors=[];
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+  // Reconocedor simulado: prueba el camino completo del dictado salvo el servicio de voz
+  // real, que no existe sin micrófono ni red. Lo que se simula es la transcripción, no la lógica.
+  await page.addInitScript(()=>{
+    class ReconocimientoSimulado{
+      start(){setTimeout(()=>{this.onresult&&this.onresult({results:[{0:{transcript:window.__voiceSaid||''}}]});this.onend&&this.onend();},20);}
+      stop(){this.onend&&this.onend();}
+    }
+    window.SpeechRecognition=ReconocimientoSimulado;window.webkitSpeechRecognition=ReconocimientoSimulado;
+  });
   await page.goto(url);await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   await page.screenshot({path:'data/qa/desktop.png',fullPage:true});
   const read=()=>page.evaluate(async()=>await(await fetch('/api/state')).json());
@@ -38,6 +47,34 @@ try{
   assert.equal((await read()).operations.filter(o=>o.concept==='Gasto QA sin comprobante').length,1);
   await page.reload();await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   assert.equal((await read()).operations.filter(o=>o.concept==='Gasto QA sin comprobante').length,1);
+  // Dictado de una factura completa: se muestra antes de aplicar y no guarda nada por sí solo.
+  await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
+  await page.evaluate(()=>{window.__voiceSaid='factura de proveedor de materiales por 1.250 pesos del 24 de octubre';});
+  const beforeVoice=(await read()).operations.length;
+  await page.getByRole('button',{name:'Dictar la factura'}).click();
+  await page.locator('.voice-result').waitFor();
+  assert.match(await page.locator('.voice-said').textContent(),/proveedor de materiales/i,'se muestra la transcripción tal como llegó');
+  const voiceRows=(await page.locator('.voice-fields div').allTextContents()).join(' | ');
+  assert.ok(voiceRows.includes('Proveedor de materiales'),voiceRows);
+  assert.ok(/1\.250,00/.test(voiceRows),voiceRows);
+  assert.equal((await read()).operations.length,beforeVoice,'el dictado no puede guardar nada por sí solo');
+  await page.getByRole('button',{name:'Usar estos datos'}).click();
+  assert.equal(await page.locator('[name=concept]').inputValue(),'Proveedor de materiales');
+  assert.equal(await page.locator('[name=amount]').inputValue(),'1250.00');
+  assert.equal(await page.locator('[name=date]').inputValue(),'2026-10-24');
+  await page.locator('[name=accountId]').selectOption(initial.accounts[0].id);
+  await page.locator('#operation-form [type=submit]').click();await page.locator('#modal').waitFor({state:'hidden'});
+  assert.equal((await read()).operations.find(o=>o.concept==='Proveedor de materiales').amount,125000);
+  // Sin importe reconocido se avisa y no se pisa lo que ya estaba escrito.
+  await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
+  await page.locator('[name=amount]').fill('99');
+  await page.evaluate(()=>{window.__voiceSaid='factura de proveedor sin importe';});
+  await page.getByRole('button',{name:'Dictar la factura'}).click();
+  await page.locator('.voice-result').waitFor();
+  assert.ok(await page.locator('.voice-warning').count()>0,'debe avisar que no reconoció el importe');
+  await page.getByRole('button',{name:'Usar estos datos'}).click();
+  assert.equal(await page.locator('[name=amount]').inputValue(),'99','un importe no reconocido no debe borrar el escrito');
+  await page.getByRole('button',{name:'Cancelar'}).click();await page.locator('#modal').waitFor({state:'hidden'});
   // Saved on server, response lost: retry MUST reuse the same idempotency key.
   let lost=false;
   await page.route('**/api/commands',async route=>{
@@ -91,6 +128,12 @@ try{
   assert.equal(await page.locator('#modal').evaluate(e=>e.scrollWidth>e.clientWidth),false);
   await page.screenshot({path:'data/qa/mobile-form.png',fullPage:true});
   await page.getByRole('button',{name:'Cerrar diálogo',exact:true}).click();
+  // El panel de dictado no debe desbordar el diálogo en el ancho de un iPhone.
+  await page.locator('.mobile-nav [data-action=register]').click();
+  await page.locator('.voice-panel').waitFor();
+  assert.equal(await page.locator('#modal').evaluate(e=>e.scrollWidth>e.clientWidth),false,'el panel de dictado desborda el diálogo');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.getByRole('button',{name:'Cancelar'}).click();await page.locator('#modal').waitFor({state:'hidden'});
   // Cache contains shell only. Offline reload cannot disclose finances.
   await page.evaluate(async()=>await navigator.serviceWorker.ready);
   await page.reload();await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
@@ -122,5 +165,5 @@ try{
     assert.equal(await privatePage.getByText('Cuenta sintética privada',{exact:true}).count(),0);
   }finally{await privateContext.close();await new Promise(resolve=>privateServer.close(resolve));privateLedger.close();}
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
+  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation','voice-full-invoice','voice-refuses-unknown-amount','voice-panel-fits-mobile'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));ledger.close();}

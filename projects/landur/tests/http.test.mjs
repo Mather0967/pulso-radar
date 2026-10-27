@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { connect } from 'node:net';
 import { Ledger } from '../server/ledger.mjs';
-import { createApp } from '../server/app.mjs';
+import { createApp, clientAddress } from '../server/app.mjs';
 const password='synthetic-test-secret-only';
 async function fixture(t, options={}) {
   const ledger=new Ledger();const server=createApp({ledger,password,insecureCookies:true,...options});
@@ -139,10 +139,27 @@ test('límite de acceso por cliente: una tabla llena no bloquea a todos',async t
   assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'203.0.113.11'})).status,200);
 });
 
-test('sin confianza explícita, X-Forwarded-For no evita el límite',async t=>{
+test('detrás del proxy local el límite es por cliente reenviado, no por el proxy',async t=>{
+  // fetch conecta desde 127.0.0.1: es el caso real de Passenger/Apache.
   const {post}=await fixture(t);
-  for(let i=0;i<8;i++)assert.equal((await post('/api/login',{password:'wrong'},'',{'x-forwarded-for':`198.51.100.${i}`})).status,401);
-  assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'198.51.100.99'})).status,429);
+  for(let i=0;i<8;i++)assert.equal((await post('/api/login',{password:'wrong'},'',{'x-forwarded-for':'203.0.113.10'})).status,401);
+  assert.equal((await post('/api/login',{password:'wrong'},'',{'x-forwarded-for':'203.0.113.10'})).status,429);
+  // Otro cliente conserva su propio presupuesto: ocho fallos ajenos no bloquean la operación.
+  assert.equal((await post('/api/login',{password},'',{'x-forwarded-for':'203.0.113.11'})).status,200);
+});
+
+test('la clave de cliente solo confía en X-Forwarded-For desde el proxy local',()=>{
+  // Último salto: el que agrega el proxy inmediato.
+  assert.equal(clientAddress({peer:'127.0.0.1',forwarded:'203.0.113.10, 198.51.100.7'}),'198.51.100.7');
+  assert.equal(clientAddress({peer:'::1',forwarded:'203.0.113.10'}),'203.0.113.10');
+  assert.equal(clientAddress({peer:'::ffff:127.0.0.1',forwarded:'203.0.113.10'}),'203.0.113.10');
+  // Un cliente directo no puede suplantar su IP reenviándola.
+  assert.equal(clientAddress({peer:'203.0.113.77',forwarded:'198.51.100.7'}),'203.0.113.77');
+  assert.equal(clientAddress({peer:'10.0.0.5',forwarded:'198.51.100.7'}),'10.0.0.5');
+  // Solo la confianza explícita cubre un proxy que no sea local.
+  assert.equal(clientAddress({peer:'203.0.113.77',forwarded:'198.51.100.7',trustProxy:true}),'198.51.100.7');
+  assert.equal(clientAddress({peer:'198.51.100.7',forwarded:''}),'198.51.100.7');
+  assert.equal(clientAddress({peer:undefined}),'unknown');
 });
 
 test('escrituras con Host falsificado rechazadas',async t=>{
