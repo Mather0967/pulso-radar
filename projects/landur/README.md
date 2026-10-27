@@ -41,7 +41,11 @@ Integraciones automáticas, OCR, recetas, márgenes avanzados, push y escritura 
 
 **Corrección y reversión auditada:** un registro equivocado se corrige revirtiendo y volviendo a registrar. La reversión no borra ni edita la operación original: crea un contra-asiento vinculado, la marca como revertida, restaura el saldo y la saca de los totales vigentes. Se rechaza si algo se apoya en ella sin revertir. El esquema se versiona con `PRAGMA user_version` y se migra en el lugar, sin perder datos.
 
-**Pendientes:** comprobantes adjuntos, reservas operativas, recuperación de acceso y usuarios definitivos (los aporta el portal RIVECT), conciliación avanzada, informes por período y validación de reglas/datos reales. No se ha desplegado ni probado en Namecheap, en Safari/iPhone real ni se ha hecho pentesting. Es una alfa para pruebas, no está habilitada para datos reales.
+**Comprobantes adjuntos:** una foto o un PDF se adjunta al registrar o desde el detalle de la operación. El archivo se reduce en el teléfono antes de subir y vive dentro de la misma base privada, así que el respaldo y la restauración lo incluyen. El servidor decide el tipo por los bytes —firma y cierre del archivo—, no por lo que declare el navegador, y acepta JPEG, PNG, WebP y PDF hasta 1.536 KB. Se descargan con `no-store`, solo el espacio dueño los lee, y la reversión los conserva porque son parte de la historia.
+
+**Revisión de pendientes:** además de obligaciones y ventas por cobrar, la vista Pendientes muestra «Duplicados dudosos» e «Información incompleta». Los duplicados se señalan cuando dos registros manuales coinciden en tipo, moneda, importe, fecha, cuenta **y concepto**: compartir solo importe y fecha no alcanza, porque la propia demo tiene dos gastos distintos de $1.250 el mismo día. La app nunca fusiona nada: lista los registros, permite abrir cada uno y deja la decisión al usuario. Los importes y las aperturas no verificados se muestran como faltantes, sin convertirlos en cero.
+
+**Pendientes:** reservas operativas, recuperación de acceso y usuarios definitivos (los aporta el portal RIVECT), conciliación avanzada, informes por período y validación de reglas/datos reales. No se ha desplegado ni probado en Namecheap, en Safari/iPhone real ni se ha hecho pentesting. Es una alfa para pruebas, no está habilitada para datos reales.
 
 ### Ejecutar y verificar
 
@@ -78,9 +82,9 @@ La rama de esta sesión es `arena/eab1cd0e-pulso-radar`. No se creó un reposito
 
 ## Verificación de este corte
 
-- 79 pruebas unitarias/integración locales: núcleo monetario, API privada, configuración, respaldos, CSV atómico, idempotencia, endurecimiento de la importación, parser del dictado, migración de esquema y reversión auditada. Tres fallan por límites de Windows (enlace simbólico sin Developer Mode, ruta POSIX esperada y `chmod 0600` no aplicable); las tres se reproducen sobre `HEAD` limpio.
-- QA de navegador con Chromium: escritorio y viewport 390×844, registros, doble envío, pérdida de respuesta después de guardar, pago parcial, CSV repetido, exportación, escape de texto, cuentas, persistencia, caché pública, bloqueo offline, logout, login privado, factura dictada de punta a punta con un reconocedor simulado y reversión auditada. `npm run test:portal` agrega 13 verificaciones del montaje dentro del portal.
-- Desde la raíz, `npm test` incluye una comprobación de que las dos listas de recursos de LANDUR (servidor autónomo y portal) sirven lo mismo, derivada de los propios archivos. Existe porque la separación entre ambas ya rompió la aplicación en producción una vez.
+- 141 pruebas locales en verde (60 desde la raíz y 81 en LANDUR): núcleo monetario, API privada, configuración, respaldos, CSV atómico, idempotencia, endurecimiento de la importación, parser del dictado, migración de esquema, reversión auditada, comprobantes y límite por sesión. Tres fallan por límites de Windows (enlace simbólico sin Developer Mode, ruta POSIX esperada y `chmod 0600` no aplicable); las tres se reproducen sobre `HEAD` limpio.
+- QA de navegador con Chromium: 28 verificaciones en escritorio y viewport 390×844 — registros, doble envío, pérdida de respuesta después de guardar, pago parcial, CSV repetido, exportación, escape de texto, cuentas, persistencia, caché pública, bloqueo offline, logout, login privado, factura dictada con un reconocedor simulado, reversión auditada, comprobantes adjuntos desde el alta y desde el detalle, comprobantes fuera de la caché y revisión de duplicados e información incompleta. `npm run test:portal` agrega 13 verificaciones del montaje dentro del portal.
+- Desde la raíz, `npm test` comprueba dos cosas derivadas de los propios archivos: que las dos listas de recursos de LANDUR (servidor autónomo y portal) sirven lo mismo, y que las rutas de API que llama `public/app.js` existen en las dos superficies con los mismos métodos. Existe porque la separación entre ambas ya rompió la aplicación en producción una vez.
 - Capturas locales en `data/qa/`, fuera de Git. Dependencias de navegador son solo de desarrollo.
 - No se reemplaza prueba en dispositivo real ni pentesting por emulación móvil.
 

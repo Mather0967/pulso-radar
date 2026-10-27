@@ -6,6 +6,7 @@ import { once } from 'node:events';
 import assert from 'node:assert/strict';
 import { Ledger } from '../server/ledger.mjs';
 import { createApp } from '../server/app.mjs';
+import { pngBytes } from '../tests/helpers/png.mjs';
 
 mkdirSync('data/qa',{recursive:true});
 const ledger=new Ledger();
@@ -18,6 +19,9 @@ const browser=await chromium.launch({executablePath:process.env.BROWSER_EXECUTAB
   args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--no-zygote','--use-gl=angle','--use-angle=swiftshader'],
   env:{...process.env,...(libraryDir?{LD_LIBRARY_PATH:`${libraryDir}/lib:${process.env.LD_LIBRARY_PATH||''}`}:{})},headless:true});
 const errors=[];
+// Un PNG de 1×1 real, generado: los comprobantes se validan por sus bytes y el navegador
+// tiene que poder decodificarlos para probar el recorte antes de subir.
+const PNG=pngBytes();
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -33,6 +37,11 @@ try{
   await page.goto(url);await page.getByRole('heading',{name:/Saldos y compromisos|Control financiero del negocio/}).waitFor();
   await page.screenshot({path:'data/qa/desktop.png',fullPage:true});
   const read=()=>page.evaluate(async()=>await(await fetch('/api/state')).json());
+  // `waitFor` solo espera el elemento: una miniatura puede estar en pantalla sin haber cargado.
+  const thumbLoaded=()=>page.locator('.evidence-thumb').first().evaluate(img=>img.complete?img.naturalWidth>0
+    :new Promise(resolve=>{const finish=value=>resolve(value);
+      img.addEventListener('load',()=>finish(true),{once:true});img.addEventListener('error',()=>finish(false),{once:true});
+      setTimeout(()=>finish(img.naturalWidth>0),5000);}));
   const initial=await read();assert.equal(initial.demo,true);
   // Paid expense with double submit. Both events reach the handler in one task.
   await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
@@ -120,6 +129,70 @@ try{
   assert.equal(await page.getByRole('button',{name:'Revertir…'}).count(),0,'no se ofrece revertir lo ya revertido');
   await page.getByRole('button',{name:'Cerrar diálogo'}).click();
   assert.equal((await read()).operations.filter(o=>o.kind==='reversal').length,1,null,'no se crea una segunda reversión');
+  // Comprobantes: se adjuntan al registrar y desde el detalle, y se leen con la sesión.
+  await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
+  await page.locator('[name=concept]').fill('Gasto QA con comprobante');
+  await page.locator('[name=amount]').fill('310');
+  await page.locator('[name=accountId]').selectOption(initial.accounts[0].id);
+  await page.locator('[name=evidence]').setInputFiles({name:'ticket.png',mimeType:'image/png',buffer:PNG});
+  await page.locator('#operation-form [type=submit]').click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  const conComprobante=(await read()).operations.find(o=>o.concept==='Gasto QA con comprobante');
+  assert.ok(conComprobante,'el registro con archivo se guarda igual');
+  let comprobantes=(await read()).evidence.filter(e=>e.operation===conComprobante.id);
+  assert.equal(comprobantes.length,1,'el comprobante queda asociado a la operación');
+  await page.locator(`[data-operation="${conComprobante.id}"]`).click();
+  const descargado=await page.evaluate(async id=>{const r=await fetch(`/api/evidence/${id}`);return {status:r.status,type:r.headers.get('content-type'),cache:r.headers.get('cache-control')};},comprobantes[0].id);
+  assert.equal(descargado.status,200,JSON.stringify(descargado));
+  assert.equal(descargado.type,'image/jpeg',JSON.stringify(descargado));
+  assert.equal(descargado.cache,'no-store','un comprobante no se cachea');
+  await page.locator('.evidence-thumb').waitFor();
+  assert.equal(await thumbLoaded(),true,'la miniatura carga desde la API privada');
+  await page.getByRole('button',{name:'Cerrar diálogo'}).click();
+  // Desde el detalle: el botón abre el selector y el archivo se adjunta a lo ya registrado.
+  const sinComprobante=(await read()).operations.find(o=>o.concept==='Proveedor de materiales');
+  await page.locator(`[data-operation="${sinComprobante.id}"]`).click();
+  const selector=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'Adjuntar comprobante'}).click();
+  await (await selector).setFiles({name:'factura.png',mimeType:'image/png',buffer:PNG});
+  await page.locator('.evidence-thumb').waitFor();
+  assert.equal(await thumbLoaded(),true,'el comprobante adjuntado desde el detalle también se muestra');
+  comprobantes=(await read()).evidence.filter(e=>e.operation===sinComprobante.id);
+  assert.equal(comprobantes.length,1,'el comprobante se adjunta a una operación ya registrada');
+  assert.equal((await read()).evidence.length,2);
+  await page.getByRole('button',{name:'Cerrar diálogo'}).click();
+  // Revisión: duplicados dudosos e información incompleta se muestran, nunca se resuelven solos.
+  // Mismo concepto, mismo importe, misma cuenta y misma fecha: el caso típico de doble carga.
+  for(let n=0;n<2;n++){
+    await page.getByRole('button',{name:'Registrar operación',exact:true}).click();
+    await page.locator('[name=concept]').fill('Gasto QA repetido');
+    await page.locator('[name=amount]').fill('777');
+    await page.locator('[name=accountId]').selectOption(initial.accounts[0].id);
+    await page.locator('#operation-form [type=submit]').click();
+    await page.locator('#modal').waitFor({state:'hidden'});
+  }
+  await page.locator('.sidebar [data-view=pending]').click();
+  await page.getByRole('heading',{name:'Duplicados dudosos'}).waitFor();
+  await page.getByRole('heading',{name:'Información incompleta'}).waitFor();
+  const cardDudosos=page.locator('.card').filter({hasText:'Duplicados dudosos'});
+  const dudosos=await cardDudosos.textContent();
+  assert.equal(await cardDudosos.locator('.duplicate-group .concept-button').count(),2,dudosos);
+  assert.ok(dudosos.includes('Gasto QA repetido'),dudosos);
+  assert.ok(dudosos.includes('No se fusionan solos'),'debe decir que no se resuelven automáticamente');
+  // Dos gastos distintos con el mismo importe el mismo día no son duplicados: la demo tiene
+  // dos de $1.250 el 24 de octubre y marcarlos sería ruido.
+  assert.ok(!dudosos.includes('Proveedor de materiales'),'un importe compartido no es duplicado');
+  // Cada registro del grupo se abre desde la propia revisión.
+  await cardDudosos.locator('.concept-button').first().click();
+  await page.locator('#modal').waitFor({state:'visible'});
+  await page.getByRole('button',{name:'Cerrar diálogo'}).click();
+  await page.locator('#modal').waitFor({state:'hidden'});
+  assert.ok(await page.getByText('1 por revisar',{exact:true}).count()>0,'la cabecera cuenta los grupos');
+  const incompleta=await page.locator('.card').filter({hasText:'Información incompleta'}).textContent();
+  assert.ok(/sin comprobante/.test(incompleta),'debe señalar los registros sin comprobante');
+  assert.ok(/Todas las aperturas|apertura sin verificar/.test(incompleta));
+  // El servicio de la revisión no inventa datos: sigue mostrando la decisión pendiente del disponible.
+  assert.ok(await page.getByText('Decisiones pendientes').count()>0);
   // Import preview + commit + repeated upload; also prove CSV markup stays inert.
   await page.locator('.sidebar [data-view=settings]').click();
   const csv='kind,date,concept,amount,currency,account_id,due,source,external_id,category\nsale,2026-10-24,<img src=x onerror=alert(1)>,50,UYU,,,QA,QA-CSV-01,Ventas';
@@ -186,5 +259,5 @@ try{
     assert.equal(await privatePage.getByText('Cuenta sintética privada',{exact:true}).count(),0);
   }finally{await privateContext.close();await new Promise(resolve=>privateServer.close(resolve));privateLedger.close();}
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation','voice-full-invoice','voice-refuses-unknown-amount','voice-panel-fits-mobile','audited-reversal'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
+  console.log(JSON.stringify({passed:['dashboard','expense-double-submit','server-persistence','ambiguous-response-retry','partial-payment','csv-preview','csv-repeat','escaped-markup','csv-download','mobile-navigation','account-creation','no-horizontal-overflow','shell-only-cache','offline-lock','logout','private-login','private-empty-state','private-account-persistence','voice-dictation','voice-full-invoice','voice-refuses-unknown-amount','voice-panel-fits-mobile','audited-reversal','evidence-on-create','evidence-from-detail','evidence-not-cached','duplicate-review','incomplete-review'],screenshots:'data/qa/',limitations:['Chromium mobile emulation, not real iPhone/Safari','not a pentest','not deployed to Namecheap']},null,2));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));ledger.close();}

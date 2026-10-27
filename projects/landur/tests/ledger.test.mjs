@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { Ledger, money } from '../server/ledger.mjs';
+import { Ledger, money, MIGRATIONS } from '../server/ledger.mjs';
+import { pngBytes } from './helpers/png.mjs';
 
 function fixture(t) {
   const ledger = new Ledger(); ledger.workspace('a'); ledger.workspace('b'); t.after(() => ledger.close());
@@ -139,7 +140,7 @@ test('una base anterior se migra en el lugar sin perder datos', t => {
   legacy.close();
   const ledger=new Ledger(file);
   try {
-    assert.equal(ledger.db.prepare('PRAGMA user_version').get().user_version,2);
+    assert.equal(ledger.db.prepare('PRAGMA user_version').get().user_version,MIGRATIONS.length);
     const state=ledger.snapshot('a');
     assert.equal(state.operations.length,1,'los datos anteriores se conservan');
     assert.equal(state.operations[0].concept,'Anterior a la migración');
@@ -148,9 +149,10 @@ test('una base anterior se migra en el lugar sin perder datos', t => {
   // Reabrir no vuelve a migrar ni duplica columnas.
   const again=new Ledger(file);
   try {
-    assert.equal(again.db.prepare('PRAGMA user_version').get().user_version,2);
+    assert.equal(again.db.prepare('PRAGMA user_version').get().user_version,MIGRATIONS.length);
     assert.equal(again.db.prepare('PRAGMA table_info(operations)').all().filter(c=>c.name==='reversed_by').length,1);
     assert.equal(again.db.prepare('PRAGMA table_info(applications)').all().filter(c=>c.name==='reversed').length,1);
+    assert.equal(again.db.prepare('PRAGMA table_info(evidence)').all().filter(c=>c.name==='content').length,1,'la migración crea la tabla de comprobantes');
   } finally { again.close(); }
 });
 test('revertir un gasto devuelve el dinero y lo saca del resultado', t => {
@@ -223,4 +225,54 @@ test('una venta sin cobros se revierte y deja de contarse', t => {
   const state=ledger.snapshot('a');
   assert.equal(state.totals[0].sales,0);assert.equal(state.totals[0].receivable,0);
   assert.equal(state.operations.find(o=>o.id===sale).reversed_by!==null,true);
+});
+
+const PNG=pngBytes().toString('base64');
+
+test('comprobantes: se adjuntan, se leen por espacio y el reintento no duplica', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account(),amount:'1250'})).id;
+  const key=randomUUID();
+  const input={operationId:expense,name:'ticket.png',mime:'image/png',data:PNG};
+  const first=ledger.attachEvidence('a','tester',key,input);
+  assert.equal(ledger.attachEvidence('a','tester',key,input).id,first.id,'el reintento devuelve el mismo archivo');
+  const file=ledger.evidenceFile('a',first.id);
+  assert.equal(file.name,'ticket.png');assert.equal(file.mime,'image/png');
+  assert.deepEqual([...file.content],[...Buffer.from(PNG,'base64')],'el bytes devuelto es el que se subió');
+  const state=ledger.snapshot('a');
+  assert.equal(state.evidence.length,1);assert.equal(state.evidence[0].operation,expense);
+  assert.equal(state.audit[0].action,'evidence.attached');
+  assert.throws(()=>ledger.evidenceFile('b',first.id),/no existe o no está disponible/,'un espacio ajeno no lo lee');
+});
+
+test('comprobantes: el tipo sale de los bytes y nada mentiroso se guarda', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account(),amount:'1250'})).id;
+  const at=(mime,name,data)=>({operationId:expense,name,mime,data});
+  // Un HTML con extensión de imagen no pasa: el servidor mira los bytes, no la etiqueta.
+  const script=Buffer.from('<script>alert(1)</script>').toString('base64');
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('image/png','x.html',script)),/no es una imagen/);
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('text/html','x.png',PNG)),/no es una imagen/);
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('image/png','',PNG)),/entre 1 y 120/);
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('image/png','x.png','no base64!!')),/No se pudo leer/);
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),{operationId:'no-existe',name:'x.png',mime:'image/png',data:PNG}),/operación/);
+  const huge=Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),Buffer.alloc(1572864)]);
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('image/png','grande.png',huge.toString('base64'))),/KB o menos/);
+  // Firma correcta pero archivo cortado: se rechaza por incompleto, no por el tipo.
+  assert.throws(()=>ledger.attachEvidence('a','t',randomUUID(),at('image/png','cortado.png',pngBytes().subarray(0,20).toString('base64'))),/incompleto/);
+  // Un nombre con ruta no crea rutas en el servidor: se guarda como etiqueta.
+  const ok=ledger.attachEvidence('a','t',randomUUID(),at('image/png','../../etc/passwd.png',PNG));
+  assert.equal(ledger.evidenceFile('a',ok.id).name,'..-..-etc-passwd.png');
+  assert.equal(ledger.snapshot('a').evidence.length,1);
+});
+
+test('la reversión conserva el comprobante de la operación original', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account(),amount:'1250'})).id;
+  ledger.attachEvidence('a','tester',randomUUID(),{operationId:expense,name:'ticket.png',mime:'image/png',data:PNG});
+  run({kind:'reversal',operationId:expense,date:'2026-10-25'});
+  const state=ledger.snapshot('a');
+  assert.equal(state.evidence.length,1,'el archivo no se borra con la operación');
+  assert.equal(state.evidence[0].operation,expense);
+  assert.equal(state.operations.find(o=>o.id===expense).reversed_by!==null,true);
 });

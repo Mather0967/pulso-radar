@@ -7,6 +7,7 @@ const scryptKey = (password, salt, size = 64) => new Promise((resolve, reject) =
   scrypt(password, salt, size, (error, key) => error ? reject(error) : resolve(key)));
 import { DomainError } from './ledger.mjs';
 import { exportOperations } from './csv.mjs';
+import { createRateLimiter } from './limits.mjs';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const assets = new Map([
@@ -23,6 +24,13 @@ const assets = new Map([
   ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
 ]);
 const digest = text => createHash('sha256').update(text).digest('hex');
+// Paridad de superficies: el servidor autónomo y el montaje del portal deben ofrecer las
+// mismas rutas que usa el cliente. `tests/landur-assets.test.mjs` compara las dos listas
+// contra los endpoint que llama `public/app.js`, porque ya hubo una separación que dejó
+// la aplicación en pantalla en blanca en producción.
+export const appApiRoutes = ['GET /api/session','POST /api/demo','POST /api/login','POST /api/logout',
+  'GET /api/state','GET /api/export.csv','GET /api/evidence/*','POST /api/evidence',
+  'POST /api/import/preview','POST /api/import/commit','POST /api/commands'];
 // El proxy del propio host (Passenger/Apache) siempre conecta desde loopback, así que
 // ahí X-Forwarded-For es confiable y se toma el último salto: el que agrega el proxy
 // inmediato. Un cliente directo nunca llega desde loopback y no puede falsearla.
@@ -50,6 +58,9 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
     // including when the operator rotates the password in cPanel.
     ledger.db.prepare("DELETE FROM sessions WHERE mode='private'").run();
   }
+  // 30 por minuto y por sesión: alcanza para cargar un lote y adjuntar sus comprobantes
+  // a mano, y corta la amplificación desde una sesión válida.
+  const bulkLimiter = createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
   const mode = demo ? 'demo' : 'private';
   // Embedded synthetic previews may run with third-party cookies blocked.
   // Header credentials are accepted ONLY by the explicitly enabled demo instance.
@@ -180,7 +191,22 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
           res.setHeader('Content-Disposition','attachment; filename="landur-operaciones.csv"');
           return res.end(exportOperations(ledger.snapshot(s.workspace)));
         }
+        if (req.method === 'GET' && url.pathname.startsWith('/api/evidence/')) {
+          const file = ledger.evidenceFile(s.workspace, decodeURIComponent(url.pathname.slice('/api/evidence/'.length)));
+          res.setHeader('Content-Type', file.mime);
+          res.setHeader('Content-Length', String(file.content.length));
+          // Una foto se muestra y un PDF se descarga: el tipo lo decide el archivo guardado, no el cliente.
+          res.setHeader('Content-Disposition', `${file.mime === 'application/pdf' ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`);
+          res.writeHead(200);
+          return res.end(file.content);
+        }
+        if (req.method === 'POST' && url.pathname === '/api/evidence') {
+          bulkLimiter.check(s.hash);
+          const input = await body(req,2400000);
+          return json(res,200,ledger.attachEvidence(s.workspace,s.actor,req.headers['idempotency-key'],input));
+        }
         if (req.method === 'POST' && ['/api/import/preview','/api/import/commit'].includes(url.pathname)) {
+          bulkLimiter.check(s.hash);
           const input = await body(req,131072);
           const result = url.pathname.endsWith('preview')
             ? ledger.previewImport(s.workspace,s.actor,input.csv)

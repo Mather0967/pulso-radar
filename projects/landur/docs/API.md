@@ -15,6 +15,8 @@ Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas s
 | `POST /api/import/preview` | `{csv}`; valida dentro de transacción revertida, sin guardar |
 | `POST /api/import/commit` | `{csv}` y `Idempotency-Key`; lote atómico, deduplicación adicional por fila |
 | `GET /api/export.csv` | CSV de operaciones de todas las monedas del espacio, no del filtro visual |
+| `POST /api/evidence` | `{operationId, name, mime, data}`; adjunta un comprobante, con `Idempotency-Key` |
+| `GET /api/evidence/<id>` | Devuelve el archivo; solo el espacio dueño puede leerlo |
 
 Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen permitido. La clave idempotente debe reutilizarse al reintentar **la misma operación**, no generar otra cuando se pierde una respuesta. El servidor devuelve conflicto si la clave existe con un contenido diferente.
 
@@ -30,6 +32,21 @@ Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen per
 - `reversal`: `operationId`, `date`. Registra el contra-asiento de una operación existente. No borra ni edita la original: la marca como revertida, invierte sus movimientos de cuenta, desactiva su aplicación si la tenía y, cuando corresponde, revierte también la comisión del cobro. Se rechaza si ya fue revertida, si es una reversión, o si algo se apoya en ella sin revertir.
 
 Importes de entrada como strings decimales, sin miles, hasta dos decimales; respuesta monetaria en unidades menores enteras. Monedas admitidas técnicamente: UYU, USD y BRL, separadas sin conversión. Esto no confirma cuáles usa LANDUR en producción.
+
+## Comprobantes
+
+`data` es base64 (con o sin prefijo `data:`). El archivo vive dentro de la misma base privada, así que el respaldo y la restauración ya probados lo incluyen sin un directorio adicional ni permisos nuevos en el hosting.
+
+- **Admitidos:** JPEG, PNG, WebP y PDF, hasta 1.536 KB por archivo.
+- **El tipo lo deciden los bytes**, no la etiqueta del cliente: se comprueba la firma y que el archivo esté completo (cierre de imagen, chunk final o marcador de cierre). Una extensión mentirosa no pasa, y un archivo truncado tampoco.
+- **El nombre** se guarda como etiqueta: se le quitan los caracteres de control y los separadores de ruta.
+- **Descarga:** `Content-Type` del archivo guardado, `Content-Disposition` `inline` para imágenes y `attachment` para PDF, y `Cache-Control: no-store`. El tipo no lo decide el cliente.
+- **No se borran.** La reversión de una operación conserva sus comprobantes, porque son parte de la historia.
+- **Límite:** 30 llamadas por minuto y por sesión, junto con la importación. Es el mismo tope en el servidor autónomo y en el montaje del portal.
+- **Reintento:** reutilizar la `Idempotency-Key` devuelve el mismo comprobante; usarla con otro archivo genera conflicto.
+- **Alcance:** solo se adjunta a una operación existente del propio espacio. Una lectura ajena responde 404, igual que un identificador inexistente.
+
+Los comprobantes no son una validación de contenido: el servidor comprueba estructura y tamaño, no que la imagen corresponda al gasto. Eso sigue siendo una revisión del usuario.
 
 Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección se hace revirtiendo y registrando de nuevo, nunca editando el registro original: la historia se conserva y cada reversión queda auditada con su autor y su fecha.
 

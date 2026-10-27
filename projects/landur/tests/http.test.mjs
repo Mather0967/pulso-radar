@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { connect } from 'node:net';
 import { Ledger } from '../server/ledger.mjs';
 import { createApp, clientAddress } from '../server/app.mjs';
+import { pngBytes } from './helpers/png.mjs';
 const password='synthetic-test-secret-only';
 async function fixture(t, options={}) {
   const ledger=new Ledger();const server=createApp({ledger,password,insecureCookies:true,...options});
@@ -205,4 +206,42 @@ test('la reversión por HTTP es idempotente y no se repite',async t=>{
   assert.equal(state.operations.filter(o=>o.kind==='reversal').length,1);
   assert.equal(state.totals[0].expenses,0);
   assert.equal(state.totals[0].balance,50000);
+});
+
+const PNG=pngBytes().toString('base64');
+
+test('comprobantes por HTTP: adjuntar, descargar y no salir del espacio',async t=>{
+  const {base,post,login}=await fixture(t);const cookie=await login();
+  const account=await(await post('/api/commands',{kind:'account',name:'Caja',accountKind:'cash',currency:'UYU',opening:'100',cutoff:'2026-10-24',verified:true,accessible:true},cookie,{'idempotency-key':randomUUID()})).json();
+  const expense=await(await post('/api/commands',{kind:'expense',concept:'Embalajes',amount:'250',currency:'UYU',date:'2026-10-24',accountId:account.id},cookie,{'idempotency-key':randomUUID()})).json();
+  const body={operationId:expense.id,name:'ticket.png',mime:'image/png',data:PNG};
+  const key=randomUUID();
+  const upload=await post('/api/evidence',body,cookie,{'idempotency-key':key});
+  assert.equal(upload.status,200);
+  const id=(await upload.json()).id;
+  const replay=await post('/api/evidence',body,cookie,{'idempotency-key':key});
+  assert.equal((await replay.json()).id,id,'el reintento con la misma clave no duplica');
+  const file=await fetch(`${base}/api/evidence/${id}`,{headers:{cookie}});
+  assert.equal(file.status,200);
+  assert.equal(file.headers.get('content-type'),'image/png');
+  assert.equal(file.headers.get('cache-control'),'no-store','un comprobante no se cachea');
+  assert.match(file.headers.get('content-disposition'),/inline/);
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())],[...Buffer.from(PNG,'base64')]);
+  assert.equal((await fetch(`${base}/api/evidence/${id}`)).status,401,'sin sesión no se descarga');
+  assert.equal((await fetch(`${base}/api/evidence/${randomUUID()}`,{headers:{cookie}})).status,404);
+  assert.equal((await post('/api/evidence',body)).status,401);
+  assert.equal((await post('/api/evidence',{...body,data:'aGVsbG8='},cookie,{'idempotency-key':randomUUID()})).status,400,'los bytes deciden el tipo');
+});
+
+test('la importación tiene límite por sesión y no bloquea a los demás',async t=>{
+  const {post,login}=await fixture(t);const cookie=await login();
+  const csv='kind,date,concept,amount,currency,account_id,due,source,external_id,category\r\nsale,2026-10-24,Prueba de límite,10.00,UYU,,,manual,QA-LIMITE-1,\r\n';
+  let last;
+  for(let i=0;i<31;i++)last=await post('/api/import/preview',{csv},cookie);
+  assert.equal(last.status,429,'la 31ª llamada en el minuto se corta');
+  // El tope es por sesión: otra sesión de la misma instancia sigue funcionando.
+  const other=await login();
+  assert.equal((await post('/api/import/preview',{csv},other)).status,200);
+  // Y los comandos normales tampoco se ven afectados.
+  assert.equal((await post('/api/commands',{kind:'account',name:'Caja',accountKind:'cash',currency:'UYU',opening:'100',cutoff:'2026-10-24',verified:true,accessible:true},cookie,{'idempotency-key':randomUUID()})).status,200);
 });

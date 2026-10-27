@@ -55,3 +55,30 @@ test('ambas superficies sirven todo lo que la interfaz de LANDUR necesita', asyn
     await portal.close();
   }
 });
+
+// Lo mismo vale para las rutas de API: las dos superficies mantienen su propia lista y una
+// ruta que el cliente llama y una superficie desconoce llega al usuario como 404.
+test('las dos superficies conocen las rutas de API que llama el cliente', async () => {
+  const [{ appApiRoutes }, { portalApiRoutes }] = await Promise.all([
+    import('../projects/landur/server/app.mjs'),
+    import('../namecheap/server/landur.mjs')
+  ]);
+  // El portal reemplaza estas tres a propósito: la sesión la administra RIVECT.
+  const standaloneOnly = new Set(['/api/login', '/api/demo', '/api/logout']);
+  const clientPaths = [...new Set([...source('app.js').matchAll(/['"`](\/api\/[A-Za-z0-9/_.-]+)['"`]/g)].map(match => match[1]))];
+  assert.ok(clientPaths.length >= 8, `no se derivaron las rutas del cliente: ${clientPaths.join(', ')}`);
+
+  const methodsFor = (routes, target) => routes.filter(route => {
+    const [, routePath] = route.split(' ');
+    return routePath === target || (routePath.endsWith('/*') && target.startsWith(routePath.slice(0, -1)));
+  }).map(route => route.split(' ')[0]).sort();
+
+  for (const path of clientPaths) {
+    const standalone = methodsFor(appApiRoutes, path);
+    assert.ok(standalone.length, `el servidor autónomo no conoce ${path}`);
+    const portal = methodsFor(portalApiRoutes, path);
+    if (standaloneOnly.has(path)) { assert.equal(portal.length, 0, `el portal no debe exponer ${path}`); continue; }
+    assert.ok(portal.length, `el portal no conoce ${path}`);
+    assert.deepEqual(portal, standalone, `las dos superficies no coinciden en ${path}`);
+  }
+});

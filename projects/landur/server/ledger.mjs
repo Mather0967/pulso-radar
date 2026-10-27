@@ -32,11 +32,41 @@ function stable(value) {
   return value;
 }
 
+// Comprobantes: viven dentro de la misma base privada, así que el respaldo y la
+// restauración ya probados los incluyen sin depender de un directorio extra ni de
+// permisos nuevos en el hosting. El tipo se decide por los bytes del archivo y no por
+// lo que declare el cliente: una extensión mentirosa no debe servir HTML desde el dominio.
+const EVIDENCE_LIMIT = 1572864;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// No basta con mirar la firma: un archivo firmado pero ilegible se acepta igual, no se
+// puede recortar en el teléfono y tampoco se puede mostrar. Se comprueba además que el
+// archivo esté completo, que es lo que impide que un PNG truncado pase la validación.
+const EVIDENCE_TYPES = new Map([
+  ['image/jpeg', b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff && b.subarray(-2).equals(Buffer.from([0xff, 0xd9]))],
+  ['image/png', b => b.subarray(0, 8).equals(PNG_SIGNATURE) && b.subarray(-8, -4).toString('latin1') === 'IEND'],
+  ['image/webp', b => b.length >= 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP'],
+  ['application/pdf', b => b.subarray(0, 5).toString('latin1') === '%PDF-' && b.subarray(-1024).includes('%%EOF')]
+]);
+function evidenceName(value) {
+  const name = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/[\\/]/g, '-').trim();
+  if (!name || name.length > 120) throw new DomainError('El nombre del archivo debe tener entre 1 y 120 caracteres.');
+  return name;
+}
+function evidenceBytes(value) {
+  // Se acepta con o sin el prefijo `data:` porque el cliente recorta la foto antes de enviarla.
+  const base64 = String(value ?? '').replace(/^data:[^,]*,/, '');
+  if (!base64 || base64.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) throw new DomainError('No se pudo leer el archivo adjunto.');
+  const bytes = Buffer.from(base64, 'base64');
+  if (!bytes.length) throw new DomainError('No se pudo leer el archivo adjunto.');
+  if (bytes.length > EVIDENCE_LIMIT) throw new DomainError(`El comprobante debe pesar ${Math.round(EVIDENCE_LIMIT / 1024)} KB o menos. Reducí la foto e intentá otra vez.`, 413);
+  return bytes;
+}
+
 // Esquema versionado con `PRAGMA user_version`. Cada paso se aplica una sola vez y
 // dentro de una transacción: si falla, la base queda como estaba. La versión 1 es el
 // esquema original del constructor (creado con IF NOT EXISTS), así que el mismo punto
 // de partida sirve para una base nueva y para una que ya existía sin marca de versión.
-const MIGRATIONS = [
+export const MIGRATIONS = [
   () => {},
   db => {
     const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(entry => entry.name === column);
@@ -44,6 +74,14 @@ const MIGRATIONS = [
     if (!has('operations', 'reversed_by')) db.exec('ALTER TABLE operations ADD COLUMN reversed_by TEXT');
     if (!has('operations', 'reversed_at')) db.exec('ALTER TABLE operations ADD COLUMN reversed_at TEXT');
     if (!has('applications', 'reversed')) db.exec('ALTER TABLE applications ADD COLUMN reversed INTEGER NOT NULL DEFAULT 0');
+  },
+  db => {
+    db.exec(`CREATE TABLE IF NOT EXISTS evidence (
+      id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
+      operation TEXT NOT NULL REFERENCES operations(id), name TEXT NOT NULL, mime TEXT NOT NULL,
+      bytes INTEGER NOT NULL CHECK(bytes > 0), sha256 TEXT NOT NULL, content BLOB NOT NULL,
+      created_at TEXT NOT NULL, actor TEXT NOT NULL
+    )`);
   }
 ];
 export class Ledger {
@@ -112,6 +150,7 @@ export class Ledger {
       this.db.prepare(`DELETE FROM entries WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list})) OR account IN (SELECT id FROM accounts WHERE workspace IN (${list}))`).run(...ids, ...ids);
       this.db.prepare(`DELETE FROM operations WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM accounts WHERE workspace IN (${list})`).run(...ids);
+      this.db.prepare(`DELETE FROM evidence WHERE workspace IN (${list})`).run(...ids);
       const removed = this.db.prepare(`DELETE FROM workspaces WHERE id IN (${list})`).run(...ids).changes;
       this.db.exec('COMMIT');
       return removed;
@@ -181,6 +220,44 @@ export class Ledger {
       this.db.exec('COMMIT');
       return result;
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  // Adjuntar un comprobante no pasa por `command` porque un archivo no es dinero: se
+  // valida, se guarda con su hash y se audita. Reintentar con la misma clave devuelve
+  // el mismo comprobante en lugar de duplicarlo.
+  attachEvidence(workspace, actor, key, input) {
+    if (typeof key !== 'string' || !/^[\w-]{16,100}$/.test(key)) throw new DomainError('Falta una clave de operación válida.');
+    const name = evidenceName(input?.name);
+    const mime = String(input?.mime ?? '');
+    const bytes = evidenceBytes(input?.data);
+    if (!EVIDENCE_TYPES.get(mime)?.(bytes)) throw new DomainError('El archivo no es una imagen JPEG, PNG o WebP ni un PDF válido, o está incompleto.');
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const operationId = String(input?.operationId ?? '');
+    const fingerprint = createHash('sha256').update(JSON.stringify(stable({ operationId, name, mime, sha256 }))).digest('hex');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, key);
+      if (previous) {
+        if (previous.fingerprint !== fingerprint) throw new DomainError('Esta clave ya fue usada para otro archivo.', 409);
+        this.db.exec('COMMIT');
+        return { ...JSON.parse(previous.result), replayed: true };
+      }
+      if (!this.db.prepare('SELECT id FROM operations WHERE workspace=? AND id=?').get(workspace, operationId))
+        throw new DomainError('No se encontró la operación a la que querés adjuntar el comprobante.', 404);
+      const id = randomUUID();
+      this.db.prepare('INSERT INTO evidence (id,workspace,operation,name,mime,bytes,sha256,content,created_at,actor) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .run(id, workspace, operationId, name, mime, bytes.length, sha256, bytes, new Date().toISOString(), actor);
+      const result = { id };
+      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?)').run(workspace, key, fingerprint, JSON.stringify(result));
+      this.audit(workspace, actor, 'evidence.attached', id);
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  // Solo el espacio dueño del comprobante puede leerlo: la comprobación va en la consulta.
+  evidenceFile(workspace, id) {
+    const row = this.db.prepare('SELECT id,name,mime,bytes,content FROM evidence WHERE workspace=? AND id=?').get(workspace, String(id ?? ''));
+    if (!row) throw new DomainError('El comprobante no existe o no está disponible en este espacio.', 404);
+    return { id: row.id, name: row.name, mime: row.mime, bytes: row.bytes, content: Buffer.from(row.content) };
   }
   previewImport(workspace, actor, csv) {
     this.db.exec('BEGIN IMMEDIATE');
@@ -297,7 +374,8 @@ export class Ledger {
         withdrawals: byKind('withdrawal'), available: null,
       };
     });
-    return { accounts, operations, entries, totals, policy: 'pending',
+    const evidence = this.db.prepare('SELECT id, operation, name, mime, bytes, created_at, actor FROM evidence WHERE workspace=? ORDER BY rowid DESC').all(workspace);
+    return { accounts, operations, entries, evidence, totals, policy: 'pending',
       audit: this.db.prepare('SELECT * FROM audit WHERE workspace=? ORDER BY rowid DESC LIMIT 30').all(workspace) };
   }
   seed(workspace) {
