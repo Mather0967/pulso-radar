@@ -506,7 +506,7 @@ function closeDialog(){if(busy)return;if(pendingRequest&&!confirm('La respuesta 
 modal.addEventListener('cancel',e=>{e.preventDefault();closeDialog();});
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.view){view=b.dataset.view;query='';filter='';modal.close();render();window.scrollTo(0,0);return;}
+  if(b.dataset.view){view=b.dataset.view;query='';filter='';try{modal.close();}catch{};if(typeof render==='function')render();window.scrollTo(0,0);return;}
   if(b.dataset.form){form(b.dataset.form);return;}
   if(b.dataset.pay){form(b.dataset.type,b.dataset.pay);return;}
   if(b.dataset.revert){revertDialog(b.dataset.revert);return;}
