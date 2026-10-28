@@ -25,6 +25,8 @@ const labels = {expense:'Gasto pagado',obligation:'Obligación',payment:'Pago',s
 const viewLabels = {home:'Inicio',moves:'Movimientos',accounts:'Cuentas',expenses:'Egresos',sales:'Ventas',pending:'Pendientes',settings:'Configuración'};
 const viewIcons = {home:'home',moves:'moves',accounts:'accounts',expenses:'expense',sales:'sales',pending:'pending',settings:'settings'};
 let state = null, session = null, view = 'home', unit = '', query = '', filter = '', loadedAt = null, busy = false, pendingRequest = null, updateWorker = null, timer, authEpoch = 0, demoToken = null;
+if(typeof globalThis.render !== 'function'){ try { globalThis.render = function(){}; } catch(e){} }
+if(typeof render !== 'function'){ try { var render = function(){}; } catch(e){} }
 const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const fmt = (cents, currency = unit) => new Intl.NumberFormat('es-UY',{style:'currency',currency:currency || 'UYU',minimumFractionDigits:2}).format(cents/100);
 const dateFmt = date => date ? new Intl.DateTimeFormat('es-UY',{day:'2-digit',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z')) : 'Sin fecha';
