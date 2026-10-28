@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="landur®">
+  <title>landur®</title>
+  <rect width="512" height="512" rx="96" ry="96" fill="#222244"/>
+  <text x="248" y="322"
+        text-anchor="middle"
+        fill="#F4F0E6"
+        font-family="ui-rounded, 'Arial Rounded MT Bold', 'Segoe UI Rounded', 'Helvetica Neue', system-ui, sans-serif"
+        font-size="210"
+        font-weight="800"
+        letter-spacing="-6">landur</text>
+  <g transform="translate(404 158)" fill="none" stroke="#F4F0E6" stroke-width="10">
+    <circle cx="34" cy="34" r="34"/>
+  </g>
+  <text x="438" y="204" text-anchor="middle" fill="#F4F0E6"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="46" font-weight="700">R</text>
+</svg>

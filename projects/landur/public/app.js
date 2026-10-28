@@ -94,8 +94,6 @@ function render() {
   $('#search')?.addEventListener('input',e=>{query=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
   $('#kind-filter')?.addEventListener('change',e=>{filter=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
   app.addEventListener('click',async event=>{
-    const accountBtn=event.target.closest('[data-delete-account]');
-    if(accountBtn){const id=accountBtn.getAttribute('data-delete-account');if(!confirm('Eliminar esta cuenta, sus movimientos de saldo, sus contra-asientos y las comisiones de sus cobros. Esto revierte todo lo que la cuenta movió. ¿Continuás?'))return;try{await api('/api/commands',{kind:'account.delete',accountId:id});await refresh();toast('Cuenta eliminada.');}catch(error){toast(error.message);}}
     const opBtn=event.target.closest('[data-operation]');
     if(opBtn){detail(opBtn.getAttribute('data-operation'));return;}
     const paymentBtn=event.target.closest('[data-delete-payment]');

@@ -318,28 +318,13 @@ export class Ledger {
     if (kind === 'account.delete') {
       const account = this.account(workspace, String(input.accountId ?? ''));
       const ids = new Set(this.db.prepare('SELECT DISTINCT operation FROM entries WHERE account=?').all(account.id).map(row => row.operation));
-      // Eliminar una cuenta también quita sus contra-asientos y las comisiones
-      // generadas por cobros suyos. La venta/deuda vinculada queda pendiente, intacta.
-      for (const id of [...ids]) {
-        const op = this.db.prepare('SELECT * FROM operations WHERE workspace=? AND id=?').get(workspace, id);
-        if (!op) continue;
-        if (op.reversed_by) ids.add(op.reversed_by);
-        if (op.kind === 'reversal' && op.related_id) ids.add(op.related_id);
-        if (op.kind === 'collection') {
-          for (const child of this.db.prepare("SELECT id,reversed_by FROM operations WHERE workspace=? AND related_id=? AND kind='commission'").all(workspace, op.id)) {
-            ids.add(child.id);
-            if (child.reversed_by) ids.add(child.reversed_by);
-          }
-        }
-      }
-      // También incluye una reversión cuyo original fue el primer movimiento que tocó la cuenta.
-      for (const id of [...ids]) {
-        const row = this.db.prepare("SELECT id FROM operations WHERE workspace=? AND related_id=? AND kind='reversal'").all(workspace, id);
-        for (const reversal of row) ids.add(reversal.id);
-      }
-      const removed = this.deleteOperations(workspace, actor, ids, 'account.deleted', account);
+      // Decisión registrada (DECISIONES.md, API.md): solo se elimina una cuenta sin movimientos.
+      // Si la cuenta tiene entradas de dinero, nada cambia y el historial manda: hay que anular
+      // antes cada operación que la use. Ninguna operación financiera se borra desde acá.
+      if (ids.size) throw new DomainError('La cuenta tiene movimientos. Anulá primero cada operación que la usa.', 409);
+      this.audit(workspace, actor, 'account.deleted', JSON.stringify({account}));
       this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
-      return { id: account.id, removedOperations: removed.operations, removedEvidence: removed.evidence };
+      return { id: account.id };
     }
     if (kind === 'evidence.remove') {
       const evidenceId = String(input.evidenceId ?? '');
