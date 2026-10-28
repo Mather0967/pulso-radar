@@ -276,3 +276,37 @@ test('la reversión conserva el comprobante de la operación original', t => {
   assert.equal(state.evidence[0].operation,expense);
   assert.equal(state.operations.find(o=>o.id===expense).reversed_by!==null,true);
 });
+
+test('una cuenta vacía se elimina con auditoría y una cuenta con movimientos se protege', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const empty=account({name:'Cuenta para quitar',opening:'0'});
+  const key=randomUUID(),deletion={kind:'account.delete',accountId:empty};
+  assert.deepEqual(run(deletion,key),{id:empty});
+  assert.equal(ledger.snapshot('a').accounts.some(a=>a.id===empty),false);
+  assert.equal(ledger.snapshot('a').audit[0].action,'account.deleted');
+  assert.match(ledger.snapshot('a').audit[0].entity,/Cuenta para quitar/);
+  assert.equal(run(deletion,key).replayed,true,'el reintento idempotente no vuelve a borrar');
+  const used=account({name:'Cuenta con movimiento'});
+  run(op('expense',{accountId:used}));
+  assert.throws(()=>run({kind:'account.delete',accountId:used}),error=>error.status===409&&/movimientos/.test(error.message));
+  assert.ok(ledger.snapshot('a').accounts.some(a=>a.id===used),'el rechazo no altera la cuenta');
+  assert.ok(ledger.snapshot('a').entries.some(e=>e.account===used),'el historial no se elimina');
+  assert.throws(()=>run({kind:'account.delete',accountId:'foreign'}),error=>error.status===404);
+});
+
+test('un comprobante se puede eliminar con idempotencia, auditoría y aislamiento', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const expense=run(op('expense',{accountId:account()})).id;
+  const evidence=ledger.attachEvidence('a','tester',randomUUID(),{operationId:expense,name:'factura equivocada.png',mime:'image/png',data:PNG});
+  const deletion={kind:'evidence.remove',evidenceId:evidence.id},key=randomUUID();
+  assert.deepEqual(run(deletion,key),{id:evidence.id});
+  assert.equal(ledger.snapshot('a').evidence.length,0);
+  assert.equal(ledger.snapshot('a').operations.length,1,'borrar el archivo no altera la operación');
+  assert.equal(ledger.snapshot('a').audit[0].action,'evidence.removed');
+  assert.match(ledger.snapshot('a').audit[0].entity,/factura equivocada/);
+  assert.equal(run(deletion,key).replayed,true);
+  assert.throws(()=>ledger.evidenceFile('a',evidence.id),error=>error.status===404);
+  assert.throws(()=>run({kind:'evidence.remove',evidenceId:evidence.id}),error=>error.status===404);
+  const foreign=ledger.attachEvidence('b','other',randomUUID(),{operationId:run(op('sale',{}),randomUUID(),'b').id,name:'ajeno.png',mime:'image/png',data:PNG});
+  assert.throws(()=>run({kind:'evidence.remove',evidenceId:foreign.id}),error=>error.status===404,'un espacio ajeno es indistinguible de uno inexistente');
+});

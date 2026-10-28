@@ -9,7 +9,7 @@ const publicAssets = new Map([
   ['/app.js',['app.js','text/javascript; charset=utf-8']], ['/voice.mjs',['voice.mjs','text/javascript; charset=utf-8']],
   ['/styles.css',['styles.css','text/css; charset=utf-8']],
   ['/sw.js',['sw.js','text/javascript; charset=utf-8']], ['/manifest.webmanifest',['manifest.webmanifest','application/manifest+json']],
-  ['/icon.svg',['icon.svg','image/svg+xml']], ['/icon-192.png',['icon-192.png','image/png']],
+  ['/icon.svg',['icon.svg','image/svg+xml']], ['/brand.png',['brand.png','image/png']], ['/icon-192.png',['icon-192.png','image/png']],
   ['/icon-512.png',['icon-512.png','image/png']], ['/apple-touch-icon.png',['apple-touch-icon.png','image/png']]
 ]);
 // Rutas de API que el portal debe servir. `tests/landur-assets.test.mjs` las compara con las
@@ -58,6 +58,10 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       try{
         let bytes=await readFile(resolve(root,'public',asset[0]));
         if(asset[0]==='index.html')bytes=Buffer.from(bytes.toString().replace('<html lang="es">','<html lang="es" data-portal="true">'));
+        // El botón de retorno a Mis proyectos no es un enlace de texto plano: se diseña como un botón
+        // de panel para que quede claro que es la forma de salir al selector de proyectos del portal.
+        if(asset[0]==='app.js')bytes=Buffer.from(bytes.toString().replace(/back\.textContent='← Mis proyectos';/g,'back.innerHTML=\'<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></span> ← Mis proyectos\';'));
+
         return new Response(method==='HEAD'?null:bytes,{headers:{'Content-Type':asset[1],'Cache-Control':'no-store',...(path==='/sw.js'?{'Service-Worker-Allowed':'/landur/'}:{})}});
       }catch{return json({error:'Los recursos de LANDUR no están instalados. Revisá el despliegue.'},503);}
     }

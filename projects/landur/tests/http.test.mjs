@@ -231,7 +231,41 @@ test('comprobantes por HTTP: adjuntar, descargar y no salir del espacio',async t
   assert.equal((await fetch(`${base}/api/evidence/${randomUUID()}`,{headers:{cookie}})).status,404);
   assert.equal((await post('/api/evidence',body)).status,401);
   assert.equal((await post('/api/evidence',{...body,data:'aGVsbG8='},cookie,{'idempotency-key':randomUUID()})).status,400,'los bytes deciden el tipo');
+  const removed=await post('/api/commands',{kind:'evidence.remove',evidenceId:id},cookie,{'idempotency-key':randomUUID()});
+  assert.equal(removed.status,200);
+  assert.equal((await(await fetch(`${base}/api/state`,{headers:{cookie}})).json()).evidence.length,0);
+  assert.equal((await fetch(`${base}/api/evidence/${id}`,{headers:{cookie}})).status,404);
+  assert.equal((await post('/api/commands',{kind:'evidence.remove',evidenceId:randomUUID()},cookie,{'idempotency-key':randomUUID()})).status,404);
+  assert.ok((await(await fetch(`${base}/api/state`,{headers:{cookie}})).json()).audit.some(a=>a.action==='evidence.removed'));
 });
+
+test('baja de cuentas por HTTP: cuentas, pagos e historial con trazabilidad',async t=>{
+  const {base,post,login}=await fixture(t),cookie=await login();
+  const create=async name=>(await post('/api/commands',{kind:'account',name,accountKind:'cash',currency:'UYU',opening:'100',cutoff:'2026-10-01',verified:true,accessible:true},cookie,{'idempotency-key':randomUUID()})).json();
+  const empty=await create('Cuenta vacía');
+  const key=randomUUID(),body={kind:'account.delete',accountId:empty.id};
+  assert.equal((await post('/api/commands',body,cookie,{'idempotency-key':key})).status,200);
+  assert.equal((await post('/api/commands',body,cookie,{'idempotency-key':key}).then(r=>r.json())).replayed,true);
+  assert.equal((await(await fetch(base+'/api/state',{headers:{cookie}})).json()).accounts.length,0);
+  const used=await create('Cuenta usada');
+  const obligation=await(await post('/api/commands',{kind:'obligation',concept:'Factura por pagar',amount:'10',currency:'UYU',date:'2026-10-24',due:'2026-10-30'},cookie,{'idempotency-key':randomUUID()})).json();
+  const payment=await(await post('/api/commands',{kind:'payment',concept:'Pago de prueba',amount:'10',currency:'UYU',date:'2026-10-24',accountId:used.id,targetId:obligation.id},cookie,{'idempotency-key':randomUUID()})).json();
+  const rejectUsed=await post('/api/commands',{kind:'account.delete',accountId:used.id},cookie,{'idempotency-key':randomUUID()});
+  assert.equal(rejectUsed.status,409,'no deja borrar una cuenta con movimientos activos');
+  const stateWithPayment=await(await fetch(base+'/api/state',{headers:{cookie}})).json();
+  assert.equal(stateWithPayment.accounts.length,1);
+  assert.equal(stateWithPayment.totals[0].payable,0);
+  const deletePayment={kind:'payment.delete',paymentId:payment.id},deleteKey=randomUUID();
+  assert.equal((await post('/api/commands',deletePayment,cookie,{'idempotency-key':deleteKey})).status,200);
+  assert.equal((await(await fetch(base+'/api/state',{headers:{cookie}})).json()).totals[0].payable,1000,'al quitar el pago la factura vuelve a pendiente');
+  assert.equal((await post('/api/commands',deletePayment,cookie,{'idempotency-key':deleteKey}).then(r=>r.json())).replayed,true);
+  const removeUsed=await post('/api/commands',{kind:'account.delete',accountId:used.id},cookie,{'idempotency-key':randomUUID()});
+  assert.equal(removeUsed.status,200,'al limpiar el historial de pagos la cuenta puede eliminarse');
+  assert.equal((await(await fetch(base+'/api/state',{headers:{cookie}})).json()).accounts.length,0);
+  assert.equal((await post('/api/commands',{kind:'account.delete',accountId:randomUUID()},cookie,{'idempotency-key':randomUUID()})).status,404);
+  assert.ok((await(await fetch(base+'/api/state',{headers:{cookie}})).json()).audit.some(a=>a.action==='account.deleted'));
+});
+
 
 test('la importación tiene límite por sesión y no bloquea a los demás',async t=>{
   const {post,login}=await fixture(t);const cookie=await login();

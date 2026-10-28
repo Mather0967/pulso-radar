@@ -259,6 +259,28 @@ export class Ledger {
     if (!row) throw new DomainError('El comprobante no existe o no está disponible en este espacio.', 404);
     return { id: row.id, name: row.name, mime: row.mime, bytes: row.bytes, content: Buffer.from(row.content) };
   }
+  deleteOperations(workspace, actor, ids, auditAction, account = null) {
+    const operations = [...ids].map(id => this.db.prepare('SELECT * FROM operations WHERE workspace=? AND id=?').get(workspace, id)).filter(Boolean);
+    const operationIds = operations.map(op => op.id);
+    const removedEntries = operationIds.length
+      ? this.db.prepare(`SELECT * FROM entries WHERE operation IN (${operationIds.map(() => '?').join(',')})`).all(...operationIds) : [];
+    const removedApplications = operationIds.length
+      ? this.db.prepare(`SELECT * FROM applications WHERE operation IN (${operationIds.map(() => '?').join(',')}) OR target IN (${operationIds.map(() => '?').join(',')})`).all(...operationIds, ...operationIds) : [];
+    const removedObligations = operationIds.length
+      ? this.db.prepare(`SELECT * FROM obligations WHERE operation IN (${operationIds.map(() => '?').join(',')})`).all(...operationIds) : [];
+    const removedEvidence = operationIds.length
+      ? this.db.prepare(`SELECT id,operation,name,mime,bytes,sha256,actor FROM evidence WHERE workspace=? AND operation IN (${operationIds.map(() => '?').join(',')})`).all(workspace, ...operationIds) : [];
+    this.audit(workspace, actor, auditAction, JSON.stringify({account,operations,entries:removedEntries,applications:removedApplications,obligations:removedObligations,evidence:removedEvidence}));
+    if (operationIds.length) {
+      const slots = operationIds.map(() => '?').join(',');
+      this.db.prepare(`DELETE FROM evidence WHERE workspace=? AND operation IN (${slots})`).run(workspace,...operationIds);
+      this.db.prepare(`DELETE FROM entries WHERE operation IN (${slots})`).run(...operationIds);
+      this.db.prepare(`DELETE FROM applications WHERE operation IN (${slots}) OR target IN (${slots})`).run(...operationIds,...operationIds);
+      this.db.prepare(`DELETE FROM obligations WHERE operation IN (${slots})`).run(...operationIds);
+      this.db.prepare(`DELETE FROM operations WHERE workspace=? AND id IN (${slots})`).run(workspace,...operationIds);
+    }
+    return {operations:operationIds.length,evidence:removedEvidence.length};
+  }
   previewImport(workspace, actor, csv) {
     this.db.exec('BEGIN IMMEDIATE');
     try { return this.execute(workspace, actor, {kind:'import', csv}); }
@@ -285,8 +307,50 @@ export class Ledger {
       }
       return {rows:results,created:results.filter(r=>r.status==='new').length,existing:results.filter(r=>r.status==='existing').length};
     }
-    const id = randomUUID();
     if (kind === 'reversal') return this.reverse(workspace, actor, input);
+    if (kind === 'payment.delete') {
+      const payment = this.db.prepare("SELECT * FROM operations WHERE workspace=? AND id=? AND kind='payment'").get(workspace, String(input.paymentId ?? ''));
+      if (!payment) throw new DomainError('No se encontró el pago en este espacio.', 404);
+      const ids = new Set([payment.id]);
+      if (payment.reversed_by) ids.add(payment.reversed_by);
+      return this.deleteOperations(workspace, actor, ids, 'payment.deleted');
+    }
+    if (kind === 'account.delete') {
+      const account = this.account(workspace, String(input.accountId ?? ''));
+      const ids = new Set(this.db.prepare('SELECT DISTINCT operation FROM entries WHERE account=?').all(account.id).map(row => row.operation));
+      // Eliminar una cuenta también quita sus contra-asientos y las comisiones
+      // generadas por cobros suyos. La venta/deuda vinculada queda pendiente, intacta.
+      for (const id of [...ids]) {
+        const op = this.db.prepare('SELECT * FROM operations WHERE workspace=? AND id=?').get(workspace, id);
+        if (!op) continue;
+        if (op.reversed_by) ids.add(op.reversed_by);
+        if (op.kind === 'reversal' && op.related_id) ids.add(op.related_id);
+        if (op.kind === 'collection') {
+          for (const child of this.db.prepare("SELECT id,reversed_by FROM operations WHERE workspace=? AND related_id=? AND kind='commission'").all(workspace, op.id)) {
+            ids.add(child.id);
+            if (child.reversed_by) ids.add(child.reversed_by);
+          }
+        }
+      }
+      // También incluye una reversión cuyo original fue el primer movimiento que tocó la cuenta.
+      for (const id of [...ids]) {
+        const row = this.db.prepare("SELECT id FROM operations WHERE workspace=? AND related_id=? AND kind='reversal'").all(workspace, id);
+        for (const reversal of row) ids.add(reversal.id);
+      }
+      const removed = this.deleteOperations(workspace, actor, ids, 'account.deleted', account);
+      this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
+      return { id: account.id, removedOperations: removed.operations, removedEvidence: removed.evidence };
+    }
+    if (kind === 'evidence.remove') {
+      const evidenceId = String(input.evidenceId ?? '');
+      const entry = this.db.prepare('SELECT id,name,operation,sha256 FROM evidence WHERE workspace=? AND id=?').get(workspace, evidenceId);
+      if (!entry) throw new DomainError('El comprobante no existe o no está disponible en este espacio.', 404);
+      const id = randomUUID();
+      this.audit(workspace, actor, 'evidence.removed', JSON.stringify(entry));
+      this.db.prepare('DELETE FROM evidence WHERE workspace=? AND id=?').run(workspace, entry.id);
+      return { id: entry.id };
+    }
+    const id = randomUUID();
     if (kind === 'account') {
       const accountKind = input.accountKind;
       if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');

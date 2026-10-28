@@ -1,0 +1,50 @@
+// Confirmación para comandos que no crean una operación: quitar un comprobante o
+// eliminar una cuenta. Misma clave idempotente que el resto de los comandos.
+function commandDialog({title,subtitle,body,confirm,retryLabel,success,input,refreshMessage}){
+  let key=null;
+  openDialog(title,subtitle,`<div class="dialog-body">${body}<p class="error" id="command-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="command-confirm">${escape(confirm)}</button></div>`);
+  const button=$('#command-confirm');
+  button.onclick=async()=>{
+    if(busy)return;busy=true;button.disabled=true;$('#command-error').textContent='';
+    key=key||crypto.randomUUID();
+    try{
+      await api('/api/commands',input(),key);
+      modal.close();modal.innerHTML='';
+      try{await refresh();toast(success);}
+      catch{lock(refreshMessage);}
+    }catch(error){
+      if($('#command-error'))$('#command-error').textContent=error.message;
+      if(!error.uncertain)key=null;
+      button.disabled=false;
+      button.textContent=key&&error.uncertain?retryLabel:confirm;
+    }finally{busy=false;}
+  };
+}
+// Quitar un comprobante no mueve dinero: borra el archivo y queda auditado.
+function undoPaymentDialog(id){
+  const o=state.operations.find(x=>x.id===id);if(!o)return;
+  const target=state.operations.find(x=>x.id===o.target_id);if(!target)return;
+  commandDialog({
+    title:deleteLabels.payment,subtitle:'Quita este pago, no la obligación. El saldo vuelve al estado anterior.',
+    body:`<p class="form-note">Se va a eliminar el pago <strong>«${escape(o.concept)}»</strong> de ${fmt(o.amount,o.currency)} registrado el ${o.date} sobre «${escape(target.concept)}». No se borra la obligación: vuelve a quedar pendiente de ese importe, y el saldo de la cuenta se reconstruye como si ese pago no hubiera ocurrido. La operación de pago <strong>no se borra</strong>, queda marcada como eliminada y sigue siendo consultable.</p><p class="error" id="undo-payment-error" role="alert"></p><p class="detail-note">Si cargaste mal quién pagó o cuánto, reintentalo desde el detalle de la obligación. Ahora no quiero que quede una deuda pagada que en realidad no se pagó.</p>`,
+    confirm:"Quitar este pago",retryLabel:"Reintentar quitar este pago",
+    success:"Pago quitado. La deuda vuelve a pendiente.",
+    refreshMessage:"El pago quedó quitado, pero no se pudo actualizar la vista. Reconectá antes de seguir.",
+    input:()=>({kind:'payment.undo',paymentId:o.id,latestPayment:o.applied}),
+  });
+}
+function removeEvidenceDialog(id){
+  const entry=(state.evidence||[]).find(x=>x.id===id);if(!entry)return;
+  const operation=state.operations.find(o=>o.id===entry.operation);
+  commandDialog({
+    title:'Quitar comprobante',subtitle:'Se elimina el archivo adjunto; la operación no cambia.',
+    body:`<p class="form-note">Se va a eliminar <strong>${escape(entry.name)}</strong> de «${escape(operation?.concept||'este registro')}». No se toca el importe ni la operación: solo desaparece el archivo adjunto y <strong>no se puede recuperar</strong>.</p><p class="detail-note">Si está mal cargado, podés adjuntarlo de nuevo desde esta misma vista.</p>`,
+    confirm:'Quitar comprobante',retryLabel:'Reintentar el mismo borrado',
+    success:'Comprobante quitado.',
+    refreshMessage:'El comprobante se quitó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',
+    input:()=>({kind:'evidence.remove',evidenceId:entry.id}),
+  });
+}
+// Una cuenta con historial no se elimina: el servidor lo rechaza y el diálogo lo explica
+// antes de que alguien haga clic esperando lo contrario.
+f

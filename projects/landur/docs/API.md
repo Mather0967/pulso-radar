@@ -30,6 +30,10 @@ Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen per
 - `collection`: campos comunes y `accountId`, `targetId` (venta pendiente), `commission` explícita.
 - `transfer`: campos comunes y `accountId`, `toAccountId` de igual moneda.
 - `reversal`: `operationId`, `date`. Registra el contra-asiento de una operación existente. No borra ni edita la original: la marca como revertida, invierte sus movimientos de cuenta, desactiva su aplicación si la tenía y, cuando corresponde, revierte también la comisión del cobro. Se rechaza si ya fue revertida, si es una reversión, o si algo se apoya en ella sin revertir.
+- `evidence.remove`: `evidenceId`. Elimina un comprobante adjunto. No toca importes ni la operación a la que estaba ligado: el archivo simplemente desaparece y la baja queda auditada con autor y fecha. Responde 404 si no existe o si pertenece a otro espacio, también cuando ya se borró. Reutilizar la misma `Idempotency-Key` devuelve la respuesta original en lugar de repetir la operación.
+- `account.delete`: `accountId`. Elimina una cuenta **sin movimientos**. Si tiene entradas de dinero, se responde 409 y nada cambia: el historial manda y hay que eliminar antes cada operación que la use. La auditoría conserva nombre, moneda y saldo inicial, que es exactamente lo que la cuenta pierde.
+
+Estos dos son los únicos borrados del sistema y son deliberadamente angostos: **no existe una operación financiera que se borre**. Lo que se pone mal en un registro se corrige con `reversal` y volviendo a cargar; lo que se pone mal en un comprobante se quita y se vuelve a adjuntar; una cuenta recién creada y sin uso se elimina. Nada de esto altera una cifra de forma silenciosa: cada baja queda en la auditoría con su autor y su fecha.
 
 Importes de entrada como strings decimales, sin miles, hasta dos decimales; respuesta monetaria en unidades menores enteras. Monedas admitidas técnicamente: UYU, USD y BRL, separadas sin conversión. Esto no confirma cuáles usa LANDUR en producción.
 
@@ -41,14 +45,15 @@ Importes de entrada como strings decimales, sin miles, hasta dos decimales; resp
 - **El tipo lo deciden los bytes**, no la etiqueta del cliente: se comprueba la firma y que el archivo esté completo (cierre de imagen, chunk final o marcador de cierre). Una extensión mentirosa no pasa, y un archivo truncado tampoco.
 - **El nombre** se guarda como etiqueta: se le quitan los caracteres de control y los separadores de ruta.
 - **Descarga:** `Content-Type` del archivo guardado, `Content-Disposition` `inline` para imágenes y `attachment` para PDF, y `Cache-Control: no-store`. El tipo no lo decide el cliente.
-- **No se borran.** La reversión de una operación conserva sus comprobantes, porque son parte de la historia.
+- **No se borran con la reversión.** La reversión de una operación conserva sus comprobantes, porque son parte de la historia.
+- **Baja explícita:** `evidence.remove` los elimina a pedido del usuario (mal cargados, equivocados). Es la única forma de quitarlos: queda auditado con autor y fecha, y no requiere reabrir la operación. Revertir no los restaura.
 - **Límite:** 30 llamadas por minuto y por sesión, junto con la importación. Es el mismo tope en el servidor autónomo y en el montaje del portal.
 - **Reintento:** reutilizar la `Idempotency-Key` devuelve el mismo comprobante; usarla con otro archivo genera conflicto.
 - **Alcance:** solo se adjunta a una operación existente del propio espacio. Una lectura ajena responde 404, igual que un identificador inexistente.
 
 Los comprobantes no son una validación de contenido: el servidor comprueba estructura y tamaño, no que la imagen corresponda al gasto. Eso sigue siendo una revisión del usuario.
 
-Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección se hace revirtiendo y registrando de nuevo, nunca editando el registro original: la historia se conserva y cada reversión queda auditada con su autor y su fecha.
+Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección se hace revirtiendo y registrando de nuevo, nunca editando el registro original: la historia se conserva y cada reversión queda auditada con su autor y su fecha. Un registro equivocado, por lo tanto, **no se borra**: se anula con `reversal`. Las dos excepciones son `evidence.remove` y `account.delete`, descritas arriba, y ninguna de las dos mueve dinero.
 
 ## Plantilla CSV propuesta
 

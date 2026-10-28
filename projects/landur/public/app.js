@@ -60,13 +60,13 @@ async function refresh() {
 }
 function lock(message='') {
   authEpoch++;state=null;modal.close();modal.innerHTML='';pendingRequest=null;busy=false;
-  app.innerHTML=`<div class="login"><section class="login-brand"><div class="wordmark">LANDUR<span>®</span></div><div><span class="eyebrow">Tu espacio financiero</span><h1>Control financiero<br>del negocio.</h1><p>Saldos, cobros y compromisos en un solo registro. Cada cifra conserva su origen y su fecha.</p></div><footer>UNA SOLUCIÓN DE RIVECT</footer></section><main class="login-main" id="main"><div class="login-box"><span class="eyebrow muted">${session?.demo?'ENTORNO DE PRUEBA':'ACCESO PRIVADO'}</span><h2>${session?.demo?'Conocé tu espacio':'Bienvenido a LANDUR'}</h2><p>${session?.demo?'Explorá con datos sintéticos. No ingreses información financiera real en esta demostración.':'Ingresá con la contraseña configurada para esta aplicación.'}</p><form id="login-form">${session?.demo?'':`<label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label>`}<p class="error" id="login-error" role="alert">${escape(message)}</p><button class="primary" type="submit">${session?.demo?'Explorar demostración':'Ingresar al espacio'} ${icon('arrow')}</button></form><p class="footnote">${navigator.onLine?'Conexión necesaria para consultar y guardar.':'Sin conexión. Volvé a conectarte para continuar.'} No se guarda una copia financiera offline en el navegador.</p><button class="text-btn" data-action="install">${icon('phone')} Instalar en el iPhone</button></div></main></div>`;
+  app.innerHTML=`<div class="login"><section class="login-brand"><img class="brand-logo" src="${BASE}icon-512.png" alt="LANDUR®" loading="lazy" width="56" height="56"><div><span class="eyebrow">Tu espacio financiero</span><h1>Control financiero<br>del negocio.</h1><p>Saldos, cobros y compromisos en un solo registro. Cada cifra conserva su origen y su fecha.</p></div><footer>UNA SOLUCIÓN DE RIVECT</footer></section><main class="login-main" id="main"><div class="login-box"><span class="eyebrow muted">${session?.demo?'ENTORNO DE PRUEBA':'ACCESO PRIVADO'}</span><h2>${session?.demo?'Conocé tu espacio':'Bienvenido a LANDUR'}</h2><p>${session?.demo?'Explorá con datos sintéticos. No ingreses información financiera real en esta demostración.':'Ingresá con la contraseña configurada para esta aplicación.'}</p><form id="login-form">${session?.demo?'':`<label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label>`}<p class="error" id="login-error" role="alert">${escape(message)}</p><button class="primary" type="submit">${session?.demo?'Explorar demostración':'Ingresar al espacio'} ${icon('arrow')}</button></form><p class="footnote">${navigator.onLine?'Conexión necesaria para consultar y guardar.':'Sin conexión. Volvé a conectarte para continuar.'} No se guarda una copia financiera offline en el navegador.</p><button class="text-btn" data-action="install">${icon('phone')} Instalar en el iPhone</button></div></main></div>`;
   if(portalMode){
     $('.login-box h2').textContent='Tu acceso está en RIVECT';
-    $('#login-form').innerHTML='<p class="error" role="alert"></p><a class="primary" href="/login">Ingresar desde el portal ↗</a><a class="text-btn" href="/portal">← Mis proyectos</a>';
+    $('#login-form').innerHTML='<p class="error" role="alert"></p><a class="primary" href="/login">Ingresar desde el portal ↗</a><a class="text-btn" href="/portal"><span>←</span> Mis proyectos</a>';
     $('#login-form .error').textContent=message;
     return;
-  }
+  
   $('#login-form').addEventListener('submit',async event=>{
     event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;
     try { await api(session?.demo?'/api/demo':'/api/login',session?.demo?{}:{password:new FormData(event.currentTarget).get('password')}); await refresh(); }
@@ -80,9 +80,9 @@ function navButton(key){return `<button class="nav-button ${view===key?'active':
 function render() {
   if(!state)return;
   const heading = {home:['INICIO','Saldos y compromisos','Saldos reconstruidos desde el corte de cada cuenta y sus movimientos. No consulta tu banco.'],moves:['MOVIMIENTOS','Registro de operaciones','Tipo, origen, fecha y estado de cada registro. Ventas y cobros se guardan por separado.'],accounts:['CUENTAS','Cuentas y saldos','Un saldo por cuenta y moneda con su fecha de corte. Sin conversión automática.'],expenses:['EGRESOS','Gastos y deudas','Lo pagado descuenta caja. Lo pendiente queda como obligación hasta que registres el pago.'],sales:['VENTAS','Ventas y cobros','Una venta no es dinero disponible. Cada cobro se asocia a su venta con la comisión real.'],pending:['PENDIENTES','Lo que requiere decisión','Obligaciones vencidas o próximas, cobros sin registrar y reglas sin validar.'],settings:['CONFIGURACIÓN','Datos y alcance','Exportación, instalación y límites conocidos de esta versión.']}[view];
-  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="wordmark">LANDUR<span>®</span></div><small>CONTROL FINANCIERO</small></div><div class="workspace"><div class="workspace-mark">L</div><div><strong>Mi negocio</strong><small>${state.demo?'Espacio de demostración':'Espacio privado'}</small></div></div><div class="nav-label">PRINCIPAL</div><nav aria-label="Navegación principal">${Object.keys(viewLabels).filter(k=>k!=='settings').map(navButton).join('')}</nav><div class="sidebar-bottom">${navButton('settings')}<button class="nav-button" data-action="install">${icon('phone')} Instalar aplicación</button><div class="sidebar-note">Datos en el servidor.<br>Sin conexión bancaria activa.</div><div class="rivect">POR <b>✳ RIVECT</b></div></div></aside><div class="shell"><header class="topbar"><div class="breadcrumb">Mi negocio <span>/</span> <strong>${viewLabels[view]}</strong></div><div class="wordmark mobile-logo">LANDUR<span>®</span></div><div class="top-actions"><span class="top-date">${state.demo?'Octubre 2026 · muestra':new Intl.DateTimeFormat('es-UY',{day:'numeric',month:'long',year:'numeric'}).format(new Date())}</span><button class="icon-btn" data-action="refresh" aria-label="Actualizar datos">${icon('refresh')}</button><button class="icon-btn" data-action="logout" aria-label="Cerrar sesión">${icon('logout')}</button><div class="avatar" title="${escape(state.actor)}">${state.demo?'DE':'RA'}</div></div></header>${state.demo?'<div class="demo-bar"><span></span>DEMOSTRACIÓN · Datos sintéticos, no representan las finanzas reales de LANDUR.</div>':'<div class="demo-bar"><span></span>VERSIÓN PRIVADA · Pentesting independiente y prueba en iPhone real pendientes. No cargues datos reales todavía.</div>'}${updateWorker?'<div class="update-bar">Hay una actualización de la aplicación.<button class="mini-button" data-action="update">Actualizar</button></div>':''}<main class="page" id="main"><section class="heading"><div><div class="eyebrow">${heading[0]}</div><h1>${heading[1]}</h1><p>${heading[2]}</p></div><button class="primary" data-action="register">${icon('plus')} Registrar operación</button></section><div class="toolbar"><div class="period">${icon('calendar')} ${view==='home'?'Resumen acumulado · sin filtro de período':'Registros acumulados'}</div><label class="flex muted"><span class="eyebrow">Moneda</span><select id="currency" class="currency-select" aria-label="Moneda del resumen">${state.totals.length?state.totals.map(t=>`<option ${t.currency===unit?'selected':''}>${t.currency}</option>`).join(''):'<option value="">Sin cuentas</option>'}</select></label></div><div id="view-content">${content()}</div><footer class="page-footer"><span class="flex">${icon('lock')} Información guardada en el servidor · Sin conexiones bancarias activas</span><span>Última lectura ${loadedAt?.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'})} · LANDUR × RIVECT</span></footer></main></div><nav class="mobile-nav" aria-label="Navegación móvil"><button data-view="home" class="${view==='home'?'active':''}">${icon('home')}Inicio</button><button data-view="moves" class="${view==='moves'?'active':''}">${icon('moves')}Actividad</button><button data-action="register" class="register">${icon('plus')}Registrar</button><button data-view="pending" class="${view==='pending'?'active':''}">${icon('pending')}Pendientes</button><button data-action="menu">${icon('more')}Más</button></nav>`;
+  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="wordmark">LANDUR<span>®</span></div><small>CONTROL FINANCIERO</small></div><div class="workspace"><div class="workspace-mark">L</div><div><strong>Mi negocio</strong><small>${state.demo?'Espacio de demostración':'Espacio privado'}</small></div></div><div class="nav-label">PRINCIPAL</div><nav aria-label="Navegación principal">${Object.keys(viewLabels).filter(k=>k!=='settings').map(navButton).join('')}</nav><div class="sidebar-bottom">${navButton('settings')}<button class="nav-button" data-action="install">${icon('phone')} Instalar aplicación</button><div class="sidebar-note">Datos en el servidor.<br>Sin conexión bancaria activa.</div><div class="rivect">POR <b>✳ RIVECT</b></div></div></aside><div class="shell"><header class="topbar"><div class="breadcrumb">Mi negocio <span>/</span> <strong>${viewLabels[view]}</strong></div><img class="brand-logo mobile-logo" src="${BASE}icon-512.png" alt="LANDUR®" loading="lazy" width="40" height="40"><div class="top-actions"><span class="top-date">${state.demo?'Octubre 2026 · muestra':new Intl.DateTimeFormat('es-UY',{day:'numeric',month:'long',year:'numeric'}).format(new Date())}</span><button class="icon-btn" data-action="refresh" aria-label="Actualizar datos">${icon('refresh')}</button><button class="icon-btn" data-action="logout" aria-label="Cerrar sesión">${icon('logout')}</button><div class="avatar" title="${escape(state.actor)}">${state.demo?'DE':'RA'}</div></div></header>${state.demo?'<div class="demo-bar"><span></span>DEMOSTRACIÓN · Datos sintéticos, no representan las finanzas reales de LANDUR.</div>':'<div class="demo-bar"><span></span>VERSIÓN PRIVADA · Pentesting independiente y prueba en iPhone real pendientes. No cargues datos reales todavía.</div>'}${updateWorker?'<div class="update-bar">Hay una actualización de la aplicación.<button class="mini-button" data-action="update">Actualizar</button></div>':''}<main class="page" id="main"><section class="heading"><div><div class="eyebrow">${heading[0]}</div><h1>${heading[1]}</h1><p>${heading[2]}</p></div><button class="primary" data-action="register">${icon('plus')} Registrar operación</button></section><div class="toolbar"><div class="period">${icon('calendar')} ${view==='home'?'Resumen acumulado · sin filtro de período':'Registros acumulados'}</div><label class="flex muted"><span class="eyebrow">Moneda</span><select id="currency" class="currency-select" aria-label="Moneda del resumen">${state.totals.length?state.totals.map(t=>`<option ${t.currency===unit?'selected':''}>${t.currency}</option>`).join(''):'<option value="">Sin cuentas</option>'}</select></label></div><div id="view-content">${content()}</div><footer class="page-footer"><span class="flex">${icon('lock')} Información guardada en el servidor · Sin conexiones bancarias activas</span><span>Última lectura ${loadedAt?.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'})} · LANDUR × RIVECT</span></footer></main></div><nav class="mobile-nav" aria-label="Navegación móvil"><button data-view="home" class="${view==='home'?'active':''}">${icon('home')}Inicio</button><button data-view="moves" class="${view==='moves'?'active':''}">${icon('moves')}Actividad</button><button data-action="register" class="register">${icon('plus')}Registrar</button><button data-view="pending" class="${view==='pending'?'active':''}">${icon('pending')}Pendientes</button><button data-action="menu">${icon('more')}Más</button></nav>`;
   if(portalMode){
-    const back=document.createElement('a');back.href='/portal';back.className='portal-back';back.textContent='← Mis proyectos';
+    const back=document.createElement('a');back.href='/portal';back.className='portal-back';back.innerHTML='<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></span> ← Mis proyectos';
     $('.shell').prepend(back);
     $('.avatar').textContent=(state.actor||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]||'').join('').toUpperCase();
     if(state.access==='viewer'){
@@ -93,6 +93,35 @@ function render() {
   $('#currency').addEventListener('change',e=>{unit=e.target.value;render();});
   $('#search')?.addEventListener('input',e=>{query=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
   $('#kind-filter')?.addEventListener('change',e=>{filter=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
+  app.addEventListener('click',async event=>{
+    const accountBtn=event.target.closest('[data-delete-account]');
+    if(accountBtn){const id=accountBtn.getAttribute('data-delete-account');if(!confirm('Eliminar esta cuenta, sus movimientos de saldo, sus contra-asientos y las comisiones de sus cobros. Esto revierte todo lo que la cuenta movió. ¿Continuás?'))return;try{await api('/api/commands',{kind:'account.delete',accountId:id});await refresh();toast('Cuenta eliminada.');}catch(error){toast(error.message);}}
+    const opBtn=event.target.closest('[data-operation]');
+    if(opBtn){detail(opBtn.getAttribute('data-operation'));return;}
+    const paymentBtn=event.target.closest('[data-delete-payment]');
+    if(paymentBtn){const id=paymentBtn.getAttribute('data-delete-payment');if(!confirm('Eliminar este pago del saldo. La operación original queda registrada pero el dinero vuelve a la cuenta. ¿Continuás?'))return;try{await api('/api/commands',{kind:'payment.delete',paymentId:id});await refresh();toast('Pago eliminado del saldo.');}catch(error){toast(error.message);}}
+    const revertBtn=event.target.closest('[data-revert]');
+    if(revertBtn){const id=revertBtn.getAttribute('data-revert');if(!confirm('Eliminar este registro, sus comisiones y sus contra-asientos del saldo, con la cuenta de auditoría correspondiente. ¿Continuás?'))return;try{await api('/api/commands',{kind:'reversal',operationId:id});await refresh();toast('Registro revertido.');}catch(error){toast(error.message);}}
+    const evidenceBtn=event.target.closest('[data-remove-evidence]');
+    if(evidenceBtn){const id=evidenceBtn.getAttribute('data-remove-evidence');if(!confirm('Quitar este comprobante del registro. No se borra del todo, queda constancia en el registro. ¿Continuás?'))return;try{await api('/api/commands',{kind:'evidence.remove',evidenceId:id});await refresh();toast('Comprobante quitado.');}catch(error){toast(error.message);}}
+    const payBtn=event.target.closest('[data-pay]');
+    if(payBtn){const id=payBtn.getAttribute('data-pay');const type=payBtn.getAttribute('data-type')||'payment';form(type,id);return;}
+    const attachBtn=event.target.closest('[data-attach]');
+    if(attachBtn){const id=attachBtn.getAttribute('data-attach');attachFile(id,{files:[document.querySelector('[data-action="attach-file"]')?.files?.[0]]||null});return;}
+    const closeBtn=event.target.closest('[data-action="close"]'); if(closeBtn){modal.close();return;}
+    const importBtn=event.target.closest('[data-action="import"]'); if(importBtn)opendialog('Importar CSV','Una plantilla acotada con vista previa.');
+    const exportBtn=event.target.closest('[data-action="export"]'); if(exportBtn){window.location.href=endpoint('/api/export.csv');return;}
+    const registerBtn=event.target.closest('[data-action="register"]'); if(registerBtn){form('expense');return;}
+    const policyBtn=event.target.closest('[data-action="policy"]'); if(policyBtn){openDialog('Disponible estimado','Reglas pendientes','<div class="rule-list"><div class="rule-item"><strong>Regla aún no activada</strong><p>El cálculo de disponible descontando obligaciones, retiros y reservas todavía no tiene regla definida. Hasta tanto, el valor muestra «Por validar».</div></div>');return;}
+    const updateBtn=event.target.closest('[data-action="update"]'); if(updateBtn){return;}
+    const menuBtn=event.target.closest('[data-action="menu"]'); if(menuBtn)openMenu('Tu espacio','Elegí una sección.',`<div class="dialog-body settings-stack">${['accounts','expenses','sales','settings'].map(k=>`<button class="secondary" data-view="${k}">${icon(viewIcons[k])} ${viewLabels[k]}</button>`).join('')}</div>`);
+    const launchBtn=event.target.closest('[data-action="experiments"]'); if(launchBtn){const base=`${location.origin}${location.pathname}`;const side=`${base}side-by-side/qa.html`;window.open(side,'_blank');return;}
+  });
+  app.addEventListener('click',event=>{const viewBtn=event.target.closest('[data-view]');if(viewBtn){view=viewBtn.getAttribute('data-view');render();};});
+  app.addEventListener('click',event=>{const formBtn=event.target.closest('[data-form]');if(formBtn){const kind=formBtn.getAttribute('data-form')==='account'?'account':'expense';form(kind);};});
+  app.addEventListener('click',event=>{const installBtn=event.target.closest('[data-action="install"]');if(installBtn)install();});
+  app.addEventListener('click',event=>{const logoutBtn=event.target.closest('[data-action="logout"]');if(logoutBtn){api('/api/logout').then(()=>{session=null;lock('Sesión cerrada.');});return;};});
+}
 }
 function content(){
   if(view==='home')return home();
@@ -107,7 +136,7 @@ function home(){
   return `<section class="summary-grid" aria-label="Resumen por moneda"><article class="stat dark"><div class="stat-label">Saldo registrado ${icon('wallet')}</div><div class="stat-value">${fmt(t.balance)}</div><div class="stat-note">${state.accounts.filter(a=>a.currency===unit).length} cuentas · reconstruido desde el corte</div></article><article class="stat"><div class="stat-label">Obligaciones pendientes ${icon('expense')}</div><div class="stat-value">${fmt(t.payable)}</div><div class="stat-note">${outstanding('obligation').length} compromisos por pagar</div></article><article class="stat"><div class="stat-label">Por cobrar ${icon('down')}</div><div class="stat-value">${fmt(t.receivable)}</div><div class="stat-note">Ventas pendientes · no es saldo</div></article><article class="stat"><div class="stat-label">Disponible estimado ${icon('info')}</div><div class="stat-value pending">Por validar</div><button class="stat-link" data-action="policy">Ver reglas pendientes</button></article></section><div class="main-grid"><div><section class="card"><div class="card-head"><div><h2>Tus cuentas</h2><p>Dónde está el dinero de tu negocio</p></div><button class="text-btn" data-view="accounts">Ver todas ${icon('arrow')}</button></div><div class="account-list">${state.accounts.filter(a=>a.currency===unit).map(accountRow).join('')}</div><div class="card-foot">${icon('info')} Saldos calculados desde la apertura y movimientos registrados.</div></section><section class="card activity-card"><div class="card-head"><div><h2>Últimas operaciones</h2><p>Origen y tipo, siempre a la vista</p></div><button class="text-btn" data-view="moves">Ver todas ${icon('arrow')}</button></div>${table(selectedOps().slice(0,5),true)}</section></div><div><section class="card"><div class="card-head"><div><h2>Próximos pagos</h2><p>Compromisos que requieren atención</p></div>${pill(`${outstanding('obligation').length} pendientes`,'amber')}</div>${obligations(outstanding('obligation').sort((a,b)=>a.due.localeCompare(b.due)).slice(0,4))}<div class="card-foot"><button class="text-btn" data-view="pending">Revisar todos los pendientes ${icon('arrow')}</button></div></section><aside class="notice-card">${icon('shield')}<div><h3>Saldo no es dinero libre</h3><p>Antes de calcular el disponible, hay que validar qué obligaciones y reservas descontar. No mostramos una certeza que todavía no tenemos.</p><button class="text-btn" data-action="policy">Revisar criterios ${icon('arrow')}</button></div></aside><aside class="notice-card">${icon('phone')}<div><h3>LANDUR en tu iPhone</h3><p>Instalá la app desde Safari. Necesita conexión: no guarda una copia financiera en el teléfono.</p><button class="text-btn" data-action="install">Cómo instalar ${icon('arrow')}</button></div></aside></div></div>`;
 }
 function accountRow(a){return `<div class="account-row"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div><div><div class="account-name">${escape(a.name)}</div><div class="account-sub">${a.verified?'Apertura verificada':'Apertura sin verificar'} · ${dateFmt(a.cutoff)}</div></div><div class="account-amount">${fmt(a.balance,a.currency)}<div class="account-sub">${a.accessible?'Fondos accesibles':'Acceso restringido'}</div></div></div>`;}
-function accounts(){return `<div class="toolbar"><p class="muted">Monedas separadas. Sin conversiones automáticas.</p><button class="secondary" data-form="account">${icon('plus')} Agregar cuenta</button></div><div class="accounts-grid">${state.accounts.filter(a=>!unit||a.currency===unit).map(a=>`<article class="card account-card"><div class="flex spread"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div>${pill(a.verified?'Apertura verificada':'Sin verificar',a.verified?'green':'amber')}</div><h2>${escape(a.name)}</h2><p class="muted eyebrow">${a.currency} · ${a.kind==='bank'?'Cuenta bancaria':a.kind==='cash'?'Efectivo':'Billetera digital'}</p><div class="stat-value">${fmt(a.balance,a.currency)}</div><dl><dt>Saldo inicial al inicio del ${dateFmt(a.cutoff)}</dt><dd>${fmt(a.opening,a.currency)}</dd><dt>Accesibilidad declarada</dt><dd>${a.accessible?'Fondos accesibles':'Fondos restringidos'}</dd><dt>Identificador para importación CSV</dt><dd><code>${escape(a.id)}</code></dd></dl><button class="text-btn" data-account="${a.id}">Ver movimientos ${icon('arrow')}</button></article>`).join('') || '<div class="card empty">Todavía no hay cuentas en esta moneda.</div>'}</div>`;}
+function accounts(){return `<div class="toolbar"><p class="muted">Monedas separadas. Sin conversiones automáticas.</p><button class="secondary" data-form="account">${icon('plus')} Agregar cuenta</button></div><div class="accounts-grid">${state.accounts.filter(a=>!unit||a.currency===unit).map(a=>`<article class="card account-card"><div class="flex spread"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div>${pill(a.verified?'Apertura verificada':'Sin verificar',a.verified?'green':'amber')}</div><h2>${escape(a.name)}</h2><p class="muted eyebrow">${a.currency} · ${a.kind==='bank'?'Cuenta bancaria':a.kind==='cash'?'Efectivo':'Billetera digital'}</p><div class="stat-value">${fmt(a.balance,a.currency)}</div><dl><dt>Saldo inicial al inicio del ${dateFmt(a.cutoff)}</dt><dd>${fmt(a.opening,a.currency)}</dd><dt>Accesibilidad declarada</dt><dd>${a.accessible?'Fondos accesibles':'Fondos restringidos'}</dd><dt>Identificador para importación CSV</dt><dd><code>${escape(a.id)}</code></dd></dl><div class="account-actions"><button class="text-btn" data-account="${a.id}">Ver movimientos ${icon('arrow')}</button>${state.access==='viewer'?'':`<button class="text-btn danger" data-delete-account="${a.id}">Eliminar cuenta</button>`}</div></article>`).join('') || '<div class="card empty">Todavía no hay cuentas en esta moneda.</div>'}</div>`;}
 function filteredOps(){return selectedOps().filter(o=>(view!=='expenses'||['expense','obligation','payment','commission'].includes(o.kind))&&(view!=='sales'||['sale','collection'].includes(o.kind))&&(!filter||o.kind===filter)&&(!query||[o.concept,o.source,o.external_id].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())));}
 function opStatus(o){
   if(o.reversed_by)return pill('Revertido','gray');
@@ -156,7 +185,7 @@ async function uploadEvidence(operationId, file, key) {
 }
 function evidenceRow(entry) {
   const href = endpoint(`/api/evidence/${encodeURIComponent(entry.id)}`);
-  return `<a class="evidence-row" href="${escape(href)}" target="_blank" rel="noopener">${entry.mime === 'application/pdf' ? '<span class="evidence-kind">PDF</span>' : `<img class="evidence-thumb" src="${escape(href)}" alt="" loading="lazy">`}<span class="evidence-name">${escape(entry.name)}<span class="concept-sub">${Math.max(1, Math.round(entry.bytes / 1024))} KB · ${dateFmt(entry.created_at.slice(0, 10))}</span></span></a>`;
+  return `<div class="evidence-row"><a class="evidence-open" href="${escape(href)}" target="_blank" rel="noopener">${entry.mime === 'application/pdf' ? '<span class="evidence-kind">PDF</span>' : `<img class="evidence-thumb" src="${escape(href)}" alt="" loading="lazy">`}<span class="evidence-name">${escape(entry.name)}<span class="concept-sub">${Math.max(1, Math.round(entry.bytes / 1024))} KB · ${dateFmt(entry.created_at.slice(0, 10))}</span></span></a>${state.access==='viewer'?'':`<button class="evidence-remove" data-remove-evidence="${escape(entry.id)}">Quitar</button>`}</div>`;
 }
 function evidenceSection(operationId, attached, editable) {
   return `${attached.length ? `<div class="evidence-list">${attached.map(evidenceRow).join('')}</div>` : '<p class="detail-note">Sin comprobante adjunto. Es opcional: un gasto sin factura también se registra.</p>'}${editable ? '<input class="hidden-file" type="file" id="evidence-file" accept="image/jpeg,image/png,image/webp,application/pdf"><p class="form-note" id="evidence-status" role="status"></p>' : ''}`;
@@ -212,6 +241,9 @@ function incompleteCard() {
 function openDialog(title,subtitle,body,footer=''){
   modal.innerHTML=`<div class="dialog-head"><div><h2 id="dialog-title">${escape(title)}</h2>${subtitle?`<p>${escape(subtitle)}</p>`:''}</div><button class="icon-btn" data-action="close" aria-label="Cerrar diálogo">${icon('close')}</button></div>${body}${footer}`;
   if(!modal.open)modal.showModal();
+}
+function openMenu(title,subtitle,body){
+  openDialog(title,subtitle,body);
 }
 function field(label,name,type='text',value='',wide=false,extra=''){
   return `<label class="field ${wide?'wide':''}">${label}<input name="${name}" type="${type}" value="${escape(value)}" ${extra}></label>`;
@@ -276,26 +308,33 @@ function wireVoice(formEl,kind){
   const start=$('#voice-start'),resultBox=$('#voice-result');
   if(!start||!resultBox)return;
   if(!SPEECH){start.disabled=true;start.textContent='Este navegador no permite dictar';return;}
-  let recognition=null,listening=false;
+  let recognition=null,listening=false,generation=0;
   const reset=()=>{listening=false;start.classList.remove('recording');start.innerHTML=`${icon('mic')} Dictar la factura`;};
   start.addEventListener('click',()=>{
     if(listening){try{recognition?.stop();}catch{}return;}
     stopDictation();
+    const run=++generation;
     recognition=new SPEECH();
     recognition.lang='es-UY';recognition.interimResults=false;recognition.continuous=false;
     invoiceRecognition=recognition;
     listening=true;start.classList.add('recording');start.textContent='Escuchando… tocá para detener';
     recognition.onresult=event=>{
+      if(run!==generation||invoiceRecognition!==recognition)return;
+      listening=false;start.classList.remove('recording');start.innerHTML=`${icon('mic')} Dictar la factura`;
       const said=[...event.results].map(result=>result[0].transcript).join(' ').trim();
       if(said)showSpokenInvoice(resultBox,formEl,kind,said);
     };
     recognition.onerror=event=>{
+      if(run!==generation||invoiceRecognition!==recognition)return;
       toast(event.error==='not-allowed'||event.error==='service-not-allowed'
         ? 'Permití el micrófono en los ajustes del navegador para dictar.'
         : 'No se pudo dictar. Escribí los campos a mano.');
     };
-    recognition.onend=()=>{if(invoiceRecognition!==recognition)return;invoiceRecognition=null;reset();};
-    try{recognition.start();}catch{invoiceRecognition=null;reset();toast('No se pudo iniciar el micrófono.');}
+    recognition.onend=()=>{
+      if(run!==generation||invoiceRecognition!==recognition)return;
+      invoiceRecognition=null;reset();
+    };
+    try{recognition.start();}catch{if(run===generation){invoiceRecognition=null;reset();toast('No se pudo iniciar el micrófono.');}}
   });
 }
 function showSpokenInvoice(resultBox,formEl,kind,said){
@@ -394,20 +433,21 @@ function detail(id){
   const actions=[];
   if(state.access!=='viewer'&&!o.reversed_by&&['sale','obligation'].includes(o.kind)&&o.amount>o.applied)
     actions.push(`<button class="primary" data-pay="${o.id}" data-type="${o.kind==='sale'?'collection':'payment'}">Registrar ${o.kind==='sale'?'cobro':'pago'}</button>`);
-  if(state.access!=='viewer'&&!o.reversed_by&&o.kind!=='reversal')
-    actions.push(`<button class="secondary" data-revert="${o.id}">Revertir…</button>`);
+  if(state.access!=='viewer'&&o.kind==='payment'&&!o.reversed_by)
+    actions.push(`<button class="secondary" data-delete-payment="${o.id}">Eliminar pago</button>`);
+  if(state.access!=='viewer'&&!o.reversed_by&&o.kind!=='reversal'&&o.kind!=='payment')
+    actions.push(`<button class="secondary" data-revert="${o.id}">Eliminar registro</button>`);
   if(state.access!=='viewer'&&!o.reversed_by&&o.kind!=='reversal')
     actions.push(`<button class="secondary" data-attach="${o.id}">Adjuntar comprobante</button>`);
   openDialog(labels[o.kind],o.concept,`<div class="dialog-body"><dl class="details">${pair('Importe',fmt(o.amount,o.currency))}${pair('Fecha',o.date)}${pair('Origen',o.source)}${pair('Referencia externa',o.external_id||'Sin referencia externa')}${pair('Categoría',o.category||'Sin categoría')}${pair('Vencimiento',o.due||'No aplica')}${['sale','obligation'].includes(o.kind)?pair('Pendiente',fmt(o.amount-o.applied,o.currency)):''}<div class="wide"><dt>Identificador</dt><dd>${escape(o.id)}</dd></div></dl><p class="detail-note">Movimientos de cuenta</p>${entries.map(e=>`<div class="account-row"><span>${escape(state.accounts.find(a=>a.id===e.account)?.name)}</span><strong class="account-amount">${fmt(e.amount,o.currency)}</strong></div>`).join('')||'<p class="detail-note">Este registro no mueve dinero por sí mismo.</p>'}${related.length?`<p class="detail-note">Operaciones vinculadas</p>${related.map(r=>`<div class="account-row"><button class="concept-button" data-operation="${r.id}">${escape(r.concept)}<span class="concept-sub">${labels[r.kind]}</span></button><span class="account-amount">${fmt(r.amount,r.currency)}</span></div>`).join('')}`:''}<p class="detail-note">Comprobantes adjuntos</p>${evidenceSection(o.id,evidenceOf(o.id),state.access!=='viewer'&&!o.reversed_by)}</div>`,actions.length?`<div class="dialog-footer">${actions.join('')}</div>`:'');
   const picker=$('#evidence-file');
   if(picker)picker.onchange=()=>attachFile(o.id,picker);
 }
-// Reversión desde la interfaz: dice en voz alta qué va a pasar y no borra nada.
-// La clave idempotente se genera una sola vez, para que reintentar no cree otra.
+// Las operaciones financieras no se borran: se anulan con contra-asiento y quedan consultables.
 function revertDialog(id){
   const o=state.operations.find(x=>x.id===id);if(!o)return;
   let key=null;
-  openDialog('Revertir operación','Se registra el contra-asiento; no se borra nada.',`<div class="dialog-body"><p class="form-note">Se va a registrar una <strong>reversión</strong> vinculada a «${escape(o.concept)}» por ${fmt(o.amount,o.currency)}, con fecha de hoy. La operación original no se edita ni se elimina: queda marcada como revertida y sigue siendo consultable.</p><p class="detail-note">Si algo se apoya en esta operación —un cobro, un pago, una comisión— primero hay que revertir eso. El servidor lo rechaza si no está resuelto.</p><p class="error" id="revert-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="revert-confirm">Registrar reversión</button></div>`);
+  openDialog('Eliminar registro','Se anula con una reversión auditada; el historial se conserva.',`<div class="dialog-body"><p class="form-note">Se va a anular «${escape(o.concept)}» por ${fmt(o.amount,o.currency)}, con fecha de hoy. Para mantener el historial financiero, el registro original no desaparece: queda marcado como anulado y su saldo se compensa con un contra-asiento.</p><p class="detail-note">Si existe una operación vinculada, como un pago o cobro, primero hay que anular esa operación.</p><p class="error" id="revert-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="revert-confirm">Eliminar registro</button></div>`);
   const button=$('#revert-confirm');
   button.onclick=async()=>{
     if(busy)return;busy=true;button.disabled=true;$('#revert-error').textContent='';
@@ -415,15 +455,49 @@ function revertDialog(id){
     try{
       await api('/api/commands',{kind:'reversal',operationId:o.id,date:today()},key);
       modal.close();modal.innerHTML='';
-      try{await refresh();toast('Reversión registrada. La operación original queda en el historial.');}
-      catch{lock('La reversión se guardó, pero no se pudo actualizar la vista. Reconectá antes de registrar otra operación.');}
+      try{await refresh();toast('Registro anulado; el historial se conserva.');}
+      catch{lock('La anulación se guardó, pero no se pudo actualizar la vista. Reconectá antes de registrar otra operación.');}
     }catch(error){
       if($('#revert-error'))$('#revert-error').textContent=error.message;
       if(!error.uncertain)key=null;
       button.disabled=false;
-      button.textContent=key&&error.uncertain?'Reintentar la misma reversión':'Registrar reversión';
+      button.textContent=key&&error.uncertain?'Reintentar anulación':'Eliminar registro';
     }finally{busy=false;}
   };
+}
+function commandDialog({title,subtitle,body,confirm,retryLabel,success,input,refreshMessage}){
+  let key=null;
+  openDialog(title,subtitle,`<div class="dialog-body">${body}<p class="error" id="command-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="command-confirm">${escape(confirm)}</button></div>`);
+  const button=$('#command-confirm');
+  button.onclick=async()=>{
+    if(busy)return;busy=true;button.disabled=true;$('#command-error').textContent='';key=key||crypto.randomUUID();
+    try{
+      await api('/api/commands',input(),key);modal.close();modal.innerHTML='';
+      try{await refresh();toast(success);}catch{lock(refreshMessage);}
+    }catch(error){
+      if($('#command-error'))$('#command-error').textContent=error.message;
+      if(!error.uncertain)key=null;
+      button.disabled=false;button.textContent=key&&error.uncertain?retryLabel:confirm;
+    }finally{busy=false;}
+  };
+}
+function accountDeleteDialog(id){
+  const account=state.accounts.find(a=>a.id===id);if(!account||state.access==='viewer')return;
+  const movements=state.entries.filter(e=>e.account===id).length;
+  if(movements){
+    openDialog('No se puede eliminar la cuenta','Tiene movimientos en el historial.',`<div class="dialog-body"><p class="form-note">«${escape(account.name)}» tiene ${movements} movimiento${movements===1?'':'s'}. No se elimina para proteger los saldos y el historial. Abrí cada operación y usá <strong>Eliminar registro</strong> para anularla primero; después volvé aquí a quitar la cuenta.</p></div>`,`<div class="dialog-footer"><button class="primary" data-action="close">Entendido</button></div>`);
+    return;
+  }
+  commandDialog({title:'Eliminar cuenta',subtitle:'Solo se pueden eliminar cuentas sin movimientos.',body:`<p class="form-note">Se eliminará la cuenta «${escape(account.name)}» y su saldo inicial de ${fmt(account.opening,account.currency)}. Esta acción no se puede deshacer.</p>`,confirm:'Eliminar cuenta',retryLabel:'Reintentar eliminación',success:'Cuenta eliminada.',refreshMessage:'La cuenta se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'account.delete',accountId:account.id})});
+}
+function removeEvidenceDialog(id){
+  const entry=(state.evidence||[]).find(e=>e.id===id);if(!entry||state.access==='viewer')return;
+  commandDialog({title:'Quitar comprobante',subtitle:'La operación y sus importes no cambian.',body:`<p class="form-note">Se eliminará el archivo «${escape(entry.name)}» adjunto a esta operación. El movimiento financiero permanece intacto; el comprobante ya no se podrá recuperar.</p>`,confirm:'Quitar comprobante',retryLabel:'Reintentar eliminación',success:'Comprobante eliminado.',refreshMessage:'El comprobante se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'evidence.remove',evidenceId:entry.id})});
+}
+function deletePaymentDialog(id){
+  const payment=state.operations.find(o=>o.id===id&&o.kind==='payment');if(!payment||state.access==='viewer')return;
+  const obligation=state.operations.find(o=>o.id===payment.related_id);
+  commandDialog({title:'Eliminar pago',subtitle:'Quita este registro del historial y restaura el saldo pendiente.',body:`<p class="form-note">Se eliminará el pago «${escape(payment.concept)}» por ${fmt(payment.amount,payment.currency)}${obligation?` aplicado a «${escape(obligation.concept)}»`:''}. La deuda vuelve a quedar pendiente por ese importe y el saldo de la cuenta se recalcula sin este pago. La acción queda registrada en auditoría.</p><p class="detail-note">Esto solo se habilita para pagos. Los gastos y demás operaciones se anulan con <strong>Eliminar registro</strong>, que preserva el historial con un contra-asiento.</p>`,confirm:'Eliminar pago',retryLabel:'Reintentar eliminación',success:'Pago eliminado; la deuda volvió a pendiente.',refreshMessage:'El pago se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'payment.delete',paymentId:payment.id})});
 }
 function download(contents,filename,type){const url=URL.createObjectURL(new Blob([contents],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function importDialog(){
@@ -465,7 +539,10 @@ document.addEventListener('click',async e=>{
   if(b.dataset.revert){revertDialog(b.dataset.revert);return;}
   if(b.dataset.attach){$('#evidence-file')?.click();return;}
   if(b.dataset.operation){detail(b.dataset.operation);return;}
-  if(b.dataset.account){const a=state.accounts.find(a=>a.id===b.dataset.account);const ids=new Set(state.entries.filter(e=>e.account===a.id).map(e=>e.operation));openDialog(a.name,`Saldo registrado: ${fmt(a.balance,a.currency)}`,`<div class="dialog-body">${table(state.operations.filter(o=>ids.has(o.id)))}</div>`);return;}
+  if(b.dataset.account){const a=state.accounts.find(a=>a.id===b.dataset.account);if(!a)return;const ids=new Set(state.entries.filter(e=>e.account===a.id).map(e=>e.operation));openDialog(a.name,`Saldo registrado: ${fmt(a.balance,a.currency)}`,`<div class="dialog-body">${table(state.operations.filter(o=>ids.has(o.id)))}</div>`);return;}
+  if(b.dataset.deleteAccount){accountDeleteDialog(b.dataset.deleteAccount);return;}
+  if(b.dataset.removeEvidence){removeEvidenceDialog(b.dataset.removeEvidence);return;}
+  if(b.dataset.deletePayment){deletePaymentDialog(b.dataset.deletePayment);return;}
   switch(b.dataset.action){
     case 'register':form();break;
     case 'close':closeDialog();break;
@@ -473,7 +550,7 @@ document.addEventListener('click',async e=>{
     case 'logout':await logout();break;
     case 'refresh':try{await refresh();toast('Datos actualizados.');}catch(error){toast(error.message);}break;
     case 'policy':openDialog('Disponible: pendiente de validación','Saldo, compromisos y reservas no son lo mismo.',`<div class="dialog-body"><p class="form-note">Falta acordar qué obligaciones y reservas se descuentan, con qué horizonte y cómo evitar solapamientos. Por eso el disponible todavía no se calcula.</p><p class="detail-note">${state?escape(`En ${unit || 'la moneda seleccionada'} se muestran saldos reconstruidos y deudas pendientes por separado. No se asume que todo el saldo esté libre ni que los cobros futuros estén disponibles.`):''}</p></div>`);break;
-    case 'menu':openDialog('Tu espacio','Elegí una sección.',`<div class="dialog-body settings-stack">${['accounts','expenses','sales','settings'].map(k=>`<button class="secondary" data-view="${k}">${icon(viewIcons[k])} ${viewLabels[k]}</button>`).join('')}</div>`);break;
+
     case 'import':importDialog();break;
     case 'export':{
       try{const r=await fetch(endpoint('/api/export.csv'),{cache:'no-store',credentials:'same-origin',headers:demoHeaders()});if(!r.ok){if(r.status===401)lock('La sesión venció.');throw new Error('No se pudo exportar.');}download(await r.text(),'landur-operaciones.csv','text/csv;charset=utf-8');toast('CSV de todas las monedas exportado. Guardalo en un lugar privado.');}catch(error){toast(error.message);}break;
