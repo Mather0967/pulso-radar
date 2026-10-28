@@ -56,70 +56,45 @@ async function refresh() {
   if(epoch!==authEpoch)return;
   state=fresh;loadedAt=new Date();
   if(!state.totals.some(t=>t.currency===unit))unit=state.totals[0]?.currency || '';
-  render();
+  if(typeof render === 'function') render();
 }
 function lock(message='') {
-  authEpoch++;state=null;modal.close();modal.innerHTML='';pendingRequest=null;busy=false;
-  app.innerHTML=`<div class="login"><section class="login-brand"><img class="brand-logo" src="${BASE}icon-512.png" alt="LANDUR®" loading="lazy" width="56" height="56"><div><span class="eyebrow">Tu espacio financiero</span><h1>Control financiero<br>del negocio.</h1><p>Saldos, cobros y compromisos en un solo registro. Cada cifra conserva su origen y su fecha.</p></div><footer>UNA SOLUCIÓN DE RIVECT</footer></section><main class="login-main" id="main"><div class="login-box"><span class="eyebrow muted">${session?.demo?'ENTORNO DE PRUEBA':'ACCESO PRIVADO'}</span><h2>${session?.demo?'Conocé tu espacio':'Bienvenido a LANDUR'}</h2><p>${session?.demo?'Explorá con datos sintéticos. No ingreses información financiera real en esta demostración.':'Ingresá con la contraseña configurada para esta aplicación.'}</p><form id="login-form">${session?.demo?'':`<label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label>`}<p class="error" id="login-error" role="alert">${escape(message)}</p><button class="primary" type="submit">${session?.demo?'Explorar demostración':'Ingresar al espacio'} ${icon('arrow')}</button></form><p class="footnote">${navigator.onLine?'Conexión necesaria para consultar y guardar.':'Sin conexión. Volvé a conectarte para continuar.'} No se guarda una copia financiera offline en el navegador.</p><button class="text-btn" data-action="install">${icon('phone')} Instalar en el iPhone</button></div></main></div>`;
-  if(portalMode){
-    $('.login-box h2').textContent='Tu acceso está en RIVECT';
-    $('#login-form').innerHTML='<p class="error" role="alert"></p><a class="primary" href="/login">Ingresar desde el portal ↗</a><a class="text-btn" href="/portal"><span>←</span> Mis proyectos</a>';
-    $('#login-form .error').textContent=message;
-    return;
-  
-  $('#login-form').addEventListener('submit',async event=>{
-    event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;
-    try { await api(session?.demo?'/api/demo':'/api/login',session?.demo?{}:{password:new FormData(event.currentTarget).get('password')}); await refresh(); }
-    catch(error){if($('#login-error'))$('#login-error').textContent=error.message;button.disabled=false;}
-  });
-}
-const selectedOps = () => state.operations.filter(o=>!unit || o.currency===unit);
-// Una operación revertida conserva su contra-asiento en el saldo, pero deja de ser un pendiente.
-const outstanding = kind => selectedOps().filter(o=>o.kind===kind && o.amount>o.applied && !o.reversed_by);
-function navButton(key){return `<button class="nav-button ${view===key?'active':''}" data-view="${key}" ${view===key?'aria-current="page"':''}>${icon(viewIcons[key])}<span>${viewLabels[key]}</span>${key==='pending'?`<span class="nav-count">${outstanding('obligation').length+outstanding('sale').length+2}</span>`:''}</button>`;}
-function render() {
-  if(!state)return;
-  const heading = {home:['INICIO','Saldos y compromisos','Saldos reconstruidos desde el corte de cada cuenta y sus movimientos. No consulta tu banco.'],moves:['MOVIMIENTOS','Registro de operaciones','Tipo, origen, fecha y estado de cada registro. Ventas y cobros se guardan por separado.'],accounts:['CUENTAS','Cuentas y saldos','Un saldo por cuenta y moneda con su fecha de corte. Sin conversión automática.'],expenses:['EGRESOS','Gastos y deudas','Lo pagado descuenta caja. Lo pendiente queda como obligación hasta que registres el pago.'],sales:['VENTAS','Ventas y cobros','Una venta no es dinero disponible. Cada cobro se asocia a su venta con la comisión real.'],pending:['PENDIENTES','Lo que requiere decisión','Obligaciones vencidas o próximas, cobros sin registrar y reglas sin validar.'],settings:['CONFIGURACIÓN','Datos y alcance','Exportación, instalación y límites conocidos de esta versión.']}[view];
-  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="wordmark">LANDUR<span>®</span></div><small>CONTROL FINANCIERO</small></div><div class="workspace"><div class="workspace-mark">L</div><div><strong>Mi negocio</strong><small>${state.demo?'Espacio de demostración':'Espacio privado'}</small></div></div><div class="nav-label">PRINCIPAL</div><nav aria-label="Navegación principal">${Object.keys(viewLabels).filter(k=>k!=='settings').map(navButton).join('')}</nav><div class="sidebar-bottom">${navButton('settings')}<button class="nav-button" data-action="install">${icon('phone')} Instalar aplicación</button><div class="sidebar-note">Datos en el servidor.<br>Sin conexión bancaria activa.</div><div class="rivect">POR <b>✳ RIVECT</b></div></div></aside><div class="shell"><header class="topbar"><div class="breadcrumb">Mi negocio <span>/</span> <strong>${viewLabels[view]}</strong></div><img class="brand-logo mobile-logo" src="${BASE}icon-512.png" alt="LANDUR®" loading="lazy" width="40" height="40"><div class="top-actions"><span class="top-date">${state.demo?'Octubre 2026 · muestra':new Intl.DateTimeFormat('es-UY',{day:'numeric',month:'long',year:'numeric'}).format(new Date())}</span><button class="icon-btn" data-action="refresh" aria-label="Actualizar datos">${icon('refresh')}</button><button class="icon-btn" data-action="logout" aria-label="Cerrar sesión">${icon('logout')}</button><div class="avatar" title="${escape(state.actor)}">${state.demo?'DE':'RA'}</div></div></header>${state.demo?'<div class="demo-bar"><span></span>DEMOSTRACIÓN · Datos sintéticos, no representan las finanzas reales de LANDUR.</div>':'<div class="demo-bar"><span></span>VERSIÓN PRIVADA · Pentesting independiente y prueba en iPhone real pendientes. No cargues datos reales todavía.</div>'}${updateWorker?'<div class="update-bar">Hay una actualización de la aplicación.<button class="mini-button" data-action="update">Actualizar</button></div>':''}<main class="page" id="main"><section class="heading"><div><div class="eyebrow">${heading[0]}</div><h1>${heading[1]}</h1><p>${heading[2]}</p></div><button class="primary" data-action="register">${icon('plus')} Registrar operación</button></section><div class="toolbar"><div class="period">${icon('calendar')} ${view==='home'?'Resumen acumulado · sin filtro de período':'Registros acumulados'}</div><label class="flex muted"><span class="eyebrow">Moneda</span><select id="currency" class="currency-select" aria-label="Moneda del resumen">${state.totals.length?state.totals.map(t=>`<option ${t.currency===unit?'selected':''}>${t.currency}</option>`).join(''):'<option value="">Sin cuentas</option>'}</select></label></div><div id="view-content">${content()}</div><footer class="page-footer"><span class="flex">${icon('lock')} Información guardada en el servidor · Sin conexiones bancarias activas</span><span>Última lectura ${loadedAt?.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'})} · LANDUR × RIVECT</span></footer></main></div><nav class="mobile-nav" aria-label="Navegación móvil"><button data-view="home" class="${view==='home'?'active':''}">${icon('home')}Inicio</button><button data-view="moves" class="${view==='moves'?'active':''}">${icon('moves')}Actividad</button><button data-action="register" class="register">${icon('plus')}Registrar</button><button data-view="pending" class="${view==='pending'?'active':''}">${icon('pending')}Pendientes</button><button data-action="menu">${icon('more')}Más</button></nav>`;
-  if(portalMode){
-    const back=document.createElement('a');back.href='/portal';back.className='portal-back';back.innerHTML='<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></span> ← Mis proyectos';
-    $('.shell').prepend(back);
-    $('.avatar').textContent=(state.actor||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]||'').join('').toUpperCase();
-    if(state.access==='viewer'){
-      document.querySelectorAll('button[data-action="register"],button[data-action="import"],button[data-form],button[data-pay]').forEach(b=>{b.disabled=true;b.title='Acceso de solo lectura';});
-      const note=document.createElement('span');note.className='portal-access';note.textContent='Solo lectura';back.append(note);
+  try {
+    authEpoch++; state=null;
+    try { if(modal){ modal.close(); modal.innerHTML=''; } } catch {}
+    pendingRequest=null; busy=false;
+    if(app){
+      app.innerHTML = `<div class="login"><section class="login-brand"><img class="brand-logo" src="${BASE}icon-512.png" alt="LANDUR®" loading="lazy" width="56" height="56"><div><span class="eyebrow">Tu espacio financiero</span><h1>Control financiero<br>del negocio.</h1><p>Saldos, cobros y compromisos en un solo registro. Cada cifra conserva su origen y su fecha.</p></div><footer>UNA SOLUCIÓN DE RIVECT</footer></section><main class="login-main" id="main"><div class="login-box"><span class="eyebrow muted">${session?.demo?'ENTORNO DE PRUEBA':'ACCESO PRIVADO'}</span><h2>${session?.demo?'Conocé tu espacio':'Bienvenido a LANDUR'}</h2><p>${session?.demo?'Explorá con datos sintéticos. No ingreses información financiera real en esta demostración.':'Ingresá con la contraseña configurada para esta aplicación.'}</p><form id="login-form">${session?.demo?'':`<label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label>`}<p class="error" id="login-error" role="alert">${escape(message||'')}</p><button class="primary" type="submit">${session?.demo?'Explorar demostración':'Ingresar al espacio'} ${icon('arrow')}</button></form><p class="footnote">${navigator.onLine?'Conexión necesaria para consultar y guardar.':'Sin conexión. Volvé a conectarte para continuar.'} No se guarda una copia financiera offline en el navegador.</p><button class="text-btn" data-action="install">${icon('phone')} Instalar en el iPhone</button></div></main></div>`;
     }
+    if(portalMode){
+      const h2 = $('.login-box h2'); if(h2) h2.textContent='Tu acceso está en RIVECT';
+      const form = $('#login-form');
+      if(form){
+        form.innerHTML = '<p class="error" role="alert"></p><a class="primary" href="/login">Ingresar desde el portal ↗</a><a class="text-btn" href="/portal"><span>←</span> Mis proyectos</a>';
+        const err = form.querySelector('.error'); if(err) err.textContent = message||'';
+      }
+      return;
+    }
+    const formEl = $('#login-form');
+    if(formEl && !formEl.dataset.bound){
+      formEl.dataset.bound='1';
+      formEl.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = event.currentTarget.querySelector('button');
+        if(button) button.disabled = true;
+        try {
+          await api(session?.demo?'/api/demo':'/api/login', session?.demo?{} : {password: new FormData(event.currentTarget).get('password')});
+          await refresh();
+        } catch(error) {
+          const errEl = $('#login-error');
+          if(errEl) errEl.textContent = error.message;
+          if(button) button.disabled = false;
+        }
+      });
+    }
+  } catch(e) {
+    console.error('lock error', e);
   }
-  $('#currency').addEventListener('change',e=>{unit=e.target.value;render();});
-  $('#search')?.addEventListener('input',e=>{query=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
-  $('#kind-filter')?.addEventListener('change',e=>{filter=e.target.value;$('#operation-table').innerHTML=table(filteredOps());});
-  app.addEventListener('click',async event=>{
-    const opBtn=event.target.closest('[data-operation]');
-    if(opBtn){detail(opBtn.getAttribute('data-operation'));return;}
-    const paymentBtn=event.target.closest('[data-delete-payment]');
-    if(paymentBtn){const id=paymentBtn.getAttribute('data-delete-payment');if(!confirm('Eliminar este pago del saldo. La operación original queda registrada pero el dinero vuelve a la cuenta. ¿Continuás?'))return;try{await api('/api/commands',{kind:'payment.delete',paymentId:id});await refresh();toast('Pago eliminado del saldo.');}catch(error){toast(error.message);}}
-    const revertBtn=event.target.closest('[data-revert]');
-    if(revertBtn){const id=revertBtn.getAttribute('data-revert');if(!confirm('Eliminar este registro, sus comisiones y sus contra-asientos del saldo, con la cuenta de auditoría correspondiente. ¿Continuás?'))return;try{await api('/api/commands',{kind:'reversal',operationId:id});await refresh();toast('Registro revertido.');}catch(error){toast(error.message);}}
-    const evidenceBtn=event.target.closest('[data-remove-evidence]');
-    if(evidenceBtn){const id=evidenceBtn.getAttribute('data-remove-evidence');if(!confirm('Quitar este comprobante del registro. No se borra del todo, queda constancia en el registro. ¿Continuás?'))return;try{await api('/api/commands',{kind:'evidence.remove',evidenceId:id});await refresh();toast('Comprobante quitado.');}catch(error){toast(error.message);}}
-    const payBtn=event.target.closest('[data-pay]');
-    if(payBtn){const id=payBtn.getAttribute('data-pay');const type=payBtn.getAttribute('data-type')||'payment';form(type,id);return;}
-    const attachBtn=event.target.closest('[data-attach]');
-    if(attachBtn){const id=attachBtn.getAttribute('data-attach');attachFile(id,{files:[document.querySelector('[data-action="attach-file"]')?.files?.[0]]||null});return;}
-    const closeBtn=event.target.closest('[data-action="close"]'); if(closeBtn){modal.close();return;}
-    const importBtn=event.target.closest('[data-action="import"]'); if(importBtn)opendialog('Importar CSV','Una plantilla acotada con vista previa.');
-    const exportBtn=event.target.closest('[data-action="export"]'); if(exportBtn){window.location.href=endpoint('/api/export.csv');return;}
-    const registerBtn=event.target.closest('[data-action="register"]'); if(registerBtn){form('expense');return;}
-    const policyBtn=event.target.closest('[data-action="policy"]'); if(policyBtn){openDialog('Disponible estimado','Reglas pendientes','<div class="rule-list"><div class="rule-item"><strong>Regla aún no activada</strong><p>El cálculo de disponible descontando obligaciones, retiros y reservas todavía no tiene regla definida. Hasta tanto, el valor muestra «Por validar».</div></div>');return;}
-    const updateBtn=event.target.closest('[data-action="update"]'); if(updateBtn){return;}
-    const menuBtn=event.target.closest('[data-action="menu"]'); if(menuBtn)openMenu('Tu espacio','Elegí una sección.',`<div class="dialog-body settings-stack">${['accounts','expenses','sales','settings'].map(k=>`<button class="secondary" data-view="${k}">${icon(viewIcons[k])} ${viewLabels[k]}</button>`).join('')}</div>`);
-    const launchBtn=event.target.closest('[data-action="experiments"]'); if(launchBtn){const base=`${location.origin}${location.pathname}`;const side=`${base}side-by-side/qa.html`;window.open(side,'_blank');return;}
-  });
-  app.addEventListener('click',event=>{const viewBtn=event.target.closest('[data-view]');if(viewBtn){view=viewBtn.getAttribute('data-view');render();};});
-  app.addEventListener('click',event=>{const formBtn=event.target.closest('[data-form]');if(formBtn){const kind=formBtn.getAttribute('data-form')==='account'?'account':'expense';form(kind);};});
-  app.addEventListener('click',event=>{const installBtn=event.target.closest('[data-action="install"]');if(installBtn)install();});
-  app.addEventListener('click',event=>{const logoutBtn=event.target.closest('[data-action="logout"]');if(logoutBtn){api('/api/logout').then(()=>{session=null;lock('Sesión cerrada.');});return;};});
-}
 }
 function content(){
   if(view==='home')return home();
@@ -557,8 +532,8 @@ document.addEventListener('click',async e=>{
   }
 });
 async function boot(autoDemo=true){
-  try{session=await api('/api/session');if(session.authenticated)await refresh();else if(session.demo&&autoDemo){await api('/api/demo',{});await refresh();}else lock();}
-  catch(error){lock(error.message);}
+  try{session=await api('/api/session');if(session?.authenticated){try{await refresh();}catch(e){try{lock(e.message);}catch{}}}else if(session?.demo&&autoDemo){try{await api('/api/demo',{});await refresh();}catch(e){try{lock(e.message);}catch{}}}else {try{lock();}catch{}}}
+  catch(error){try{lock(error.message);}catch{}}
 }
 window.addEventListener('offline',()=>{if(!busy)lock('Sin conexión. No se puede consultar ni guardar. Volvé a conectarte.');else toast('Se perdió la conexión. No cierres el formulario hasta verificar el resultado.');});
 window.addEventListener('online',()=>{if(!busy&&!modal.open)boot(false);});
@@ -568,7 +543,7 @@ window.addEventListener('pageshow',e=>{if(e.persisted)boot(false);});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state&&!busy&&!modal.open)refresh().catch(()=>lock('No se pudo verificar la sesión. Volvé a ingresar.'));});
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register(endpoint('/sw.js'),{scope:BASE}).then(reg=>{
-    const update=()=>{if(reg.waiting&&navigator.serviceWorker.controller){updateWorker=reg.waiting;if(state)render();}};
+    const update=()=>{if(reg.waiting&&navigator.serviceWorker.controller){updateWorker=reg.waiting;if(state && typeof render==='function')render();}};
     update();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',update));
   }).catch(()=>{/* Installation status is not a financial save; app can operate online without SW. */});
   let controlled=!!navigator.serviceWorker.controller;
