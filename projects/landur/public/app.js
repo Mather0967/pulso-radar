@@ -468,14 +468,50 @@ function commandDialog({title,subtitle,body,confirm,retryLabel,success,input,ref
     }finally{busy=false;}
   };
 }
+// Eliminar una cuenta con movimientos exige decidir qué pasa con ellos: pasarlos a otra
+// cuenta existente, crear una cuenta nueva con esa información, o borrarlos también.
 function accountDeleteDialog(id){
   const account=state.accounts.find(a=>a.id===id);if(!account||state.access==='viewer')return;
   const movements=state.entries.filter(e=>e.account===id).length;
-  if(movements){
-    openDialog('No se puede eliminar la cuenta','Tiene movimientos en el historial.',`<div class="dialog-body"><p class="form-note">«${escape(account.name)}» tiene ${movements} movimiento${movements===1?'':'s'}. No se elimina para proteger los saldos y el historial. Abrí cada operación y usá <strong>Eliminar registro</strong> para anularla primero; después volvé aquí a quitar la cuenta.</p></div>`,`<div class="dialog-footer"><button class="primary" data-action="close">Entendido</button></div>`);
+  if(!movements){
+    commandDialog({title:'Eliminar cuenta',subtitle:'Sin movimientos: no se pierde historial.',body:`<p class="form-note">Se eliminará la cuenta «${escape(account.name)}» y su saldo inicial de ${fmt(account.opening,account.currency)}. Esta acción no se puede deshacer.</p>`,confirm:'Eliminar cuenta',retryLabel:'Reintentar eliminación',success:'Cuenta eliminada.',refreshMessage:'La cuenta se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'account.delete',accountId:account.id})});
     return;
   }
-  commandDialog({title:'Eliminar cuenta',subtitle:'Solo se pueden eliminar cuentas sin movimientos.',body:`<p class="form-note">Se eliminará la cuenta «${escape(account.name)}» y su saldo inicial de ${fmt(account.opening,account.currency)}. Esta acción no se puede deshacer.</p>`,confirm:'Eliminar cuenta',retryLabel:'Reintentar eliminación',success:'Cuenta eliminada.',refreshMessage:'La cuenta se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'account.delete',accountId:account.id})});
+  const targets=state.accounts.filter(a=>a.currency===account.currency&&a.id!==account.id);
+  const plural=movements===1?'':'s';
+  openDialog('Eliminar cuenta',`${movements} movimiento${plural} en «${escape(account.name)}»`,`<div class="dialog-body"><p class="form-note">«${escape(account.name)}» tiene ${movements} movimiento${plural} y un saldo de ${fmt(account.balance,account.currency)}. Elegí qué pasa con esa información antes de eliminarla.</p><label class="check"><input type="radio" name="mode" value="move" ${targets.length?'checked':'disabled'}><span><strong>Pasar todo a otra cuenta</strong><span class="choice-sub">Los movimientos y el saldo inicial se suman a la cuenta que elijas. No se pierde nada.</span></span></label><label class="field">Cuenta de destino<select name="toAccountId" ${targets.length?'':'disabled'}>${targets.map(a=>`<option value="${a.id}">${escape(a.name)} · ${a.currency}</option>`).join('')||'<option value="">No hay otra cuenta en esta moneda</option>'}</select></label><label class="check"><input type="radio" name="mode" value="new" ${targets.length?'':'checked'}><span><strong>Crear una cuenta nueva con esta información</strong><span class="choice-sub">Se crea una cuenta nueva con el mismo saldo inicial y ahí pasan los movimientos.</span></span></label><label class="field">Nombre de la cuenta nueva<input name="newname" value="${escape(account.name)}" maxlength="60" ${targets.length?'disabled':''}></label><label class="check"><input type="radio" name="mode" value="purge"><span><strong>Eliminar también sus movimientos</strong><span class="choice-sub">Se borran ${movements} movimiento${plural}, sus pagos, cobros y comprobantes. No se puede deshacer.</span></span></label><p class="error" id="account-error" role="alert"></p></div>`,`<div class="dialog-footer"><button class="secondary" data-action="close">Cancelar</button><button class="primary" id="account-confirm">Continuar</button></div>`);
+  let key=null;
+  const button=$('#account-confirm');
+  const select=$('[name="toAccountId"]',modal), named=$('[name="newname"]',modal);
+  const chosen=()=>modal.querySelector('input[name="mode"]:checked')?.value||'new';
+  const sync=()=>{const mode=chosen();if(select)select.disabled=mode!=='move';if(named)named.disabled=mode!=='new';$('#account-error').textContent='';button.textContent=mode==='purge'?'Eliminar cuenta y movimientos':mode==='new'?'Crear cuenta y pasar todo':'Mover todo y eliminar cuenta';};
+  modal.querySelectorAll('input[name="mode"]').forEach(radio=>radio.addEventListener('change',sync));
+  sync();
+  button.onclick=async()=>{
+    if(busy)return;
+    const mode=chosen();$('#account-error').textContent='';
+    const input={kind:'account.delete',accountId:account.id};
+    if(mode==='move'){
+      if(!select?.value){$('#account-error').textContent='Elegí la cuenta de destino.';return;}
+      input.mode='move';input.toAccountId=select.value;
+    }else if(mode==='new'){
+      const name=named?.value.trim();
+      if(!name){$('#account-error').textContent='Escribí el nombre de la cuenta nueva.';return;}
+      input.mode='move';input.newAccount={name};
+    }else{
+      input.mode='purge';input.confirm=true;
+    }
+    busy=true;button.disabled=true;key=key||crypto.randomUUID();
+    try{
+      await api('/api/commands',input,key);modal.close();modal.innerHTML='';
+      try{await refresh();toast(mode==='purge'?'Cuenta y movimientos eliminados.':mode==='new'?'Cuenta nueva creada con los movimientos.':'Movimientos trasladados y cuenta eliminada.');}
+      catch{lock('El cambio se guardó, pero no se pudo actualizar la vista. Reconectá antes de seguir.');}
+    }catch(error){
+      if($('#account-error'))$('#account-error').textContent=error.message;
+      if(!error.uncertain)key=null;
+      button.disabled=false;if(key&&error.uncertain)button.textContent='Reintentar';
+    }finally{busy=false;}
+  };
 }
 function removeEvidenceDialog(id){
   const entry=(state.evidence||[]).find(e=>e.id===id);if(!entry||state.access==='viewer')return;

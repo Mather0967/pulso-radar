@@ -281,6 +281,33 @@ export class Ledger {
     }
     return {operations:operationIds.length,evidence:removedEvidence.length};
   }
+  // Todo lo que cuelga de una cuenta: las operaciones con entrada de dinero en ella y los
+  // registros derivados (comisiones, contra-asientos) que no tienen entradas propias pero
+  // quedarían huérfanos si se borra el original.
+  accountOperations(workspace, accountId) {
+    const ids = new Set(this.db.prepare('SELECT DISTINCT operation FROM entries WHERE account=?').all(accountId).map(row => row.operation));
+    for (let grew = true; grew && ids.size;) {
+      grew = false;
+      const slots = [...ids].map(() => '?').join(',');
+      for (const row of this.db.prepare(`SELECT id FROM operations WHERE workspace=? AND related_id IN (${slots})`).all(workspace, ...ids))
+        if (!ids.has(row.id)) { ids.add(row.id); grew = true; }
+    }
+    return [...ids];
+  }
+  // Traspaso de una cuenta a otra: los movimientos cambian de dueño y los saldos iniciales
+  // se suman, así el total de dinero del espacio no cambia y no hay que registrar nada a mano.
+  mergeAccount(workspace, actor, account, target) {
+    if (target.id === account.id) throw new DomainError('Elegí una cuenta distinta de la que vas a eliminar.');
+    if (target.currency !== account.currency) throw new DomainError('Las cuentas tienen monedas distintas. No se hacen conversiones automáticas: elegí una cuenta de la misma moneda.');
+    const moved = this.db.prepare('SELECT COUNT(*) n FROM entries WHERE account=?').get(account.id).n;
+    const opening = target.opening + account.opening;
+    const cutoff = target.cutoff < account.cutoff ? target.cutoff : account.cutoff;
+    this.db.prepare('UPDATE entries SET account=? WHERE account=?').run(target.id, account.id);
+    this.db.prepare('UPDATE accounts SET opening=?, cutoff=? WHERE workspace=? AND id=?').run(opening, cutoff, workspace, target.id);
+    this.audit(workspace, actor, 'account.merged', JSON.stringify({ from: account, into: target.id, opening, cutoff, entries: moved }));
+    this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
+    return { id: account.id, into: target.id, entries: moved };
+  }
   previewImport(workspace, actor, csv) {
     this.db.exec('BEGIN IMMEDIATE');
     try { return this.execute(workspace, actor, {kind:'import', csv}); }
@@ -318,10 +345,35 @@ export class Ledger {
     if (kind === 'account.delete') {
       const account = this.account(workspace, String(input.accountId ?? ''));
       const ids = new Set(this.db.prepare('SELECT DISTINCT operation FROM entries WHERE account=?').all(account.id).map(row => row.operation));
-      // Decisión registrada (DECISIONES.md, API.md): solo se elimina una cuenta sin movimientos.
-      // Si la cuenta tiene entradas de dinero, nada cambia y el historial manda: hay que anular
-      // antes cada operación que la use. Ninguna operación financiera se borra desde acá.
-      if (ids.size) throw new DomainError('La cuenta tiene movimientos. Anulá primero cada operación que la usa.', 409);
+      // Traspaso (decisión del 29/10/2026, DECISIONES.md): la cuenta desaparece pero sus
+      // movimientos y su saldo inicial siguen existiendo en otra cuenta.
+      if (input.mode === 'move') {
+        let target;
+        if (input.toAccountId !== undefined) target = this.account(workspace, String(input.toAccountId));
+        else if (input.newAccount && typeof input.newAccount === 'object' && !Array.isArray(input.newAccount)) {
+          const accountKind = input.newAccount.accountKind ?? account.kind;
+          if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
+          const id = randomUUID();
+          // Nace en cero: el saldo inicial se asigna en el traspaso, que suma el de la original.
+          this.db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?,?,?,?)').run(id, workspace,
+            text(input.newAccount.name, 'Nombre', 60), accountKind, account.currency, 0,
+            account.cutoff, account.verified, account.accessible);
+          this.audit(workspace, actor, 'account.created', id);
+          target = this.account(workspace, id);
+        } else throw new DomainError('Elegí a qué cuenta se trasladan los movimientos.');
+        return this.mergeAccount(workspace, actor, account, target);
+      }
+      // Borrado con todo lo asociado. La auditoría guarda una copia completa de lo eliminado
+      // (operaciones, entradas, aplicaciones, obligaciones y metadatos de comprobantes).
+      if (input.mode === 'purge') {
+        if (input.confirm !== true) throw new DomainError('Confirmá que querés eliminar también los movimientos de la cuenta.');
+        const removed = this.deleteOperations(workspace, actor, this.accountOperations(workspace, account.id), 'account.purged', account);
+        this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
+        this.audit(workspace, actor, 'account.deleted', JSON.stringify({ account }));
+        return { id: account.id, ...removed };
+      }
+      // Sin decisión explícita no se supone nada: una cuenta con movimientos no se elimina.
+      if (ids.size) throw new DomainError('La cuenta tiene movimientos. Elegí si los trasladás a otra cuenta o los eliminás también.', 409);
       this.audit(workspace, actor, 'account.deleted', JSON.stringify({account}));
       this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
       return { id: account.id };

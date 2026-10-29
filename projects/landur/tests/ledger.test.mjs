@@ -294,6 +294,82 @@ test('una cuenta vacía se elimina con auditoría y una cuenta con movimientos s
   assert.throws(()=>run({kind:'account.delete',accountId:'foreign'}),error=>error.status===404);
 });
 
+test('eliminar una cuenta con movimientos: se traslada todo a otra cuenta sin perder dinero', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const from=account({name:'Cuenta vieja'});
+  const into=account({name:'Cuenta que queda',accountKind:'cash',opening:'10000'});
+  run(op('expense',{accountId:from,amount:'1500'}));
+  const before=ledger.snapshot('a').totals[0];
+  const result=run({kind:'account.delete',accountId:from,mode:'move',toAccountId:into});
+  assert.equal(result.into,into);assert.equal(result.entries,1);
+  const state=ledger.snapshot('a');
+  assert.equal(state.accounts.some(a=>a.id===from),false,'la cuenta original desaparece');
+  const target=state.accounts.find(a=>a.id===into);
+  assert.equal(target.opening,7000000,'los saldos iniciales se suman (en unidades menores)');
+  assert.equal(target.balance,before.balance,'el saldo de la cuenta que queda absorbe el otro');
+  assert.equal(state.totals[0].balance,before.balance,'el total de dinero del espacio no cambia');
+  assert.equal(state.entries.some(e=>e.account===from),false,'los movimientos cambiaron de cuenta');
+  assert.equal(state.audit[0].action,'account.merged');
+});
+
+test('eliminar una cuenta con movimientos: se puede crear una cuenta nueva con esa información', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const from=account({name:'Banco viejo'});
+  run(op('expense',{accountId:from,amount:'1250'}));
+  const before=ledger.snapshot('a').totals[0].balance;
+  const result=run({kind:'account.delete',accountId:from,mode:'move',newAccount:{name:'Banco 2026'}});
+  const state=ledger.snapshot('a');
+  const created=state.accounts.find(a=>a.id===result.into);
+  assert.equal(created.name,'Banco 2026');
+  assert.equal(created.opening,6000000,'conserva el saldo inicial de la cuenta original');
+  assert.equal(created.balance,before);
+  assert.equal(state.totals[0].balance,before);
+  assert.equal(state.accounts.some(a=>a.id===from),false);
+  assert.equal(state.entries.every(e=>e.account===created.id),true);
+  assert.equal(state.audit[0].action,'account.merged');
+});
+
+test('eliminar una cuenta con todo lo asociado es explícito y queda respaldado en auditoría', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const bank=account({name:'Cuenta a borrar'});
+  const other=account({name:'Caja',accountKind:'cash',opening:'0'});
+  const expense=run(op('expense',{accountId:bank,amount:'1250'})).id;
+  const obligation=run(op('obligation',{due:'2026-10-28'})).id;
+  const payment=run(op('payment',{accountId:bank,targetId:obligation,amount:'1000'})).id;
+  ledger.attachEvidence('a','tester',randomUUID(),{operationId:expense,name:'ticket.png',mime:'image/png',data:PNG});
+  run(op('expense',{accountId:other,amount:'500'}));
+  // Sin confirmación explícita no se borra nada.
+  assert.throws(()=>run({kind:'account.delete',accountId:bank,mode:'purge'}),/Confirmá/);
+  assert.ok(ledger.snapshot('a').accounts.some(a=>a.id===bank));
+  const result=run({kind:'account.delete',accountId:bank,mode:'purge',confirm:true});
+  assert.equal(result.operations,2,'se van el gasto y el pago de esa cuenta');
+  assert.equal(result.evidence,1,'y el comprobante adjunto');
+  const state=ledger.snapshot('a');
+  assert.equal(state.accounts.some(a=>a.id===bank),false);
+  assert.equal(state.operations.some(o=>[expense,payment].includes(o.id)),false);
+  assert.equal(state.operations.some(o=>o.id===obligation),true,'la deuda pendiente no pertenece a la cuenta');
+  assert.equal(state.evidence.length,0);
+  assert.equal(state.entries.some(e=>e.account===bank),false);
+  assert.equal(state.totals[0].payable,149000,'la deuda vuelve a quedar pendiente');
+  assert.ok(state.audit.some(a=>a.action==='account.purged'),'la baja queda auditada');
+  assert.match(state.audit.find(a=>a.action==='account.purged').entity,/Cuenta a borrar/,'la auditoría guarda la cuenta eliminada');
+});
+
+test('el traspaso valida moneda, destino y cuenta distinta antes de tocar nada', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const from=account({name:'En pesos'});
+  run(op('expense',{accountId:from,amount:'1000'}));
+  const dollars=account({name:'En dólares',currency:'USD',opening:'0'});
+  assert.throws(()=>run({kind:'account.delete',accountId:from,mode:'move',toAccountId:dollars}),/monedas distintas/);
+  assert.throws(()=>run({kind:'account.delete',accountId:from,mode:'move',toAccountId:'no-existe'}),error=>error.status===404);
+  assert.throws(()=>run({kind:'account.delete',accountId:from,mode:'move',toAccountId:from}),/distinta/);
+  assert.throws(()=>run({kind:'account.delete',accountId:from,mode:'move'}),/a qué cuenta/);
+  assert.throws(()=>run({kind:'account.delete',accountId:from,mode:'move',newAccount:{name:''}}),/Nombre/);
+  const state=ledger.snapshot('a');
+  assert.ok(state.accounts.some(a=>a.id===from),'los rechazos no tocan la cuenta');
+  assert.equal(state.entries.some(e=>e.account===from),true,'ni sus movimientos');
+});
+
 test('un comprobante se puede eliminar con idempotencia, auditoría y aislamiento', t => {
   const {ledger,run,account,op}=fixture(t);
   const expense=run(op('expense',{accountId:account()})).id;

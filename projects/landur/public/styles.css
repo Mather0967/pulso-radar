@@ -239,3 +239,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px soli
 .brand-wordmark{display:block;width:132px;height:auto;margin:0 0 11px}
 .login-brand .login-wordmark{width:min(260px,100%);height:auto;object-fit:contain;object-position:left center}
 @media(max-width:900px){.brand-wordmark{width:112px}.login-brand .login-wordmark{width:min(200px,100%)}}
+
+/* Eliminar una cuenta con movimientos: cada opción dice qué pasa con el historial. */
+.dialog-body .check{margin-bottom:12px}
+.choice-sub{display:block;font-weight:400;font-size:11px;line-height:1.6;color:#7b886e;margin-top:3px}
+.dialog-body label.field select:disabled,.dialog-body label.field input:disabled{opacity:.55;background:#f7f9f6}
