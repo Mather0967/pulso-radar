@@ -18,10 +18,10 @@ const assets = new Map([
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/sw.js', ['sw.js', 'text/javascript; charset=utf-8']],
   ['/manifest.webmanifest', ['manifest.webmanifest', 'application/manifest+json']],
-  ['/icon.svg', ['icon.svg', 'image/svg+xml']],
-  ['/brand.png', ['brand.png', 'image/png']],
+  ['/wordmark.png', ['wordmark.png', 'image/png']],
   ['/icon-192.png', ['icon-192.png', 'image/png']],
   ['/icon-512.png', ['icon-512.png', 'image/png']],
+  ['/icon-maskable-512.png', ['icon-maskable-512.png', 'image/png']],
   ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
 ]);
 const digest = text => createHash('sha256').update(text).digest('hex');

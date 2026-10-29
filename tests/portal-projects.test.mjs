@@ -35,6 +35,9 @@ test('login del portal abre LANDUR sin otra contraseña; Pulso aislado',async()=
     assert.equal((await f.request('/pulso',landur)).status,403);
     assert.equal((await f.request('/api/workspace',landur)).status,403);
     const portal=await(await f.request('/portal',admin)).text();assert.match(portal,/Abrir Pulso/);assert.match(portal,/Abrir LANDUR/);
+    // Con un solo proyecto habilitado no hay selector: se entra directo y no se puede volver a elegir.
+    const onlyLandur=await f.request('/portal',landur);assert.equal(onlyLandur.status,303);assert.equal(onlyLandur.headers.get('location'),'/landur/');
+    const onlyPulso=await f.request('/portal',pulso);assert.equal(onlyPulso.status,303);assert.equal(onlyPulso.headers.get('location'),'/pulso');
     assert.doesNotMatch(await(await f.request('/portal',pulso)).text(),/Abrir LANDUR/);
     const boot=await(await f.request('/landur/api/session',landur)).json();assert.equal(boot.portal,true);assert.equal(boot.authenticated,true);assert.equal(boot.csrf,landur.csrf);
     const page=await(await f.request('/landur/',landur)).text();assert.match(page,/data-portal="true"/);assert.match(page,/src="\.\/app.js"/);

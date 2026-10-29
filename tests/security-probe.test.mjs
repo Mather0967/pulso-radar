@@ -1,0 +1,267 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import net from 'node:net';
+import {portalFixture} from './helpers/portal-fixture.mjs';
+
+const rawRequest = (port, payload) => new Promise((resolve, reject) => {
+  const socket = net.connect(port, '127.0.0.1', () => socket.write(payload));
+  let data = '';
+  socket.setTimeout(5000, () => { socket.destroy(); resolve(data); });
+  socket.on('data', chunk => { data += chunk; });
+  socket.on('end', () => resolve(data));
+  socket.on('error', reject);
+});
+
+// Batería de ataques contra el portal real montado en un directorio temporal. Cada caso
+// describe el ataque, no la implementación: si alguien cambia una ruta o un permiso, esto
+// falla antes de llegar a producción.
+const ATTACKS = [];
+
+const SECRET_FILES = [
+  '/server/auth.mjs', '/server/main.mjs', '/server/landur.mjs', '/data/identity.json',
+  '/data/landur/landur.sqlite', '/.git/config', '/namecheap/server/auth.mjs', '/projects/landur/server/ledger.mjs',
+  '/package.json', '/scripts/cpanel-deploy.mjs', '/server/site.mjs'
+];
+
+test('sin sesión no hay datos, ni HTML interno, ni archivos del servidor', async () => {
+  const f = await portalFixture();
+  try {
+    for (const path of ['/portal', '/api/projects', '/admin', '/api/admin/users', '/pulso', '/landur/', '/landur/api/state', '/landur/api/export.csv']) {
+      const response = await f.request(path);
+      assert.ok(response.status === 401 || response.status === 403 || (response.status >= 300 && response.status < 400),
+        `${path} no debe responder ${response.status} sin sesión`);
+      const body = await response.text();
+      assert.ok(!body.includes('LANDUR'), `${path} no debe filtrar contenido de LANDUR sin sesión`);
+      assert.ok(!body.includes('password'), `${path} no debe exponer campos de credenciales`);
+    }
+    for (const path of SECRET_FILES) {
+      const response = await f.request(path);
+      assert.ok([404, 401, 403, 303].includes(response.status), `${path} respondió ${response.status}`);
+      const body = await response.text();
+      assert.ok(!/scrypt|passwordHash|BEGIN PRIVATE|NVIDIA_API_KEY/.test(body), `${path} filtró código o secretos`);
+    }
+    // Con sesión de administrador tampoco: el servidor no publica código ni datos.
+    const admin = await f.login('admin');
+    for (const path of SECRET_FILES) {
+      const response = await f.request(path, {cookie: admin.cookie});
+      const body = await response.text();
+      assert.ok(response.status === 404, `${path} con sesión respondió ${response.status}`);
+      assert.ok(!/scrypt|passwordHash|BEGIN PRIVATE|NVIDIA_API_KEY|"users"/.test(body), `${path} filtró contenido con sesión`);
+    }
+  } finally { await f.close(); }
+});
+
+test('galletas falsas o alteradas no abren sesión', async () => {
+  const f = await portalFixture();
+  try {
+    for (const cookie of ['rivect_session=', 'rivect_session=deadbeef', 'rivect_session=' + 'a'.repeat(43), 'rivect_session=../../data', 'rivect_session="><script>']) {
+      const response = await f.request('/api/projects', {cookie});
+      assert.equal(response.status, 401, `galleta ${cookie} no debe autenticar`);
+    }
+    const real = await f.login('landur');
+    const flipped = real.cookie.slice(0, -1) + (real.cookie.endsWith('A') ? 'B' : 'A');
+    assert.equal((await f.request('/api/projects', {cookie: flipped})).status, 401, 'un token alterado no vale');
+  } finally { await f.close(); }
+});
+
+test('CSRF y origen: sin token, con token ajeno o desde otro origen no se escribe', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const command = {kind: 'account', name: 'Intento', accountKind: 'cash', currency: 'UYU', opening: '1000.00', cutoff: '2026-01-01', verified: false, accessible: true};
+    const url = '/landur/api/commands';
+    const noToken = await f.request(url, {method: 'POST', cookie, body: command});
+    assert.equal(noToken.status, 403, 'sin X-CSRF-Token debe fallar');
+    const wrongToken = await f.request(url, {method: 'POST', cookie, csrf: 'csrf-de-otro', body: command});
+    assert.equal(wrongToken.status, 403, 'un CSRF ajeno debe fallar');
+    const foreignOrigin = await f.request(url, {method: 'POST', cookie, csrf, body: command, origin: 'https://evil.example'});
+    assert.equal(foreignOrigin.status, 403, 'un origen ajeno debe fallar');
+    const otherUser = await f.login('pulso');
+    const stolenCsrf = await f.request(url, {method: 'POST', cookie, csrf: otherUser.csrf, body: command});
+    assert.equal(stolenCsrf.status, 403, 'el CSRF de otro usuario no debe servir');
+    const ok = await f.request(url, {method: 'POST', cookie, csrf, body: command, headers: {'Idempotency-Key': 'csrf-legit-' + Date.now()}});
+    assert.ok(ok.status < 400, `la escritura legítima debe funcionar, dio ${ok.status}`);
+    const noKey = await f.request(url, {method: 'POST', cookie, csrf, body: {kind: 'account', name: 'Sin clave', accountKind: 'cash', currency: 'UYU', opening: '0.00', cutoff: '2026-01-01', verified: false, accessible: true}});
+    assert.equal(noKey.status, 400, 'sin Idempotency-Key no se acepta la escritura');
+    const shortKey = await f.request(url, {method: 'POST', cookie, csrf, body: {kind: 'account', name: 'Clave corta', accountKind: 'cash', currency: 'UYU', opening: '0.00', cutoff: '2026-01-01', verified: false, accessible: true}, headers: {'Idempotency-Key': 'corta'}});
+    assert.equal(shortKey.status, 400, 'una clave de operación adivinable no se acepta');
+  } finally { await f.close(); }
+});
+
+test('cada usuario sólo entra a su proyecto; el de sólo lectura no escribe', async () => {
+  const f = await portalFixture();
+  try {
+    const pulso = await f.login('pulso');
+    assert.equal((await f.request('/landur/', {cookie: pulso.cookie})).status, 403, 'Pulso no entra a LANDUR');
+    assert.equal((await f.request('/landur/api/state', {cookie: pulso.cookie})).status, 403, 'Pulso no lee la API de LANDUR');
+    const none = await f.login('none');
+    assert.equal((await f.request('/pulso', {cookie: none.cookie})).status, 403, 'sin permisos no hay proyecto');
+    assert.equal((await f.request('/landur/', {cookie: none.cookie})).status, 403, 'sin permisos no hay LANDUR');
+    const reader = await f.login('reader');
+    const state = await f.request('/landur/api/state', {cookie: reader.cookie});
+    assert.equal(state.status, 200, 'viewer puede leer');
+    const write = await f.request('/landur/api/commands', {method: 'POST', cookie: reader.cookie, csrf: reader.csrf,
+      body: {kind: 'account', name: 'X', accountKind: 'cash', currency: 'UYU', opening: '0.00', cutoff: '2026-01-01', verified: false, accessible: true}});
+    assert.equal(write.status, 403, 'viewer no puede escribir');
+    for (const path of ['/api/admin/users', '/api/admin/invite', '/api/admin/project-access', '/api/admin/settings']) {
+      const isRead = path.includes('users');
+      const response = await f.request(path, {cookie: reader.cookie, csrf: reader.csrf, method: isRead ? 'GET' : 'POST', ...(isRead ? {} : {body: {}})});
+      assert.ok([403, 404, 405].includes(response.status), `${path} dio ${response.status} a un usuario normal`);
+    }
+  } finally { await f.close(); }
+});
+
+test('no hay traversal a archivos del proyecto ni a la base', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const probes = [
+      '/landur/../server/auth.mjs', '/landur/%2e%2e/server/auth.mjs', '/landur/..%2f..%2fdata/identity.json',
+      '/landur/../../data/identity.json', '/landur/api/evidence/../../data/identity.json',
+      '/landur/api/evidence/..%2F..%2Fdata%2Fidentity.json', '/landur/api/evidence/%2e%2e%2f%2e%2e%2fidentity.json',
+      '/landur/public/../server/auth.mjs', '/landur/%252e%252e/server/auth.mjs', '/landur/app.js%00.png'
+    ];
+    for (const path of probes) {
+      const response = await f.request(path, {cookie, csrf});
+      const body = await response.text();
+      assert.ok(!/passwordHash|scrypt|"users"|BEGIN PRIVATE/.test(body), `${path} filtró contenido interno`);
+      assert.ok([400, 403, 404, 405, 415].includes(response.status), `${path} respondió ${response.status}`);
+    }
+  } finally { await f.close(); }
+});
+
+test('métodos raros, cuerpos enormes y tipos de contenido inesperados se rechazan', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    // TRACE se manda por socket crudo: algunos clientes HTTP lo bloquean antes de salir.
+    const trace = await rawRequest(Number(new URL(f.base).port), 'TRACE /portal HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+    assert.ok(!/^HTTP\/1\.[01] 200/.test(trace), 'TRACE no debe responder 200');
+    for (const method of ['PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
+      for (const path of ['/portal', '/landur/', '/landur/api/state', '/api/projects']) {
+        const response = await f.request(path, {method, cookie, csrf, ...(method === 'OPTIONS' ? {} : {body: {}})});
+        assert.ok(response.status < 500, `${method} ${path} provocó ${response.status}`);
+        assert.ok(![200, 201].includes(response.status) || method === 'OPTIONS', `${method} ${path} devolvió ${response.status}`);
+      }
+    }
+    const big = await f.request('/landur/api/commands', {method: 'POST', cookie, csrf, raw: 'x'.repeat(4_000_000)});
+    assert.equal(big.status, 413, 'un cuerpo de 4 MB debe cortarse');
+    const wrongType = await f.request('/landur/api/commands', {method: 'POST', cookie, csrf, headers: {'Content-Type': 'text/plain'}, body: {kind: 'x'}});
+    assert.equal(wrongType.status, 415, 'se exige JSON explícito');
+    for (const raw of ['{', 'null', '[]', '"texto"', '{"kind":null}']) {
+      const response = await f.request('/landur/api/commands', {method: 'POST', cookie, csrf, raw});
+      assert.ok([400, 415, 422].includes(response.status), `JSON inválido ${raw} dio ${response.status}`);
+      assert.ok(response.status < 500, `${raw} provocó ${response.status}`);
+    }
+    const loginRaw = await f.request('/auth/login', {method: 'POST', raw: '{"email":null,"password":null}'});
+    assert.ok(loginRaw.status >= 400 && loginRaw.status < 500, `login con null dio ${loginRaw.status}`);
+    const loginArray = await f.request('/auth/login', {method: 'POST', raw: '[]'});
+    assert.ok(loginArray.status < 500, `login con array dio ${loginArray.status}`);
+  } finally { await f.close(); }
+});
+
+test('un cuerpo JSON no puede contaminar prototipos ni crear permisos inexistentes', async () => {
+  const f = await portalFixture();
+  try {
+    const admin = await f.login('admin');
+    const pollution = await f.request('/api/admin/project-access', {method: 'PUT', cookie: admin.cookie, csrf: admin.csrf,
+      raw: JSON.stringify({id: 'landur', projects: JSON.parse('{"__proto__":{"landur":"editor"},"constructor":{"prototype":{"x":1}}}')})});
+    assert.ok(pollution.status < 500, `contaminación de prototipos dio ${pollution.status}`);
+    assert.equal({}.landur, undefined, 'el prototipo global no debe quedar contaminado');
+    assert.equal({}.x, undefined);
+    const invented = await f.request('/api/admin/project-access', {method: 'PUT', cookie: admin.cookie, csrf: admin.csrf,
+      body: {id: 'none', projects: {boveda: 'editor'}}});
+    assert.equal(invented.status, 400, 'no se puede inventar un proyecto nuevo');
+    const evidence = await f.request('/landur/api/evidence/' + '0'.repeat(8) + '-0000-0000-0000-' + '0'.repeat(12), {cookie: admin.cookie});
+    assert.equal(evidence.status, 404, 'un comprobante inexistente responde 404, no 500');
+  } finally { await f.close(); }
+});
+
+test('no se puede inventar identidad, rol ni permisos desde el cliente', async () => {
+  const f = await portalFixture();
+  try {
+    const reader = await f.login('reader');
+    const escalate = await f.request('/api/admin/users', {method: 'PUT', cookie: reader.cookie, csrf: reader.csrf,
+      body: {id: reader.csrf, role: 'admin'}});
+    assert.equal(escalate.status, 403, 'un viewer no se asciende solo');
+    const headerSpoof = await f.request('/landur/api/state', {cookie: reader.cookie, headers: {
+      'X-User-Id': 'admin', 'oai-authenticated-user-id': 'admin', 'X-Forwarded-User': 'admin'}});
+    assert.equal(headerSpoof.status, 200, 'la cabecera no rompe la lectura');
+    const after = await headerSpoof.json();
+    assert.equal(after.access, 'viewer', 'el acceso sigue viniendo del servidor, no de cabeceras');
+    assert.equal(after.actor, 'Lectura LANDUR', 'el actor sigue siendo el de la sesión');
+  } finally { await f.close(); }
+});
+
+test('el portal escapa nombres de usuario y no refleja HTML', async () => {
+  const f = await portalFixture();
+  try {
+    await f.store.transact(db => { db.users.find(u => u.id === 'admin').name = '<img src=x onerror=alert(1)>Rafa'; });
+    const admin = await f.login('admin');
+    const page = await f.request('/portal', {cookie: admin.cookie});
+    const html = await page.text();
+    assert.ok(!html.includes('<img src=x onerror'), 'el nombre no debe inyectarse como HTML');
+    assert.ok(html.includes('&lt;img src=x onerror'), 'el nombre debe aparecer escapado');
+  } finally { await f.close(); }
+});
+
+test('las respuestas traen cabeceras defensivas y nada se cachea', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie} = await f.login('landur');
+    for (const path of ['/login', '/portal', '/landur/', '/landur/app.js', '/landur/styles.css', '/landur/manifest.webmanifest']) {
+      const response = await f.request(path, {cookie});
+      const headers = response.headers;
+      assert.match(headers.get('cache-control') || '', /no-store/, `${path} debe ser no-store`);
+      assert.equal(headers.get('x-content-type-options'), 'nosniff', `${path} sin nosniff`);
+      assert.equal(headers.get('x-frame-options'), 'DENY', `${path} sin anti-clickjacking`);
+      const csp = headers.get('content-security-policy') || '';
+      assert.ok(csp.includes("default-src 'self'"), `${path} sin CSP`);
+      assert.ok(!csp.includes("'unsafe-eval'"), `${path} CSP demasiado permisiva`);
+      assert.ok(!headers.get('access-control-allow-origin'), `${path} no debe abrir CORS`);
+    }
+    const login = await f.request('/auth/login', {method: 'POST', body: {email: 'landur@example.test', password: f.password}});
+    const setCookie = login.headers.get('set-cookie') || '';
+    assert.ok(/HttpOnly/i.test(setCookie), 'la galleta debe ser HttpOnly');
+    assert.ok(/SameSite=Strict/i.test(setCookie), 'la galleta debe ser SameSite=Strict');
+    assert.ok(/Path=\//.test(setCookie), 'la galleta debe ser de raíz');
+  } finally { await f.close(); }
+});
+
+test('no se puede subir un archivo activo como comprobante', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>').toString('base64');
+    for (const [mime, data] of [['image/svg+xml', svg], ['text/html', Buffer.from('<script>alert(1)</script>').toString('base64')], ['application/pdf', Buffer.from('<html><script>alert(1)</script>').toString('base64')]]) {
+      const response = await f.request('/landur/api/evidence', {method: 'POST', cookie, csrf,
+        headers: {'Idempotency-Key': 'probe-' + mime.replace(/\W/g, '') + '-0123456789'},
+        body: {operationId: 'x', name: 'comprobante', mime, data}});
+      assert.ok([400, 404].includes(response.status), `${mime} no debe aceptarse (dio ${response.status})`);
+    }
+  } finally { await f.close(); }
+});
+
+test('el login no distingue correos existentes y limita los intentos', async () => {
+  const f = await portalFixture();
+  try {
+    const unknown = await f.request('/auth/login', {method: 'POST', body: {email: 'nadie@example.test', password: 'contraseña-larga-inexistente'}});
+    const wrong = await f.request('/auth/login', {method: 'POST', body: {email: 'landur@example.test', password: 'contraseña-larga-inexistente'}});
+    assert.equal(unknown.status, wrong.status, 'mismo estado para correo inexistente y contraseña mala');
+    assert.equal((await unknown.json()).error, (await wrong.json()).error, 'mismo mensaje: no se enumeran cuentas');
+    let last;
+    for (let i = 0; i < 12; i++) last = await f.request('/auth/login', {method: 'POST', body: {email: 'landur@example.test', password: 'otra-mala'}});
+    assert.equal(last.status, 429, 'tras varios fallos se corta el intento');
+  } finally { await f.close(); }
+});
+
+test('cerrar sesión invalida el token en el servidor', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    assert.equal((await f.request('/landur/api/state', {cookie})).status, 200);
+    const out = await f.request('/landur/api/logout', {method: 'POST', cookie, csrf, body: {}});
+    assert.equal(out.status, 200);
+    assert.equal((await f.request('/landur/api/state', {cookie})).status, 401, 'el token viejo no debe seguir vivo');
+  } finally { await f.close(); }
+});

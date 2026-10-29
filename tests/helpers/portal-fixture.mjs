@@ -38,7 +38,7 @@ export async function portalFixture({port=0}={}) {
   await store.transact(db=>{db.users=users;});
   const server=module.createServer();server.listen(port,'127.0.0.1');await once(server,'listening');
   const base=`http://localhost:${server.address().port}`;
-  const request=(url,{method='GET',cookie='',csrf='',body,origin='http://localhost:4180',headers={}}={})=>fetch(base+url,{method,redirect:'manual',headers:{cookie,origin,'Content-Type':'application/json','X-CSRF-Token':csrf,'X-Landur-Request':'1',...headers},...(body===undefined?{}:{body:JSON.stringify(body)})});
+  const request=(url,{method='GET',cookie='',csrf='',body,raw,origin='http://localhost:4180',headers={}}={})=>fetch(base+url,{method,redirect:'manual',headers:{cookie,origin,'Content-Type':'application/json','X-CSRF-Token':csrf,'X-Landur-Request':'1',...headers},...((raw!==undefined)?{body:raw}:(body===undefined?{}:{body:JSON.stringify(body)}))});
   const login=async id=>{
     const response=await request('/auth/login',{method:'POST',body:{email:`${id}@example.test`,password}});
     if(response.status!==200)throw Error('Fixture login failed');

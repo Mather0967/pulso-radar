@@ -22,7 +22,7 @@ const landur=createLandurPortal({dataDir:path.join(dataDir,'landur')});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  if(!['GET','HEAD'].includes(method)&&req.headers.get('origin')!==origin)return json({error:'Origen no admitido.'},403);
- if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.svg','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
+ if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});
  if(p==='/'&&method==='GET')return html('index.html');
@@ -33,7 +33,13 @@ async function route(req,ip){
  if(!['GET','HEAD'].includes(method)&&req.headers.get('x-csrf-token')!==u.csrf)return json({error:'Sesión no válida. Volvé a iniciar sesión.'},403);
  if(p==='/auth/me'&&method==='GET')return json({user:publicUser(u),csrf:u.csrf});
  if((p==='/auth/logout'||p==='/landur/api/logout')&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${local?'':'; Secure'}`}})}
- if(p==='/portal'&&method==='GET')return new Response(renderProjectsPage(u),{headers:{'Content-Type':'text/html; charset=utf-8'}});
+ if(p==='/portal'&&method==='GET'){
+  // Con un solo proyecto habilitado no hay nada que elegir: se entra directo y no se ofrece
+  // un selector que solo llevaría a un único destino.
+  const available=availableProjects(u);
+  if(available.length===1)return redirect(available[0].url);
+  return new Response(renderProjectsPage(u),{headers:{'Content-Type':'text/html; charset=utf-8'}});
+ }
  if(p==='/api/projects'&&method==='GET')return json({projects:availableProjects(u)});
  if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u);
  if(p==='/index.html'&&method==='GET')return redirect('/portal');

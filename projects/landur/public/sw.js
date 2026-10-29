@@ -2,7 +2,7 @@
 const BASE = new URL('./', self.location.href).pathname;
 const PREFIX = `landur-shell-${encodeURIComponent(BASE)}-`;
 const CACHE = PREFIX + 'v4';
-const SHELL = ['','index.html','app.js','voice.mjs','styles.css','manifest.webmanifest','icon.svg','brand.png','icon-192.png','icon-512.png','apple-touch-icon.png'].map(path=>BASE+path);
+const SHELL = ['','index.html','app.js','voice.mjs','styles.css','manifest.webmanifest','wordmark.png','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'].map(path=>BASE+path);
 self.addEventListener('install', event => event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   for(const path of SHELL){
