@@ -8,6 +8,17 @@ export const token=()=>randomBytes(32).toString('base64url');
 export async function passwordHash(password){if(typeof password!=='string'||password.length<12||password.length>200)throw Error('Usá una contraseña de entre 12 y 200 caracteres.');const salt=randomBytes(16).toString('hex');return salt+':'+Buffer.from(await scrypt(password,salt,64)).toString('hex')}
 export async function verify(password,hash){if(typeof password!=='string'||password.length>200)return false;const [salt,key]=hash.split(':');const actual=Buffer.from(await scrypt(password,salt,64)),expected=Buffer.from(key,'hex');return expected.length===actual.length&&timingSafeEqual(actual,expected)}
 export const publicUser=u=>({id:u.id,name:u.name,email:u.email,role:u.role,projects:u.projects,active:u.active});
+// Detrás de LiteSpeed/Passenger el par del socket es el proxy local: la IP del socket es la
+// misma para todos los visitantes, así que con esa clave diez contraseñas mal de cualquiera
+// bloqueaban el acceso de todos durante 15 minutos. Si el par es de loopback se confía en
+// X-Forwarded-For y se toma el último salto, que es el que agrega el proxy inmediato; un
+// cliente directo nunca llega desde loopback y no puede falsear la cabecera.
+const loopback = /^(::1|::ffff:127\.0\.0\.1|127(?:\.\d{1,3}){3})$/;
+export function clientAddress({ peer, forwarded, trustProxy = false } = {}) {
+  const hops = String(forwarded ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  if (hops.length && (trustProxy || (typeof peer === 'string' && loopback.test(peer.replace(/^\[|\]$/g, ''))))) return hops[hops.length - 1];
+  return typeof peer === 'string' && peer ? peer : 'unknown';
+}
 export class AuthStore{
  constructor(directory,filename='identity.json'){this.directory=directory;this.file=path.join(directory,filename);}
  async transact(fn){await mkdir(this.directory,{recursive:true,mode:0o700});const lock=this.file+'.lock';let acquired=false;for(let n=0;n<100;n++){try{await mkdir(lock);acquired=true;break}catch(e){if(e.code!=='EEXIST')throw e;try{if(Date.now()-(await stat(lock)).mtimeMs>120000)await rm(lock,{recursive:true,force:true})}catch{}await new Promise(r=>setTimeout(r,40))}}if(!acquired)throw Error('Servidor ocupado. Intentá otra vez.');try{let db;try{db=JSON.parse(await readFile(this.file,'utf8'))}catch(e){if(e.code!=='ENOENT')throw e;db={users:[],sessions:[],invites:[],attempts:{}}}const result=await fn(db);const temp=this.file+'.'+randomUUID();await writeFile(temp,JSON.stringify(db),{mode:0o600});await rename(temp,this.file);return result}finally{await rm(lock,{recursive:true,force:true})}}

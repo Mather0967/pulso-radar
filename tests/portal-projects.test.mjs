@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {availableProjects,mergeProjectGrants,projectAccess,renderProjectsPage} from '../namecheap/server/projects.mjs';
+import {clientAddress} from '../namecheap/server/auth.mjs';
 import {createLandurPortal} from '../namecheap/server/landur.mjs';
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
@@ -83,6 +84,31 @@ test('PWA montada: scope limitado y recursos sin datos personales',async()=>{
     assert.match(await sw.text(),/!SHELL.includes/);
     const js=await(await f.request('/landur/app.js',auth)).text();assert.match(js,/new URL\('\.\/', import.meta.url\)/);assert.match(js,/X-CSRF-Token/);
     assert.equal(fs.existsSync(path.join(f.root,'data/landur/landur.sqlite')),false);
+  }finally{await f.close();}
+});
+test('clave de cliente: X-Forwarded-For solo se confía detrás del proxy local',()=>{
+  // El par loopback es el proxy de LiteSpeed/Passenger; ahí el último salto es real.
+  assert.equal(clientAddress({peer:'127.0.0.1',forwarded:'203.0.113.10, 198.51.100.7'}),'198.51.100.7');
+  assert.equal(clientAddress({peer:'::1',forwarded:'203.0.113.10'}),'203.0.113.10');
+  assert.equal(clientAddress({peer:'::ffff:127.0.0.1',forwarded:'203.0.113.10'}),'203.0.113.10');
+  // Un par público o de red privada no está detrás de ese proxy: la cabecera no se cree.
+  assert.equal(clientAddress({peer:'203.0.113.77',forwarded:'198.51.100.7'}),'203.0.113.77');
+  assert.equal(clientAddress({peer:'10.0.0.5',forwarded:'198.51.100.7'}),'10.0.0.5');
+  assert.equal(clientAddress({peer:'198.51.100.7',forwarded:''}),'198.51.100.7');
+  assert.equal(clientAddress({peer:undefined}),'unknown');
+});
+test('el límite de intentos es por cliente: diez fallos de una IP no bloquean a otra',async()=>{
+  const f=await portalFixture();try{
+    const wrong={method:'POST',body:{email:'admin@example.test',password:'contraseña-incorrecta-de-qa'},headers:{'X-Forwarded-For':'203.0.113.10'}};
+    let blocked;
+    for(let i=0;i<11;i++)blocked=await f.request('/auth/login',wrong);
+    assert.equal(blocked.status,429,'la décima falla corta el intento de esa IP');
+    const other=await f.request('/auth/login',{...wrong,headers:{'X-Forwarded-For':'198.51.100.7'}});
+    assert.equal(other.status,401,'otra IP no hereda el bloqueo de la primera');
+    const valid=await f.request('/auth/login',{...wrong,headers:{'X-Forwarded-For':'192.0.2.44'},body:{email:'admin@example.test',password:f.password}});
+    assert.equal(valid.status,200,'una IP distinta entra con su contraseña correcta');
+    const stillBlocked=await f.request('/auth/login',wrong);
+    assert.equal(stillBlocked.status,429,'la IP bloqueada sigue cortada hasta que venza la ventana');
   }finally{await f.close();}
 });
 test('falla de runtime o ruta LANDUR no derriba el selector de proyectos',async()=>{

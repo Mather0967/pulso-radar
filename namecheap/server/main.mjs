@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {AuthStore,digest,token,publicUser} from './auth.mjs';
+import {AuthStore,digest,token,publicUser,clientAddress} from './auth.mjs';
 import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
@@ -74,8 +74,7 @@ export function createServer(){return http.createServer(async(req,res)=>{try{
  if(!local&&req.headers['x-forwarded-proto']==='http'){res.writeHead(308,{Location:'https://rivect.net'+req.url});res.end();return}
  const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>3300000){res.writeHead(413);res.end('Solicitud demasiado grande');return}chunks.push(c)}
  const headers=new Headers();for(const [k,v]of Object.entries(req.headers))if(v)headers.set(k,Array.isArray(v)?v.join(','):v);
- const request=new Request(new URL(req.url,origin),{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(chunks)}:{})});
- const r=await route(request,req.socket.remoteAddress);
+ const request=new Request(new URL(req.url,origin),{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(chunks)}:{})});  const r=await route(request,clientAddress({peer:req.socket.remoteAddress,forwarded:req.headers['x-forwarded-for']}));
  const secure={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};if(!local)secure['Strict-Transport-Security']='max-age=31536000';
  res.writeHead(r.status,{...secure,...Object.fromEntries(r.headers)});res.end(req.method==='HEAD'?undefined:Buffer.from(await r.arrayBuffer()));
  }catch(e){console.error('Request failed:',e.message);res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'No se pudo completar la operación.'}))}}).on('close',()=>landur.close())}
