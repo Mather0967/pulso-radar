@@ -62,7 +62,7 @@ Documentación de referencia:
 
 ## LANDUR en el selector de proyectos
 
-Por solicitud del usuario, `/portal` ahora sirve un catálogo con Pulso y LANDUR según permisos. LANDUR se monta en `/landur/`, usa la sesión RIVECT y guarda sus datos separados en `DATA_DIR/landur/landur.sqlite`. No requiere otra contraseña ni otra aplicación Passenger. Administradores gestionan permisos por proyecto desde el selector; tener Pulso no habilita LANDUR automáticamente.
+Por solicitud del usuario, `/portal` sirve un catálogo con Pulso y LANDUR según permisos. LANDUR se monta en `/landur/` y guarda sus datos separados en `DATA_DIR/landur/landur.sqlite`; no requiere otra contraseña ni otra aplicación Passenger. Entrar directo en `/landur` sin sesión abre el **acceso propio de LANDUR** (`/landur/login`): mismo correo y contraseña de la cuenta, formulario servido por `server/landur.mjs`, sin selector de proyectos ni login del portal y sin retorno al ecosistema desde el panel. Administradores gestionan permisos por proyecto desde el selector; tener Pulso no habilita LANDUR automáticamente.
 
 Se mantiene la landing, el módulo `site.mjs`, la administración y las páginas de acceso del hosting. El HTML previo de `portal.html` se conserva en disco, pero `/portal` pasa a usar la vista versionada de `server/projects.mjs`. No se afirma que los archivos del hosting hayan sido inspeccionados.
 

@@ -4,7 +4,7 @@ Proyecto de RIVECT para Rafael «Rafa» Sánchez, separado de la aplicación Pul
 
 ## Acceso elegido: portal RIVECT
 
-**LANDUR aparece junto a Pulso en «Mis proyectos» y usa el mismo login.** Ruta `/landur/`, permisos independientes `viewer`/`editor`, botón de retorno al portal y almacenamiento separado. Ver [PORTAL-RIVECT.md](docs/PORTAL-RIVECT.md) antes de desplegar. El ZIP y la guía de aplicación independiente anteriores no agregan el proyecto al portal.
+**LANDUR se entra en `rivect.net/landur`, con su propia pantalla de acceso y las credenciales de la cuenta RIVECT.** Sin sesión, `/landur` muestra ese formulario; dentro no hay retorno a «Mis proyectos» ni al ecosistema. Permisos independientes `viewer`/`editor` y almacenamiento separado. Ver [PORTAL-RIVECT.md](docs/PORTAL-RIVECT.md) antes de desplegar. El ZIP y la guía de aplicación independiente anteriores no agregan el proyecto al portal.
 
 ## Traspaso para instalación asistida
 

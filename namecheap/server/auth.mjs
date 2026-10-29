@@ -8,6 +8,10 @@ export const token=()=>randomBytes(32).toString('base64url');
 export async function passwordHash(password){if(typeof password!=='string'||password.length<12||password.length>200)throw Error('Usá una contraseña de entre 12 y 200 caracteres.');const salt=randomBytes(16).toString('hex');return salt+':'+Buffer.from(await scrypt(password,salt,64)).toString('hex')}
 export async function verify(password,hash){if(typeof password!=='string'||password.length>200)return false;const [salt,key]=hash.split(':');const actual=Buffer.from(await scrypt(password,salt,64)),expected=Buffer.from(key,'hex');return expected.length===actual.length&&timingSafeEqual(actual,expected)}
 export const publicUser=u=>({id:u.id,name:u.name,email:u.email,role:u.role,projects:u.projects,active:u.active});
+// Una sola forma de emitir la galleta de sesión: el portal y el acceso propio de LANDUR
+// tienen que escribir exactamente los mismos atributos o el navegador guarda dos sesiones.
+// `maxAge: 0` la borra en el cliente, además de revocarla en el servidor.
+export const sessionCookie=(value,{secure=true,maxAge=28800}={})=>'rivect_session='+value+'; Path=/; HttpOnly; SameSite=Strict; Max-Age='+maxAge+(secure?'; Secure':'')+';';
 // Detrás de LiteSpeed/Passenger el par del socket es el proxy local: la IP del socket es la
 // misma para todos los visitantes, así que con esa clave diez contraseñas mal de cualquiera
 // bloqueaban el acceso de todos durante 15 minutos. Si el par es de loopback se confía en

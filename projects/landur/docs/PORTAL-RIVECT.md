@@ -4,7 +4,7 @@ Actualización de alcance de acceso solicitada por el usuario · 24 de octubre d
 
 ## Decisión actual
 
-**LANDUR debe aparecer en «Mis proyectos», junto a Pulso, después de iniciar sesión en RIVECT.** Este modo pasa a ser el destino de integración preferido. No se necesita otro dominio, otra aplicación Passenger ni una segunda contraseña para LANDUR.
+**LANDUR se entra directamente en `https://rivect.net/landur`, con su propia pantalla de acceso.** Comparte las credenciales de la cuenta RIVECT (mismo correo y contraseña, mismo almacén de identidad) pero nunca muestra el ecosistema: quien entra en `/landur` no ve el selector de proyectos ni el login del portal, y desde el panel de LANDUR no hay un botón para volver a «Mis proyectos». No se necesita otro dominio, otra aplicación Passenger ni una segunda contraseña.
 
 La aplicación independiente y su ZIP anteriores siguen siendo útiles para pruebas aisladas, pero **no agregan por sí solos la tarjeta ni la sesión compartida al portal**. No seguir la guía de subdominio separado si lo que se quiere es esta integración.
 
@@ -13,20 +13,23 @@ Esto modifica el acceso/despliegue, no las reglas financieras ni la secuencia de
 ## Cómo funciona
 
 ```text
-Login RIVECT existente
+rivect.net/landur  (sin sesión)
           ↓
-Mis proyectos (/portal)
-          ├── Pulso  → /pulso
-          └── LANDUR → /landur/
+Acceso propio de LANDUR (/landur/login)
+          ↓  correo + contraseña de la cuenta
+LANDUR (/landur/)
+
+rivect.net → login RIVECT → Mis proyectos (/portal) → Pulso | LANDUR
 ```
 
-- Se conserva el sistema de cuentas e invitaciones del portal (`AuthStore`).
-- LANDUR verifica la sesión del portal y los permisos en cada solicitud, no solo en la tarjeta.
+- Se conserva el sistema de cuentas e invitaciones del portal (`AuthStore`): la contraseña es la misma y no se duplica en otro almacén.
+- `/landur/login` es un formulario HTML servido por LANDUR, sin scripts en línea y con la política de contenidos del portal. Sin sesión, cualquier otra ruta de `/landur/` redirige ahí.
+- LANDUR verifica la sesión y los permisos en cada solicitud, no solo en la pantalla de acceso.
 - No hay contraseña `LANDUR_PASSWORD` ni cookie `landur_session` en este modo.
-- Cerrar sesión desde LANDUR cierra la sesión de RIVECT, también para Pulso.
+- La sesión es la misma `rivect_session`: cerrar sesión desde LANDUR la revoca en el servidor, también para Pulso.
 - Los cambios financieros registran el ID del usuario real del portal en la auditoría.
-- La interfaz incluye «← Mis proyectos».
-- Se conserva la identidad visual RIVECT; no se reemplazan la landing, la administración existente ni las páginas de acceso del hosting.
+- Si la cuenta no tiene permiso sobre LANDUR, la pantalla de acceso lo avisa y ofrece cerrar sesión; no se pide la contraseña otra vez.
+- Se conserva la identidad visual de LANDUR; no se reemplazan la landing, la administración existente ni las páginas de acceso del hosting.
 
 ## Permisos por proyecto
 
@@ -59,7 +62,8 @@ Los administradores tienen acceso global, como en el portal existente. No son un
 - La PWA resuelve recursos/API dentro de `/landur/`.
 - Manifiesto, inicio y service worker limitados a `/landur/`; no controla `/portal`, `/auth` ni Pulso.
 - El service worker solo cachea la interfaz sin datos personales. No cachea API, exportaciones ni respuestas de login redirigidas.
-- Para instalar en iPhone: abrir `https://rivect.net/landur/` desde Safari después de ingresar al portal, y usar Compartir → Agregar a pantalla de inicio. Reemplazar el dominio solo si cambia la configuración real del portal.
+- La pantalla de acceso (`/landur/login`) y los recursos de marca que necesita (`wordmark.png`, iconos) se sirven sin sesión; el resto de `/landur/` no.
+- Para instalar en iPhone: abrir `https://rivect.net/landur/` desde Safari, ingresar con la cuenta y usar Compartir → Agregar a pantalla de inicio. Reemplazar el dominio solo si cambia la configuración real del portal.
 
 ## Qué cambia en el despliegue existente
 
@@ -81,8 +85,8 @@ No cambia el cron ni agrega otro. **El despliegue automático existente sigue si
 3. Tomar un respaldo privado del portal y sus datos. Si ya existe una base de LANDUR, usar copia consistente SQLite; no copiar un único `.sqlite` de una base activa ignorando WAL.
 4. Publicar mediante el procedimiento existente del portal una vez que la revisión llegue a la rama que ese procedimiento despliega. **No ejecutar `scripts/cpanel-deploy.mjs` en la rama de trabajo: el instalador de producción exige `main`.**
 5. Confirmar reinicio de la aplicación Passenger RIVECT. No levantar otro `npm start` de LANDUR.
-6. Entrar como administrador y comprobar que «Mis proyectos» muestra Pulso y LANDUR.
-7. Asignar LANDUR a los usuarios necesarios y probar editor, viewer, usuario sin permiso y revocación.
+6. Entrar como administrador y comprobar que «Mis proyectos» muestra Pulso y LANDUR, y que `https://rivect.net/landur` abre el acceso propio sin pedir nada del portal.
+7. Asignar LANDUR a los usuarios necesarios y probar editor, viewer, usuario sin permiso (aviso de LANDUR, sin bucle de contraseña) y revocación.
 8. Comprobar Pulso sin cambios en sus datos ni permisos anteriores.
 9. Probar instalación en Safari/iPhone y respaldos antes de aceptar el piloto. No usar datos reales hasta superar las puertas del roadmap.
 
@@ -99,6 +103,7 @@ El script `npm run backup` de la app independiente está diseñado para su propi
 - Suite raíz: catálogo por permisos, login compartido, controles CSRF/origen, lectura/escritura, aislamiento, asignación/revocación y compatibilidad con el admin anterior.
 - Test de instalación: preservación de landing, portal previo, identidad/datos y base LANDUR al copiar código.
 - Suite de LANDUR sin regresiones en el modo independiente.
-- `npm run test:portal` desde `projects/landur/`: QA Chromium de tarjetas, acceso sin segunda contraseña, registro auditado, permisos, retorno al portal, layout móvil, scope/caché de PWA y logout compartido.
+- `npm run test:portal` desde `projects/landur/`: QA Chromium de tarjetas, registro auditado, permisos, layout móvil, scope/caché de PWA y logout compartido.
+- Suite raíz (seguridad): `/landur` sin sesión manda a `/landur/login`; la pantalla de acceso no incluye el selector ni el login del portal, ni tokens de sesión, ni scripts en línea; credenciales incorrectas vuelven al formulario sin abrir sesión; el origen ajeno no puede iniciar sesión; el límite de intentos es el mismo del portal.
 
 Las pruebas usan un portal temporal con identidades sintéticas y sustitutos de `site.mjs`/páginas de cuenta porque los originales se conservan en Namecheap y no están en este repositorio. **No acreditan despliegue real, funcionamiento del login visual original en el hosting, aceptación en iPhone ni pentesting.**

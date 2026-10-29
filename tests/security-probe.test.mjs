@@ -255,6 +255,40 @@ test('el login no distingue correos existentes y limita los intentos', async () 
   } finally { await f.close(); }
 });
 
+test('LANDUR trae su propio acceso: nada del ecosistema y las credenciales de la cuenta', async () => {
+  const f = await portalFixture();
+  try {
+    const page = await f.request('/landur/login');
+    const html = await page.text();
+    assert.equal(page.status, 200);
+    assert.match(html, /action="\/landur\/api\/login"/, 'el formulario apunta al acceso del proyecto');
+    assert.doesNotMatch(html, /Mis proyectos/, 'no se muestra el selector de proyectos');
+    assert.doesNotMatch(html, /href="\/portal"/, 'sin camino de vuelta al ecosistema');
+    assert.doesNotMatch(html, /csrf/i, 'la pantalla pública no incluye tokens de sesión');
+    assert.doesNotMatch(html, /<script/i, 'el acceso funciona sin scripts en línea');
+    const attempt = (email, password) => f.request('/landur/api/login', {method: 'POST', raw: new URLSearchParams({email, password}).toString(),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Forwarded-For': '203.0.113.90'}});
+    const unknown = await attempt('nadie@example.test', 'contraseña-larga-inexistente');
+    const wrong = await attempt('landur@example.test', 'contraseña-larga-inexistente');
+    assert.equal(unknown.headers.get('location'), wrong.headers.get('location'), 'mismo destino: no se enumeran cuentas');
+    assert.equal(unknown.headers.get('set-cookie'), null, 'un fallo no abre sesión');
+    let blocked;
+    for (let i = 0; i < 12; i++) blocked = await attempt('landur@example.test', 'otra-mala');
+    assert.equal(blocked.headers.get('location'), '/landur/login?e=limite', 'el acceso de LANDUR hereda el límite de intentos');
+    for (const path of ['/landur/login', '/landur/wordmark.png']) {
+      const response = await f.request(path);
+      assert.ok([200, 303].includes(response.status), `${path} respondió ${response.status}`);
+      assert.equal(response.headers.get('access-control-allow-origin'), null, `${path} no debe abrir CORS`);
+    }
+    const pulso = await f.login('pulso');
+    const denied = await f.request('/landur/', pulso);
+    assert.equal(denied.status, 403);
+    const deniedHtml = await denied.text();
+    assert.match(deniedHtml, /LANDUR no está habilitado/);
+    assert.doesNotMatch(deniedHtml, /type="password"/, 'no se pide contraseña a quien ya tiene sesión');
+  } finally { await f.close(); }
+});
+
 test('cerrar sesión invalida el token en el servidor', async () => {
   const f = await portalFixture();
   try {

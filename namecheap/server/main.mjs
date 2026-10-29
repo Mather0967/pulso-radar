@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {AuthStore,digest,token,publicUser,clientAddress} from './auth.mjs';
+import {AuthStore,digest,token,publicUser,clientAddress,sessionCookie} from './auth.mjs';
 import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
@@ -18,7 +18,14 @@ const origin=local?'http://localhost:4180':'https://rivect.net';
 const html=async name=>new Response(await readFile(path.join(root,'public',name)),{headers:{'Content-Type':'text/html; charset=utf-8'}});
 const json=(data,status=200)=>Response.json(data,{status});
 const redirect=to=>new Response(null,{status:303,headers:{Location:to}});
-const landur=createLandurPortal({dataDir:path.join(dataDir,'landur')});
+// LANDUR comparte el almacén de identidad del portal (las mismas credenciales), pero no la
+// sesión del ecosistema: su pantalla de acceso escribe y revoca la misma galleta.
+const landur=createLandurPortal({dataDir:path.join(dataDir,'landur'),session:{
+ login:(email,password,ip)=>store.login(email,password,ip),
+ cookie:value=>sessionCookie(value,{secure:!local}),
+ cleared:()=>sessionCookie('',{secure:!local,maxAge:0}),
+ logout:csrf=>store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==csrf)})
+}});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  if(!['GET','HEAD'].includes(method)&&req.headers.get('origin')!==origin)return json({error:'Origen no admitido.'},403);
@@ -27,12 +34,15 @@ async function route(req,ip){
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});
  if(p==='/'&&method==='GET')return html('index.html');
  if(['/login','/activate'].includes(p)&&method==='GET')return html('account.html');
- if(p==='/auth/login'&&method==='POST'){const b=await req.json(),r=await store.login(b.email,b.password,ip);if(r.error)return json({error:r.error},r.status);return new Response(JSON.stringify({user:r.user,csrf:r.csrf}),{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=${r.value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${local?'':'; Secure'}`}})}
+ if(p==='/auth/login'&&method==='POST'){const b=await req.json(),r=await store.login(b.email,b.password,ip);if(r.error)return json({error:r.error},r.status);return new Response(JSON.stringify({user:r.user,csrf:r.csrf}),{headers:{'Content-Type':'application/json','Set-Cookie':sessionCookie(r.value,{secure:!local})}})}
  if(p==='/auth/activate'&&method==='POST'){const b=await req.json();try{const r=await store.redeem(b.token,b.name,b.password);return json(r,r.status||200)}catch(e){return json({error:e.message},400)}}
- if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/')||p.startsWith('/landur/api/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
+ // LANDUR atiende su propio montaje antes del portón de sesión: quien llega a /landur sin
+ // cuenta ve el acceso del proyecto, no el login ni el selector de RIVECT.
+ if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u,ip);
+ if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
  if(!['GET','HEAD'].includes(method)&&req.headers.get('x-csrf-token')!==u.csrf)return json({error:'Sesión no válida. Volvé a iniciar sesión.'},403);
  if(p==='/auth/me'&&method==='GET')return json({user:publicUser(u),csrf:u.csrf});
- if((p==='/auth/logout'||p==='/landur/api/logout')&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':`rivect_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${local?'':'; Secure'}`}})}
+ if(p==='/auth/logout'&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':sessionCookie('',{secure:!local,maxAge:0})}})}
  if(p==='/portal'&&method==='GET'){
   // Con un solo proyecto habilitado no hay nada que elegir: se entra directo y no se ofrece
   // un selector que solo llevaría a un único destino.
@@ -41,7 +51,6 @@ async function route(req,ip){
   return new Response(renderProjectsPage(u),{headers:{'Content-Type':'text/html; charset=utf-8'}});
  }
  if(p==='/api/projects'&&method==='GET')return json({projects:availableProjects(u)});
- if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u);
  if(p==='/index.html'&&method==='GET')return redirect('/portal');
  if(p==='/admin'&&method==='GET')return u.role==='admin'?html('admin.html'):json({error:'Sólo administradores.'},403);
  if(p.startsWith('/api/admin/')){

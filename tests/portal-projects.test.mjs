@@ -22,7 +22,7 @@ test('catálogo: permisos independientes y administradores ven ambos proyectos',
 test('sin sesión no se exponen LANDUR ni exportaciones',async()=>{
   const f=await portalFixture();try{
     assert.equal((await f.request('/portal')).headers.get('location'),'/login');
-    assert.equal((await f.request('/landur/')).headers.get('location'),'/login');
+    assert.equal((await f.request('/landur/')).headers.get('location'),'/landur/login');
     for(const route of ['/landur/api/state','/landur/api/export.csv','/api/projects'])assert.equal((await f.request(route)).status,401);
     assert.equal(fs.existsSync(path.join(f.root,'data/landur/landur.sqlite')),false);
   }finally{await f.close();}
@@ -42,7 +42,7 @@ test('login del portal abre LANDUR sin otra contraseña; Pulso aislado',async()=
     const boot=await(await f.request('/landur/api/session',landur)).json();assert.equal(boot.portal,true);assert.equal(boot.authenticated,true);assert.equal(boot.csrf,landur.csrf);
     const page=await(await f.request('/landur/',landur)).text();assert.match(page,/data-portal="true"/);assert.match(page,/src="\.\/app.js"/);
     assert.equal((await f.request('/landur',landur)).headers.get('location'),'/landur/');
-    assert.equal((await f.request('/landur/api/login',{...landur,method:'POST',body:{password:'anything'}})).status,404);
+    assert.equal((await f.request('/landur/api/login',{...landur,method:'POST',body:{password:'anything'}})).status,303,'la contraseña sola no entra: se piden las credenciales de la cuenta');
     assert.equal((await f.request('/landur/api/demo',{...landur,method:'POST',body:{}})).status,404);
     for(const route of ['/landur/server/ledger.mjs','/landur/data/landur.sqlite','/landur/.env'])assert.equal((await f.request(route,landur)).status,404);
   }finally{await f.close();}
@@ -112,6 +112,50 @@ test('el límite de intentos es por cliente: diez fallos de una IP no bloquean a
     assert.equal(valid.status,200,'una IP distinta entra con su contraseña correcta');
     const stillBlocked=await f.request('/auth/login',wrong);
     assert.equal(stillBlocked.status,429,'la IP bloqueada sigue cortada hasta que venza la ventana');
+  }finally{await f.close();}
+});
+test('LANDUR tiene su propio acceso, con las credenciales de la cuenta',async()=>{
+  const f=await portalFixture();try{
+    const page=await f.request('/landur/login');
+    const html=await page.text();
+    assert.equal(page.status,200);
+    assert.match(html,/action="\/landur\/api\/login"/);
+    assert.match(html,/name="email"/);assert.match(html,/type="password"/);
+    assert.match(html,/src="\/landur\/wordmark.png"/);
+    // Ni el selector de proyectos ni el login del portal: solo el proyecto.
+    assert.doesNotMatch(html,/href="\/portal"/);assert.doesNotMatch(html,/href="\/login"/);
+    assert.doesNotMatch(html,/Mis proyectos/);
+    // Las credenciales son las mismas: el correo y la contraseña del portal entran a LANDUR.
+    const form=password=>({method:'POST',raw:new URLSearchParams({email:'landur@example.test',password}).toString(),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+    const enter=await f.request('/landur/api/login',form(f.password));
+    assert.equal(enter.status,303);assert.equal(enter.headers.get('location'),'/landur/');
+    const setCookie=enter.headers.get('set-cookie')||'';
+    assert.match(setCookie,/HttpOnly/);assert.match(setCookie,/SameSite=Strict/);assert.match(setCookie,/Path=\//);
+    const cookie=setCookie.split(';')[0];
+    const app=await f.request('/landur/',{cookie});assert.equal(app.status,200);assert.match(await app.text(),/data-portal="true"/);
+    // Credenciales equivocadas: vuelven al acceso de LANDUR sin abrir sesión.
+    const wrong=await f.request('/landur/api/login',form('contraseña-que-no-existe'));
+    assert.equal(wrong.status,303);assert.equal(wrong.headers.get('location'),'/landur/login?e=credenciales');
+    assert.equal(wrong.headers.get('set-cookie'),null);
+    // Un sitio ajeno no puede iniciar sesión en nombre del visitante.
+    assert.equal((await f.request('/landur/api/login',{...form(f.password),origin:'https://evil.test'})).status,403);
+    // Con sesión y permiso, la pantalla de acceso no se vuelve a mostrar.
+    assert.equal((await f.request('/landur/login',{cookie})).headers.get('location'),'/landur/');
+  }finally{await f.close();}
+});
+test('quien entra sin permiso ve el aviso de LANDUR y puede cerrar sesión',async()=>{
+  const f=await portalFixture();try{
+    const none=await f.login('none');
+    const denied=await f.request('/landur/',none);
+    assert.equal(denied.status,403);
+    const html=await denied.text();
+    assert.match(html,/LANDUR no está habilitado/);
+    assert.doesNotMatch(html,/Mis proyectos/);assert.doesNotMatch(html,/href="\/portal"/);
+    assert.ok(html.includes(`name="csrf" value="${none.csrf}"`),'el aviso ofrece cerrar sesión con su token');
+    assert.equal((await f.request('/landur/api/state',none)).status,403);
+    const out=await f.request('/landur/api/logout',{...none,method:'POST',raw:`csrf=${encodeURIComponent(none.csrf)}`,headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+    assert.equal(out.status,303);assert.equal(out.headers.get('location'),'/landur/login');
+    assert.equal((await f.request('/landur/api/state',none)).status,401,'la sesión sin permiso también se cierra en el servidor');
   }finally{await f.close();}
 });
 test('falla de runtime o ruta LANDUR no derriba el selector de proyectos',async()=>{

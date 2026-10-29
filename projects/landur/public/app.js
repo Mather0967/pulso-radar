@@ -56,9 +56,9 @@ function lock(message='') {
   authEpoch++;state=null;modal.close();modal.innerHTML='';pendingRequest=null;busy=false;
   app.innerHTML=`<div class="login"><section class="login-brand"><img class="brand-logo login-wordmark" src="${BASE}wordmark.png" alt="LANDUR®" width="300" height="84"><div><span class="eyebrow">Tu espacio financiero</span><h1>Control financiero<br>del negocio.</h1><p>Saldos, cobros y compromisos en un solo registro. Cada cifra conserva su origen y su fecha.</p></div><footer>UNA SOLUCIÓN DE RIVECT</footer></section><main class="login-main" id="main"><div class="login-box"><span class="eyebrow muted">ACCESO PRIVADO</span><h2>Bienvenido a LANDUR</h2><p>Ingresá con la contraseña configurada para esta aplicación.</p><form id="login-form"><label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label><p class="error" id="login-error" role="alert">${escape(message)}</p><button class="primary" type="submit">Ingresar al espacio ${icon('arrow')}</button></form><p class="footnote">${navigator.onLine?'Conexión necesaria para consultar y guardar.':'Sin conexión. Volvé a conectarte para continuar.'} No se guarda una copia financiera offline en el navegador.</p><button class="text-btn" data-action="install">${icon('phone')} Instalar en el iPhone</button></div></main></div>`;
   if(portalMode){
-    $('.login-box h2').textContent='Tu acceso está en RIVECT';
-    $('#login-form').innerHTML='<p class="error" role="alert"></p><a class="primary" href="/login">Ingresar desde RIVECT ↗</a>';
-    $('#login-form .error').textContent=message||'';
+    // El ingreso lo sirve el propio LANDUR: la aplicación no dibuja un formulario que no
+    // puede autenticar ni muestra un camino de vuelta al ecosistema RIVECT.
+    location.assign(BASE+'login');
     return;
   }
   $('#login-form').addEventListener('submit',async event=>{
@@ -512,7 +512,7 @@ function importDialog(){
 }
 async function logout(){
   if(busy)return;
-  try{await api('/api/logout',{});if(portalMode){location.assign('/login');return;}session={authenticated:false};view='home';query='';filter='';unit='';lock('Sesión cerrada.');}
+  try{await api('/api/logout',{});if(portalMode){location.assign(BASE+'login');return;}session={authenticated:false};view='home';query='';filter='';unit='';lock('Sesión cerrada.');}
   catch{lock('No se pudo confirmar el cierre en el servidor. Reconectá y cerrá sesión antes de dejar este dispositivo.');}
 }
 function install(){openDialog('LANDUR en tu iPhone','Instalación desde Safari, con conexión HTTPS.',`<div class="dialog-body"><ol class="install-steps"><li>Abrí el enlace de LANDUR directamente en <strong>Safari</strong>, no dentro de otra aplicación.</li><li>Tocá <strong>Compartir</strong> y luego <strong>Agregar a pantalla de inicio</strong>.</li><li>Confirmá el nombre LANDUR y tocá <strong>Agregar</strong>.</li><li>Abrí el icono e ingresá a tu espacio.</li></ol><p class="form-note">Necesitás conexión para ver o registrar operaciones. Sin conexión se muestra una pantalla bloqueada: nunca se simula un guardado.</p></div>`);}
