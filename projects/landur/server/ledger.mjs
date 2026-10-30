@@ -148,9 +148,10 @@ export class Ledger {
       this.db.prepare(`DELETE FROM applications WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list})) OR target IN (SELECT id FROM operations WHERE workspace IN (${list}))`).run(...ids, ...ids);
       this.db.prepare(`DELETE FROM obligations WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list}))`).run(...ids);
       this.db.prepare(`DELETE FROM entries WHERE operation IN (SELECT id FROM operations WHERE workspace IN (${list})) OR account IN (SELECT id FROM accounts WHERE workspace IN (${list}))`).run(...ids, ...ids);
+      // Los comprobantes apuntan a sus operaciones: se borran antes, o SQLite rechaza el borrado por clave foránea.
+      this.db.prepare(`DELETE FROM evidence WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM operations WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM accounts WHERE workspace IN (${list})`).run(...ids);
-      this.db.prepare(`DELETE FROM evidence WHERE workspace IN (${list})`).run(...ids);
       const removed = this.db.prepare(`DELETE FROM workspaces WHERE id IN (${list})`).run(...ids).changes;
       this.db.exec('COMMIT');
       return removed;

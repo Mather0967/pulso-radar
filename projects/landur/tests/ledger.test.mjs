@@ -386,3 +386,18 @@ test('un comprobante se puede eliminar con idempotencia, auditoría y aislamient
   const foreign=ledger.attachEvidence('b','other',randomUUID(),{operationId:run(op('sale',{}),randomUUID(),'b').id,name:'ajeno.png',mime:'image/png',data:PNG});
   assert.throws(()=>run({kind:'evidence.remove',evidenceId:foreign.id}),error=>error.status===404,'un espacio ajeno es indistinguible de uno inexistente');
 });
+
+test('limpieza de demos: borra espacios demo vencidos aunque tengan comprobantes y reversiones, y no toca el privado', t => {
+  const ledger = new Ledger(); t.after(() => ledger.close());
+  // La tabla de sesiones la crea el servidor HTTP; la limpieza la consulta para saber qué espacios siguen en uso.
+  ledger.db.exec('CREATE TABLE sessions (hash TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, expires INTEGER NOT NULL, mode TEXT NOT NULL)');
+  ledger.seed('demo-1');
+  const expense = ledger.snapshot('demo-1').operations.find(o => o.kind === 'expense').id;
+  ledger.attachEvidence('demo-1', 'tester', randomUUID(), { operationId: expense, name: 'ticket.png', mime: 'image/png', data: PNG });
+  ledger.command('demo-1', 'tester', randomUUID(), { kind: 'reversal', operationId: expense, date: '2026-10-25' });
+  ledger.workspace('privado');
+  assert.equal(ledger.purgeDemoWorkspaces(), 1, 'se elimina el espacio demo sin sesión activa');
+  assert.equal(ledger.snapshot('demo-1').operations.length, 0);
+  assert.equal(ledger.snapshot('demo-1').evidence.length, 0);
+  assert.ok(ledger.db.prepare('SELECT 1 FROM workspaces WHERE id=?').get('privado'), 'el espacio no demo sigue ahí');
+});
