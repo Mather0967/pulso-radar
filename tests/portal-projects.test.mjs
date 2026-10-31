@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {availableProjects,mergeProjectGrants,projectAccess,renderProjectsPage} from '../namecheap/server/projects.mjs';
-import {clientAddress,sessionCookie,SESSION_COOKIES} from '../namecheap/server/auth.mjs';
+import {clientAddress,sessionCookie,SESSION_COOKIES,originAllowed} from '../namecheap/server/auth.mjs';
 import {createLandurPortal} from '../namecheap/server/landur.mjs';
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
@@ -106,6 +106,32 @@ test('una sesión abierta antes del cambio a __Host- sigue sirviendo',async()=>{
     assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session='+value})).status,200,'el nombre nuevo se acepta');
     assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session=basura; rivect_session='+value})).status,200,'una galleta basura delante no anula la válida');
     assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session=basura'})).status,401,'una galleta inventada no abre sesión');
+  }finally{await f.close();}
+});
+test('el origen de escritura se compara por host, no por la cadena exacta',()=>{
+  const post=headers=>({method:'POST',headers:new Headers(headers)});
+  assert.equal(originAllowed(post({origin:'https://rivect.net'})),true);
+  assert.equal(originAllowed(post({origin:'https://www.rivect.net'})),true,'www es el mismo sitio y el chequeo de Host ya lo admite');
+  assert.equal(originAllowed(post({origin:'https://evil.example'})),false,'otro sitio sigue rechazado');
+  assert.equal(originAllowed(post({origin:'https://rivect.net.evil.example'})),false,'no alcanza con contener el nombre');
+  assert.equal(originAllowed(post({origin:'http://rivect.net'})),false,'en producción se exige https');
+  assert.equal(originAllowed(post({origin:'null'})),false,'un origen opaco no sirve');
+  assert.equal(originAllowed(post({})),false,'sin Origin ni declaración del navegador se rechaza');
+  assert.equal(originAllowed(post({'sec-fetch-site':'cross-site'})),false);
+  assert.equal(originAllowed(post({'sec-fetch-site':'same-origin'})),true,'sin Origin, el navegador declara que es del mismo sitio');
+  assert.equal(originAllowed(post({origin:'http://127.0.0.1:4321'}),{local:true}),true,'en local cualquier nombre del loopback');
+  assert.equal(originAllowed(post({origin:'https://rivect.net'}),{local:true}),false,'en local no entra el sitio real');
+  assert.equal(originAllowed(post({origin:'http://localhost:8080'}),{base:'http://localhost:4180'}),true,'el montaje de LANDUR deduce el modo local del origen base');
+  assert.equal(originAllowed({method:'GET',headers:new Headers()}),true,'leer nunca se bloquea');
+});
+test('el acceso no falla por entrar con otro nombre del mismo servidor',async()=>{
+  const f=await portalFixture();try{
+    const body=JSON.stringify({email:'landur@example.test',password:f.password});
+    const post=headers=>fetch(f.base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json',...headers},body});
+    assert.equal((await post({origin:'http://127.0.0.1:4180'})).status,200,'127.0.0.1 y localhost son el mismo servidor');
+    assert.equal((await post({'sec-fetch-site':'same-origin'})).status,200,'sin Origin pero del mismo sitio');
+    assert.equal((await post({})).status,403,'sin ninguna señal de origen se rechaza');
+    assert.equal((await post({origin:'https://evil.example'})).status,403,'un origen ajeno no inicia sesión');
   }finally{await f.close();}
 });
 test('clave de cliente: X-Forwarded-For solo se confía detrás del proxy local',()=>{

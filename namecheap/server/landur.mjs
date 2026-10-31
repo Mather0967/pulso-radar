@@ -3,6 +3,7 @@ import { resolve, relative, sep, isAbsolute, dirname, basename } from 'node:path
 import { existsSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { projectAccess } from './projects.mjs';
+import { originAllowed } from './auth.mjs';
 
 const publicAssets = new Map([
   ['/', ['index.html','text/html; charset=utf-8']], ['/index.html',['index.html','text/html; charset=utf-8']],
@@ -110,7 +111,7 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     const url=new URL(req.url),method=req.method;
     // Ninguna escritura sin el origen correcto, ni siquiera el ingreso: un formulario de otro
     // sitio no debe poder iniciar sesión en nombre de un visitante.
-    if(!['GET','HEAD'].includes(method)&&req.headers.get('origin')!==url.origin)return json({error:'Origen no admitido.'},403);
+    if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{base:url.origin}))return json({error:'Origen no admitido.'},403);
     if(url.pathname==='/landur')return redirect('/landur/');
     if(!url.pathname.startsWith('/landur/'))return json({error:'Ruta no encontrada.'},404);
     const path=url.pathname.slice('/landur'.length);

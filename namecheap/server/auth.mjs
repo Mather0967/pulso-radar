@@ -17,6 +17,29 @@ export const publicUser=u=>({id:u.id,name:u.name,email:u.email,role:u.role,proje
 // abiertas antes del cambio siguen sirviendo hasta vencer.
 export const SESSION_COOKIES=['__Host-rivect_session','rivect_session'];
 export const sessionCookie=(value,{secure=true,maxAge=28800}={})=>(secure?SESSION_COOKIES[0]:SESSION_COOKIES[1])+'='+value+'; Path=/; HttpOnly; SameSite=Strict; Max-Age='+maxAge+(secure?'; Secure':'')+';';
+// Qué orígenes pueden escribir. Se compara el host, no el texto completo: el sitio se abre en
+// `rivect.net` y en `www.rivect.net` (el chequeo de Host admite los dos), y exigir una sola
+// cadena hacía que entrando por www la página cargara y el formulario de acceso devolviera
+// 403 «Origen no admitido». Un origen de otro sitio sigue rechazado, y en producción se exige
+// https: la comparación no habilita http ni subdominios ajenos.
+export const PUBLIC_HOSTS = ['rivect.net', 'www.rivect.net'];
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+export const isLoopbackOrigin = value => /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(String(value || ''));
+// Sin cabecera `Origin` (navegadores viejos, clientes que no la mandan) solo se acepta si el
+// propio navegador declara que la petición sale del mismo sitio: la defensa contra CSRF no
+// depende únicamente de una cabecera que el cliente puede omitir.
+export function originAllowed(request, { local = false, base = null } = {}) {
+  const method = String(request?.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return true;
+  const header = request.headers.get('origin');
+  const dev = local || isLoopbackOrigin(base);
+  if (header) {
+    let url; try { url = new URL(header); } catch { return false; }
+    if (dev) return LOOPBACK_HOSTS.has(url.hostname);
+    return url.protocol === 'https:' && PUBLIC_HOSTS.includes(url.hostname);
+  }
+  return request.headers.get('sec-fetch-site') === 'same-origin';
+}
 // Detrás de LiteSpeed/Passenger el par del socket es el proxy local: la IP del socket es la
 // misma para todos los visitantes, así que con esa clave diez contraseñas mal de cualquiera
 // bloqueaban el acceso de todos durante 15 minutos. Si el par es de loopback se confía en
