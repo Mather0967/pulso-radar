@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {AuthStore,digest,token,publicUser,clientAddress,sessionCookie,originAllowed,canonicalHost,relativeTarget} from './auth.mjs';
+import {AuthStore,digest,token,publicUser,clientAddress,sessionCookie,originAllowed,canonicalHost,relativeTarget,rejectOrigin} from './auth.mjs';
 import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
@@ -29,7 +29,7 @@ const landur=createLandurPortal({dataDir:path.join(dataDir,'landur'),session:{
 }});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
- if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{local}))return json({error:'Origen no admitido.'},403);
+ if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
  if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});

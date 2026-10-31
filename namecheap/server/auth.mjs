@@ -54,6 +54,19 @@ export function originAllowed(request, { local = false, base = null } = {}) {
   }
   return request.headers.get('sec-fetch-site') === 'same-origin';
 }
+// El rechazo tiene que explicarse solo: la respuesta devuelve el `Origin` recibido y queda una
+// línea en el log del servidor. Es un dato del cliente, no un secreto, y sin esto cada 403
+// obliga a adivinar con qué nombre entró el navegador. Se acota y se le quitan los caracteres
+// de control para que no inyecte nada en el JSON ni en el log.
+const cleanHeader = (value, max) => String(value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+export function rejectOrigin(request, pathname, ip) {
+  const raw = request?.headers?.get('origin');
+  const origin = raw === null || raw === undefined ? '(sin cabecera Origin)' : cleanHeader(raw, 200) || '(vacía)';
+  const secFetchSite = request?.headers?.get('sec-fetch-site') || null;
+  const host = cleanHeader(request?.headers?.get('host') || '', 100) || null;
+  console.warn(JSON.stringify({event: 'origin-rejected', method: String(request?.method || ''), path: String(pathname || '').slice(0, 200), origin, host, secFetchSite, ip: ip || null}));
+  return {error: 'Origen no admitido.', origin, ...(secFetchSite ? {secFetchSite} : {})};
+}
 // Detrás de LiteSpeed/Passenger el par del socket es el proxy local: la IP del socket es la
 // misma para todos los visitantes, así que con esa clave diez contraseñas mal de cualquiera
 // bloqueaban el acceso de todos durante 15 minutos. Si el par es de loopback se confía en

@@ -125,6 +125,23 @@ test('el origen de escritura se compara por host, no por la cadena exacta',()=>{
   assert.equal(originAllowed(post({origin:'http://localhost:8080'}),{base:'http://localhost:4180'}),true,'el montaje de LANDUR deduce el modo local del origen base');
   assert.equal(originAllowed({method:'GET',headers:new Headers()}),true,'leer nunca se bloquea');
 });
+test('el rechazo por origen dice cuál llegó y deja una línea en el log',async()=>{
+  const f=await portalFixture();const logs=[];const original=console.warn;console.warn=(...args)=>logs.push(args.join(' '));
+  try{
+    const post=(headers,path='/auth/login')=>fetch(f.base+path,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:'{}'});
+    const evil=await post({origin:'https://evil.example','sec-fetch-site':'cross-site'});
+    assert.equal(evil.status,403);
+    assert.deepEqual(await evil.json(),{error:'Origen no admitido.',origin:'https://evil.example',secFetchSite:'cross-site'},'la respuesta nombra el origen recibido');
+    assert.deepEqual(await (await post({})).json(),{error:'Origen no admitido.',origin:'(sin cabecera Origin)'},'sin cabecera el mensaje lo dice');
+    const long=await (await post({origin:'https://'+'a'.repeat(400)+'.example'})).json();
+    assert.equal(long.origin.length,200,'el origen reflejado se acota');
+    const landur=await fetch(f.base+'/landur/api/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',origin:'https://evil.example'},body:'email=a%40b.invalid&password=intento-invalido-largo'});
+    assert.equal((await landur.json()).origin,'https://evil.example','LANDUR informa el mismo dato');
+  }finally{console.warn=original;await f.close();}
+  const parsed=logs.map(line=>{try{return JSON.parse(line)}catch{return null}});
+  assert.ok(parsed.some(entry=>entry?.event==='origin-rejected'&&entry.origin==='https://evil.example'&&entry.path==='/auth/login'&&entry.secFetchSite==='cross-site'),'el log identifica el rechazo');
+  assert.ok(parsed.some(entry=>entry?.event==='origin-rejected'&&entry.path==='/landur/api/login'),'LANDUR registra su propio rechazo');
+});
 test('www redirige al ápex conservando método y ruta, y no copia un destino ajeno',async()=>{
   const f=await portalFixture();try{
     const port=f.server.address().port;
