@@ -11,7 +11,7 @@ Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas s
 | `POST /api/logout` | Invalida la sesión actual |
 | `POST /api/demo` | Solo en instancia sintética; crea un espacio separado por visitante |
 | `GET /api/state` | Cuentas, operaciones, movimientos, agregados por moneda y auditoría |
-| `POST /api/commands` | Registra una operación atómica con `Idempotency-Key` |
+| `POST /api/commands` | Registra una operación atómica con `Idempotency-Key`; tope de 120 por minuto y por sesión |
 | `POST /api/import/preview` | `{csv}`; valida dentro de transacción revertida, sin guardar |
 | `POST /api/import/commit` | `{csv}` y `Idempotency-Key`; lote atómico, deduplicación adicional por fila |
 | `GET /api/export.csv` | CSV de operaciones de todas las monedas del espacio, no del filtro visual |
@@ -34,7 +34,7 @@ Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen per
 - `account.delete`: `accountId` y, cuando la cuenta tiene movimientos, `mode` obligatorio. Sin `mode`, una cuenta **sin movimientos** se elimina y punto; si tiene entradas de dinero se responde 409 y nada cambia. Las tres formas de resolver una cuenta con historial son explícitas:
   - `mode: 'move'` + `toAccountId`: traslada todas las entradas a esa cuenta y elimina la original. Las dos cuentas tienen que compartir moneda (no hay conversión automática); el saldo inicial se suma y el corte queda en el más antiguo de los dos, para que el total del espacio no cambie. Auditoría `account.merged` con la cuenta de origen, el saldo combinado y la cantidad de movimientos.
   - `mode: 'move'` + `newAccount: {name, accountKind?}`: crea una cuenta con ese nombre y los mismos tipo, moneda, saldo inicial y corte de la original, traslada allí los movimientos y elimina la original. Misma auditoría `account.merged`.
-  - `mode: 'purge'` + `confirm: true`: elimina la cuenta y **todo lo asociado**: operaciones con movimiento en ella (gastos, transferencias, retiros, pagos, cobros), sus aplicaciones, obligaciones, comisiones, contra-asientos y comprobantes adjuntos. Antes de borrar, la auditoría guarda una copia completa de las filas eliminadas (operaciones, entradas, aplicaciones, obligaciones y metadatos de comprobantes); el contenido de los archivos no se conserva. Auditoría `account.purged` y `account.deleted`.
+  - `mode: 'purge'` + `confirm: true` + `confirmName` con el **nombre exacto** de la cuenta: elimina la cuenta y **todo lo asociado**: operaciones con movimiento en ella (gastos, transferencias, retiros, pagos, cobros), sus aplicaciones, obligaciones, comisiones, contra-asientos y comprobantes adjuntos. Antes de borrar, la auditoría guarda una copia completa de las filas eliminadas (operaciones, entradas, aplicaciones, obligaciones y metadatos de comprobantes); el contenido de los archivos no se conserva. Auditoría `account.purged` y `account.deleted`. En el montaje del portal, además, se pide la **contraseña de la cuenta** (`password`): se verifica contra el almacén de identidad y se descarta antes de ejecutar el comando, así que no entra ni en la auditoría ni en la clave de idempotencia. Sin las tres condiciones, la respuesta es 400 o 403 y no se toca nada.
 
 Estos son los borrados del sistema y son deliberadamente explícitos: nada se borra por omisión, y una operación financiera sigue sin poder borrarse por separado del historial de su cuenta. Lo que se pone mal en un registro se corrige con `reversal` y volviendo a cargar; lo que se pone mal en un comprobante se quita y se vuelve a adjuntar; una cuenta se elimina vacía, trasladando su historial o confirmando el borrado de ese historial. Nada de esto altera una cifra de forma silenciosa: cada baja queda en la auditoría con su autor y su fecha.
 
@@ -55,6 +55,8 @@ Importes de entrada como strings decimales, sin miles, hasta dos decimales; resp
 - **Alcance:** solo se adjunta a una operación existente del propio espacio. Una lectura ajena responde 404, igual que un identificador inexistente.
 
 Los comprobantes no son una validación de contenido: el servidor comprueba estructura y tamaño, no que la imagen corresponda al gasto. Eso sigue siendo una revisión del usuario.
+
+La clave de idempotencia se guarda **por usuario**: dos cuentas pueden usar el mismo valor sin recibir la respuesta de la otra, y reintentar con la misma clave sigue devolviendo el resultado original. Las claves de comando se descartan solas a los 30 días; las de importación (`csvrow-…`) se conservan porque son la memoria de duplicados de cada referencia externa.
 
 Los registros tienen origen manual por defecto y pueden llevar `source`/`externalId`. Una referencia externa repetida no se confirma automáticamente si hay discrepancias. La corrección se hace revirtiendo y registrando de nuevo, nunca editando el registro original: la historia se conserva y cada reversión queda auditada con su autor y su fecha. Un registro equivocado, por lo tanto, **no se borra**: se anula con `reversal`. Las excepciones son `evidence.remove`, `account.delete` de una cuenta vacía o con su historial trasladado y `account.delete` con `mode:'purge'`, que sí elimina los movimientos de esa cuenta con confirmación explícita y dejando copia en la auditoría.
 

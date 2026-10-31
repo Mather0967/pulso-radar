@@ -316,7 +316,7 @@ test('lógica de negocio: importes, monedas y carreras no permiten fabricar dine
     assert.notEqual(forged.id, '11111111-1111-1111-1111-111111111111', 'el id lo elige el servidor');
     const state = await (await f.request('/landur/api/state', {cookie})).json();
     assert.equal(state.accounts.find(x => x.id === forged.id).balance, 0, 'nadie puede regalarse saldo');
-    assert.equal(state.accounts.find(x => x.id === forged.id).workspace, 'landur', 'el espacio no se puede cambiar');
+    assert.equal(state.accounts.find(x => x.id === forged.id).workspace, undefined, 'el identificador interno del espacio no se publica');
     // Carrera: cinco cobros simultáneos del total de una venta. Solo uno aplica.
     const sale = (await (await send({kind: 'sale', concept: 'Venta', amount: '1000', currency: 'UYU', date: '2026-10-24'})).json()).id;
     const raced = await Promise.all([1, 2, 3, 4, 5].map(() => send({kind: 'collection', concept: 'Cobro', amount: '1000', currency: 'UYU', date: '2026-10-24', accountId: a, targetId: sale, commission: '0'})));
@@ -331,7 +331,7 @@ test('lógica de negocio: importes, monedas y carreras no permiten fabricar dine
     assert.deepEqual(reversals.map(r => r.status).sort(), [200, 409], 'la segunda reversión no duplica el contra-asiento');
     // Baja con movimientos: sin decisión explícita no se borra nada.
     assert.equal((await send({kind: 'account.delete', accountId: a})).status, 409, 'una cuenta con historial no se borra por omisión');
-    assert.equal((await send({kind: 'account.delete', accountId: a, mode: 'purge'})).status, 400, 'el borrado total exige confirmación');
+    assert.ok([400, 403].includes((await send({kind: 'account.delete', accountId: a, mode: 'purge'})).status), 'el borrado total exige confirmación');
     assert.ok((await (await f.request('/landur/api/state', {cookie})).json()).accounts.some(x => x.id === a));
   } finally { await f.close(); }
 });
@@ -370,7 +370,69 @@ test('lo que escribe el usuario no se ejecuta: CSV, login y cabeceras', async ()
     // Endurecimiento de sesión: sin autenticación por cabecera, sin override de método.
     assert.equal((await f.request('/landur/api/state', {headers: {'Authorization': 'Bearer ' + csrf}})).status, 401, 'no hay autenticación por Bearer');
     assert.equal((await f.request('/landur/api/state', {cookie, headers: {'X-HTTP-Method-Override': 'DELETE'}})).status, 200, 'el override de método se ignora');
-    assert.equal((await f.request('/landur/api/state', {cookie: 'rivect_session=basura; ' + cookie})).status, 401, 'una galleta duplicada basura anula la válida, como en cualquier servidor');
+    assert.equal((await f.request('/landur/api/state', {cookie: 'rivect_session=basura; ' + cookie})).status, 200, 'una galleta basura agregada delante no anula la sesión válida');
+  } finally { await f.close(); }
+});
+
+test('borrado con historial: exige el nombre exacto y la contraseña, y no se puede omitir', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const send = body => f.request('/landur/api/commands', {method: 'POST', cookie, csrf, body, headers: {'Idempotency-Key': randomUUID()}});
+    const a = (await (await send({kind: 'account', name: 'Caja', accountKind: 'cash', currency: 'UYU', opening: '1000', cutoff: '2026-10-01', verified: true, accessible: true})).json()).id;
+    await send({kind: 'expense', concept: 'mov', amount: '10', currency: 'UYU', date: '2026-10-24', accountId: a});
+    const purge = extra => send({kind: 'account.delete', accountId: a, mode: 'purge', confirm: true, ...extra});
+    assert.equal((await purge({confirmName: 'Caja'})).status, 403, 'sin contraseña no se borra el historial');
+    assert.equal((await purge({confirmName: 'Caja', password: 'contraseña-que-no-es'})).status, 403, 'con contraseña incorrecta tampoco');
+    assert.equal((await purge({confirmName: 'Otra', password: f.password})).status, 400, 'el nombre tiene que ser el de la cuenta');
+    assert.ok((await (await f.request('/landur/api/state', {cookie})).json()).accounts.some(x => x.id === a), 'los intentos fallidos no borran nada');
+    const ok = await purge({confirmName: 'Caja', password: f.password});
+    assert.equal(ok.status, 200, 'con nombre y contraseña correctos se ejecuta');
+    const state = await (await f.request('/landur/api/state', {cookie})).json();
+    assert.equal(state.accounts.some(x => x.id === a), false);
+    assert.ok(state.audit.some(x => x.action === 'account.purged'), 'y queda auditado');
+  } finally { await f.close(); }
+});
+
+test('la clave de idempotencia es de cada usuario, no del espacio', async () => {
+  const f = await portalFixture();
+  try {
+    const editor = await f.login('landur'), admin = await f.login('admin');
+    const key = randomUUID();
+    const body = {kind: 'account', name: 'Cuenta idempotente', accountKind: 'cash', currency: 'UYU', opening: '0', cutoff: '2026-10-01', verified: true, accessible: true};
+    const first = await f.request('/landur/api/commands', {...editor, method: 'POST', body, headers: {'Idempotency-Key': key}});
+    const second = await f.request('/landur/api/commands', {...admin, method: 'POST', body, headers: {'Idempotency-Key': key}});
+    assert.equal(first.status, 200); assert.equal(second.status, 200);
+    assert.notEqual((await first.json()).id, (await second.json()).id, 'cada usuario ejecuta su propio comando');
+    const replay = await f.request('/landur/api/commands', {...editor, method: 'POST', body, headers: {'Idempotency-Key': key}});
+    assert.equal((await replay.json()).replayed, true, 'el mismo usuario sí reintenta sin duplicar');
+    const changed = await f.request('/landur/api/commands', {...admin, method: 'POST', body: {...body, name: 'Otra'}, headers: {'Idempotency-Key': key}});
+    assert.equal(changed.status, 409, 'la misma clave con otro cuerpo sigue siendo un conflicto');
+  } finally { await f.close(); }
+});
+
+test('el límite de intentos no se evade rotando la IP declarada', async () => {
+  const f = await portalFixture();
+  try {
+    let last;
+    for (let i = 0; i < 22; i++)
+      last = await f.request('/auth/login', {method: 'POST', body: {email: 'landur@example.test', password: 'mala-' + i}, headers: {'X-Forwarded-For': '198.51.100.' + (10 + i)}});
+    assert.equal(last.status, 429, 'la cuenta se bloquea aunque cambie la IP declarada');
+    const other = await f.request('/auth/login', {method: 'POST', body: {email: 'admin@example.test', password: f.password}, headers: {'X-Forwarded-For': '203.0.113.200'}});
+    assert.equal(other.status, 200, 'el bloqueo es de la cuenta atacada, no global');
+  } finally { await f.close(); }
+});
+
+test('las escrituras tienen tope por sesión', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const send = body => f.request('/landur/api/commands', {method: 'POST', cookie, csrf, body, headers: {'Idempotency-Key': randomUUID()}});
+    const a = (await (await send({kind: 'account', name: 'Caja', accountKind: 'cash', currency: 'UYU', opening: '1000', cutoff: '2026-10-01', verified: true, accessible: true})).json()).id;
+    const statuses = [];
+    for (let i = 0; i < 125; i++) statuses.push((await send({kind: 'expense', concept: 'carga ' + i, amount: '1', currency: 'UYU', date: '2026-10-24', accountId: a})).status);
+    assert.ok(statuses.includes(429), 'a partir del tope la sesión deja de escribir');
+    assert.equal(statuses.filter(s => s === 200).length, 119, 'el tope es de 120 comandos por minuto, contando el alta de la cuenta');
   } finally { await f.close(); }
 });
 

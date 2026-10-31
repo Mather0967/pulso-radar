@@ -17,6 +17,23 @@
 
 No se encontró una forma de leer datos de otro proyecto, escalar de `viewer` a `editor`, ejecutar código, inyectar HTML/CSV, fabricar dinero por manipulación de importes o duplicar cobros por concurrencia. Los controles de autorización, CSRF, aislamiento por proyecto y validación monetaria resistieron los intentos.
 
+## Estado de remediación — 31/10/2026
+
+Todo lo que dependía del código quedó corregido el mismo día, con prueba permanente. Lo único abierto es la verificación en el hosting (M-2) y los riesgos residuales anotados abajo.
+
+| ID | Qué se hizo | Dónde | Prueba |
+| --- | --- | --- | --- |
+| M-1 | El borrado con historial exige escribir el nombre exacto de la cuenta **y** la contraseña de la sesión. Sin ambas no se toca nada. | `projects/landur/server/ledger.mjs`, `namecheap/server/landur.mjs`, `public/app.js` | `security-probe` · “borrado con historial: exige el nombre exacto y la contraseña” |
+| M-2 | Segundo contador de intentos por cuenta, además del de IP: rotar `X-Forwarded-For` ya no multiplica los intentos. Queda pendiente confirmar en el host que el proxy sobrescriba la cabecera. | `namecheap/server/auth.mjs` | `security-probe` · “el límite de intentos no se evade rotando la IP declarada” |
+| B-1 | Tope de 120 comandos por minuto y por sesión; las claves de idempotencia de comando se podan a los 30 días (las de importación no). | `namecheap/server/landur.mjs`, `projects/landur/server/ledger.mjs` | `security-probe` · “las escrituras tienen tope por sesión”; `ledger.test` · poda de claves |
+| B-2 | La clave de idempotencia se guarda por usuario: dos cuentas con la misma clave ya no comparten resultado. | `projects/landur/server/ledger.mjs` | `security-probe` · “la clave de idempotencia es de cada usuario” |
+| B-3 | El estado deja de publicar el identificador interno del espacio. | `ledger.mjs` (`snapshot`) | `security-probe` · asignación masiva |
+| B-4 | Galleta `__Host-` en producción (se leen los dos nombres durante la transición) y cabeceras `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy`. | `namecheap/server/auth.mjs`, `main.mjs` | `portal-projects` · nombre y atributos de la galleta |
+| B-5 | Una galleta duplicada o vencida ya no anula la válida: se prueban todas las candidatas. | `auth.mjs` (`session`) | `security-probe` · galleta duplicada |
+| B-6 | Reconfirmación de contraseña para el borrado total (5 intentos por 15 minutos). | `namecheap/server/landur.mjs` | misma prueba que M-1 |
+
+**Riesgos residuales que quedan, con su motivo:** rotar la contraseña no invalida sesiones abiertas (no hay cambio de contraseña en la interfaz: se administra desde el hosting); el bloqueo por cuenta permite que un tercero deje a un usuario sin acceso 15 minutos; el `413` se lee bien, pero una subida de más de 16 MB se corta a nivel de socket; y la restauración de una cuenta borrada sigue siendo un procedimiento manual sobre la auditoría, sin botón.
+
 ## Superficie auditada
 
 ```text
@@ -151,13 +168,14 @@ done
 | Contaminación de prototipos | sin efecto | `security-probe` |
 | Cabeceras defensivas y `no-store` en todas las rutas | presentes | `security-probe` |
 
-## Plan de remediación sugerido
+## Plan de remediación
 
-1. **M-1** — decidir el control de `purge` (rol admin o confirmación por nombre). Es el único cambio con impacto real en integridad.
-2. **M-2** — ejecutar la verificación de `X-Forwarded-For` en producción y ajustar el proxy si hace falta.
-3. **B-1** — tope de comandos por sesión y purga de `requests`.
-4. **B-5 / B-3 / B-4** — mejoras de robustez y endurecimiento, agrupadas en un mismo cambio.
-5. **B-2** — prefijar claves de idempotencia por actor (cuando haya ventana para tocar el esquema).
+1. ~~**M-1** — control de `purge`~~ → hecho: nombre exacto + contraseña.
+2. **M-2** — ejecutar la verificación de `X-Forwarded-For` en producción y ajustar el proxy si hace falta (lo único abierto; el límite por cuenta ya acota el daño).
+3. ~~**B-1** — tope de comandos y poda de `requests`~~ → hecho.
+4. ~~**B-5 / B-3 / B-4**~~ → hechos.
+5. ~~**B-2** — claves por actor~~ → hecho.
+6. **Siguiente paso recomendado:** documentar y automatizar la restauración desde auditoría de lo borrado con `purge`.
 
 ## Cómo reproducir
 

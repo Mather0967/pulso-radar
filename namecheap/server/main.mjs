@@ -24,6 +24,7 @@ const landur=createLandurPortal({dataDir:path.join(dataDir,'landur'),session:{
  login:(email,password,ip)=>store.login(email,password,ip),
  cookie:value=>sessionCookie(value,{secure:!local}),
  cleared:()=>sessionCookie('',{secure:!local,maxAge:0}),
+ reauth:(id,password)=>store.reauth(id,password),
  logout:csrf=>store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==csrf)})
 }});
 async function route(req,ip){
@@ -107,7 +108,7 @@ export function createServer(){return http.createServer(async(req,res)=>{try{
  if(read.over){res.writeHead(413,{'Content-Type':'application/json','Cache-Control':'no-store','Connection':'close'});res.end(JSON.stringify({error:'La solicitud supera el tamaño permitido.'}));return}
  const headers=new Headers();for(const [k,v]of Object.entries(req.headers))if(v)headers.set(k,Array.isArray(v)?v.join(','):v);
  const request=new Request(new URL(req.url,origin),{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:read.body}:{})});  const r=await route(request,clientAddress({peer:req.socket.remoteAddress,forwarded:req.headers['x-forwarded-for']}));
- const secure={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};if(!local)secure['Strict-Transport-Security']='max-age=31536000';
+ const secure={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Resource-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};if(!local)secure['Strict-Transport-Security']='max-age=31536000';
  res.writeHead(r.status,{...secure,...Object.fromEntries(r.headers)});res.end(req.method==='HEAD'?undefined:Buffer.from(await r.arrayBuffer()));
  }catch(e){console.error('Request failed:',e.message);res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'No se pudo completar la operación.'}))}}).on('close',()=>landur.close())}
 if(process.env.RIVECT_TEST!=='1')createServer().listen(process.env.PORT||4180,()=>console.log('RIVECT portal listo'));

@@ -98,7 +98,11 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       await mkdir(directory,{recursive:true,mode:0o700});
       const filename=resolve(directory,'landur.sqlite');
       ledger=new Ledger(filename);await chmod(filename,0o600);ledger.workspace('landur');
-      return {ledger,exportOperations,limiter:createRateLimiter({limit:30,windowMs:60*1000})};
+      return {ledger,exportOperations,limiter:createRateLimiter({limit:30,windowMs:60*1000}),
+        // Todo comando cuenta contra un tope por usuario: sin esto una sesión válida podía
+        // escribir sin límite y hacer crecer la base y la tabla de idempotencia.
+        commandLimiter:createRateLimiter({limit:120,windowMs:60*1000}),
+        reauthLimiter:createRateLimiter({limit:5,windowMs:15*60*1000})};
     })().catch(error=>{ledger?.close();ledger=undefined;initialized=undefined;throw error;});
     return initialized;
   }
@@ -203,9 +207,19 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
         if(bytes.length>limit)return json({error:'La solicitud supera el tamaño permitido.'},413);
         let input;try{input=JSON.parse(new TextDecoder().decode(bytes))}catch{return json({error:'JSON inválido.'},400);}
         if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Se requiere un objeto JSON.'},400);
-        const {ledger,limiter}=await engine();
+        const {ledger,limiter,commandLimiter,reauthLimiter}=await engine();
         // Mismo tope por sesión que el servidor autónomo: la clave es el usuario del portal.
+        if(path==='/api/commands')commandLimiter.check(user.id);
         if(['/api/import/preview','/api/import/commit','/api/evidence'].includes(path))limiter.check(user.id);
+        // Borrar una cuenta junto con su historial exige reconfirmar la contraseña y escribir
+        // el nombre de la cuenta. La contraseña se verifica acá y no entra al asiento ni a la
+        // clave de idempotencia: se descarta del objeto antes de ejecutar el comando.
+        if(path==='/api/commands'&&input.kind==='account.delete'&&input.mode==='purge'){
+          if(!session?.reauth)return json({error:'La confirmación de contraseña no está disponible en este servidor.'},503);
+          reauthLimiter.check('reauth:'+user.id);
+          const password=input.password;delete input.password;
+          if(!(await session.reauth(user.id,password)))return json({error:'La contraseña no coincide. No se eliminó nada.'},403);
+        }
         if(path==='/api/import/preview')return json(ledger.previewImport('landur',user.id,input.csv));
         if(path==='/api/evidence')return json(ledger.attachEvidence('landur',user.id,req.headers.get('idempotency-key'),input));
         if(path==='/api/commands'&&input.kind==='import')return json({error:'Usá la importación con vista previa.'},400);

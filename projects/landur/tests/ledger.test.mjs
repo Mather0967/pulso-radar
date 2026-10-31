@@ -340,8 +340,12 @@ test('eliminar una cuenta con todo lo asociado es explícito y queda respaldado 
   run(op('expense',{accountId:other,amount:'500'}));
   // Sin confirmación explícita no se borra nada.
   assert.throws(()=>run({kind:'account.delete',accountId:bank,mode:'purge'}),/Confirmá/);
-  assert.ok(ledger.snapshot('a').accounts.some(a=>a.id===bank));
-  const result=run({kind:'account.delete',accountId:bank,mode:'purge',confirm:true});
+  // Confirmar con el nombre de otra cuenta tampoco alcanza.
+  assert.throws(()=>run({kind:'account.delete',accountId:bank,mode:'purge',confirm:true,confirmName:'Otra'}),error=>error.status===400&&/nombre exacto/.test(error.message));
+  assert.throws(()=>run({kind:'account.delete',accountId:bank,mode:'purge',confirm:true,confirmName:'  '}),error=>error.status===400);
+  assert.ok(ledger.snapshot('a').accounts.some(a=>a.id===bank),'los intentos sin nombre no tocan la cuenta');
+  assert.ok(ledger.snapshot('a').operations.some(o=>o.id===expense),'ni borran movimientos');
+  const result=run({kind:'account.delete',accountId:bank,mode:'purge',confirm:true,confirmName:'  Cuenta a borrar  '});
   assert.equal(result.operations,2,'se van el gasto y el pago de esa cuenta');
   assert.equal(result.evidence,1,'y el comprobante adjunto');
   const state=ledger.snapshot('a');
@@ -368,6 +372,18 @@ test('el traspaso valida moneda, destino y cuenta distinta antes de tocar nada',
   const state=ledger.snapshot('a');
   assert.ok(state.accounts.some(a=>a.id===from),'los rechazos no tocan la cuenta');
   assert.equal(state.entries.some(e=>e.account===from),true,'ni sus movimientos');
+});
+
+test('las claves de idempotencia se podan y las de importación no', t => {
+  const {ledger}=fixture(t);
+  const old=new Date(Date.now()-40*24*60*60*1000).toISOString(),recent=new Date().toISOString();
+  const insert=ledger.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)');
+  insert.run('a','u:tester:viejaclave00001','h','{}',old);
+  insert.run('a','u:tester:nuevaclave00001','h','{}',recent);
+  insert.run('a','csvrow-abcdef0123456789','h','{}',old);
+  assert.equal(ledger.purgeRequests(),1,'solo se va la clave de comando vencida');
+  assert.deepEqual(ledger.db.prepare('SELECT key FROM requests ORDER BY key').all().map(r=>r.key),
+    ['csvrow-abcdef0123456789','u:tester:nuevaclave00001'],'la memoria de duplicados de importación se conserva');
 });
 
 test('un comprobante se puede eliminar con idempotencia, auditoría y aislamiento', t => {

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {availableProjects,mergeProjectGrants,projectAccess,renderProjectsPage} from '../namecheap/server/projects.mjs';
-import {clientAddress} from '../namecheap/server/auth.mjs';
+import {clientAddress,sessionCookie,SESSION_COOKIES} from '../namecheap/server/auth.mjs';
 import {createLandurPortal} from '../namecheap/server/landur.mjs';
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
@@ -87,6 +87,25 @@ test('PWA montada: scope limitado y recursos sin datos personales',async()=>{
     assert.match(await sw.text(),/!SHELL.includes/);
     const js=await(await f.request('/landur/app.js',auth)).text();assert.match(js,/new URL\('\.\/', import.meta.url\)/);assert.match(js,/X-CSRF-Token/);
     assert.equal(fs.existsSync(path.join(f.root,'data/landur/landur.sqlite')),false);
+  }finally{await f.close();}
+});
+test('la galleta de sesión usa __Host- en producción y el nombre simple en local',()=>{
+  const prod=sessionCookie('abc',{secure:true});
+  assert.match(prod,/^__Host-rivect_session=abc;/,'el prefijo ata la galleta al origen');
+  for(const attribute of [/; Secure/,/Path=\//,/HttpOnly/,/SameSite=Strict/,/Max-Age=28800/])assert.match(prod,attribute);
+  assert.doesNotMatch(prod,/Domain=/,'__Host- prohíbe Domain');
+  assert.match(sessionCookie('abc',{secure:false}),/^rivect_session=abc;/,'en local se omite el prefijo para no exigir Secure');
+  assert.match(sessionCookie('',{secure:true,maxAge:0}),/Max-Age=0/,'el cierre vence la galleta');
+  assert.deepEqual(SESSION_COOKIES,['__Host-rivect_session','rivect_session'],'se leen ambos nombres durante la transición');
+});
+test('una sesión abierta antes del cambio a __Host- sigue sirviendo',async()=>{
+  const f=await portalFixture();try{
+    const {cookie}=await f.login('landur');
+    const value=cookie.slice(cookie.indexOf('=')+1);
+    assert.equal((await f.request('/landur/api/state',{cookie})).status,200,'el nombre viejo sigue valiendo');
+    assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session='+value})).status,200,'el nombre nuevo se acepta');
+    assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session=basura; rivect_session='+value})).status,200,'una galleta basura delante no anula la válida');
+    assert.equal((await f.request('/landur/api/state',{cookie:'__Host-rivect_session=basura'})).status,401,'una galleta inventada no abre sesión');
   }finally{await f.close();}
 });
 test('clave de cliente: X-Forwarded-For solo se confía detrás del proxy local',()=>{

@@ -76,6 +76,12 @@ export const MIGRATIONS = [
     if (!has('applications', 'reversed')) db.exec('ALTER TABLE applications ADD COLUMN reversed INTEGER NOT NULL DEFAULT 0');
   },
   db => {
+    // La tabla de idempotencia se podaba sola: sin fecha no había forma de descartar claves
+    // viejas, y con el tope de comandos el crecimiento ya no era el único problema.
+    const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(entry => entry.name === column);
+    if (!has('requests', 'created_at')) db.exec('ALTER TABLE requests ADD COLUMN created_at TEXT');
+  },
+  db => {
     db.exec(`CREATE TABLE IF NOT EXISTS evidence (
       id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
       operation TEXT NOT NULL REFERENCES operations(id), name TEXT NOT NULL, mime TEXT NOT NULL,
@@ -204,20 +210,36 @@ export class Ledger {
     this.db.prepare('UPDATE operations SET reversed_by=?, reversed_at=? WHERE id=?').run(id, new Date().toISOString(), original.id);
     return id;
   }
+  // Las claves de idempotencia se guardan por usuario: dos cuentas no comparten el resultado
+  // de un comando. Las filas de importación (`csvrow-…`) siguen siendo del espacio, porque
+  // ahí la detección de duplicados entre usuarios es intencional.
+  requestKey(actor, key) { return 'u:' + actor + ':' + key; }
+  // Descarta las claves de comando de más de 30 días. Las de importación son la memoria de
+  // duplicados del negocio: no se tocan nunca.
+  purgeRequests(olderThanMs = 30 * 24 * 60 * 60 * 1000) {
+    const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+    return this.db.prepare("DELETE FROM requests WHERE created_at IS NOT NULL AND created_at < ? AND key NOT LIKE 'csvrow-%'").run(cutoff).changes;
+  }
   command(workspace, actor, key, input) {
     if (typeof key !== 'string' || !/^[\w-]{16,100}$/.test(key)) throw new DomainError('Falta una clave de operación válida.');
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new DomainError('La operación no es válida.');
+    const now = Date.now();
+    if (!this.requestsPurgedAt || now - this.requestsPurgedAt > 3600000) {
+      this.requestsPurgedAt = now;
+      try { this.purgeRequests(); } catch {}
+    }
+    const stored = this.requestKey(actor, key);
     const hash = createHash('sha256').update(JSON.stringify(stable(input))).digest('hex');
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, key);
+      const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, stored);
       if (previous) {
         if (previous.fingerprint !== hash) throw new DomainError('Esta clave ya fue usada para otra operación.', 409);
         this.db.exec('COMMIT');
         return { ...JSON.parse(previous.result), replayed: true };
       }
       const result = this.execute(workspace, actor, input);
-      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?)').run(workspace, key, hash, JSON.stringify(result));
+      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)').run(workspace, stored, hash, JSON.stringify(result), new Date().toISOString());
       this.db.exec('COMMIT');
       return result;
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
@@ -234,9 +256,10 @@ export class Ledger {
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     const operationId = String(input?.operationId ?? '');
     const fingerprint = createHash('sha256').update(JSON.stringify(stable({ operationId, name, mime, sha256 }))).digest('hex');
+    const stored = this.requestKey(actor, key);
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, key);
+      const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, stored);
       if (previous) {
         if (previous.fingerprint !== fingerprint) throw new DomainError('Esta clave ya fue usada para otro archivo.', 409);
         this.db.exec('COMMIT');
@@ -248,7 +271,7 @@ export class Ledger {
       this.db.prepare('INSERT INTO evidence (id,workspace,operation,name,mime,bytes,sha256,content,created_at,actor) VALUES (?,?,?,?,?,?,?,?,?,?)')
         .run(id, workspace, operationId, name, mime, bytes.length, sha256, bytes, new Date().toISOString(), actor);
       const result = { id };
-      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?)').run(workspace, key, fingerprint, JSON.stringify(result));
+      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)').run(workspace, stored, fingerprint, JSON.stringify(result), new Date().toISOString());
       this.audit(workspace, actor, 'evidence.attached', id);
       this.db.exec('COMMIT');
       return result;
@@ -330,7 +353,7 @@ export class Ledger {
         let result;
         try { result = this.execute(workspace, actor, row); }
         catch (error) { if (error instanceof DomainError) throw new DomainError(`Fila ${index+2}: ${error.message}`,error.status); throw error; }
-        this.db.prepare('INSERT INTO requests VALUES (?,?,?,?)').run(workspace,key,fingerprint,JSON.stringify(result));
+        this.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)').run(workspace,key,fingerprint,JSON.stringify(result),new Date().toISOString());
         results.push({row:index+2,concept:row.concept,status:'new',id:result.id});
       }
       return {rows:results,created:results.filter(r=>r.status==='new').length,existing:results.filter(r=>r.status==='existing').length};
@@ -368,6 +391,10 @@ export class Ledger {
       // (operaciones, entradas, aplicaciones, obligaciones y metadatos de comprobantes).
       if (input.mode === 'purge') {
         if (input.confirm !== true) throw new DomainError('Confirmá que querés eliminar también los movimientos de la cuenta.');
+        // Escribir el nombre de la cuenta evita que un clic de más (o una sesión olvidada
+        // abierta) borre el historial: no alcanza con confirmar, hay que nombrar lo que se borra.
+        const typed = typeof input.confirmName === 'string' ? input.confirmName.trim() : '';
+        if (!typed || typed !== account.name.trim()) throw new DomainError('Escribí el nombre exacto de la cuenta para eliminar también sus movimientos.', 400);
         const removed = this.deleteOperations(workspace, actor, this.accountOperations(workspace, account.id), 'account.purged', account);
         this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
         this.audit(workspace, actor, 'account.deleted', JSON.stringify({ account }));
@@ -477,8 +504,10 @@ export class Ledger {
       };
     });
     const evidence = this.db.prepare('SELECT id, operation, name, mime, bytes, created_at, actor FROM evidence WHERE workspace=? ORDER BY rowid DESC').all(workspace);
-    return { accounts, operations, entries, evidence, totals, policy: 'pending',
-      audit: this.db.prepare('SELECT * FROM audit WHERE workspace=? ORDER BY rowid DESC LIMIT 30').all(workspace) };
+    // El identificador interno del espacio no se publica: las consultas ya están fijadas a él.
+    const published = rows => rows.map(row => { const { workspace: _omit, ...rest } = row; return rest; });
+    return { accounts: published(accounts), operations: published(operations), entries, evidence, totals, policy: 'pending',
+      audit: published(this.db.prepare('SELECT * FROM audit WHERE workspace=? ORDER BY rowid DESC LIMIT 30').all(workspace)) };
   }
   seed(workspace) {
     this.workspace(workspace, true);
