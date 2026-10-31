@@ -23,6 +23,20 @@ export const sessionCookie=(value,{secure=true,maxAge=28800}={})=>(secure?SESSIO
 // 403 «Origen no admitido». Un origen de otro sitio sigue rechazado, y en producción se exige
 // https: la comparación no habilita http ni subdominios ajenos.
 export const PUBLIC_HOSTS = ['rivect.net', 'www.rivect.net'];
+// Un solo sitio canónico: `www` redirige al ápex. La galleta `__Host-` es de host único, así
+// que dejar dos nombres vivos parte la sesión en dos y la que se abre en uno no sirve en el
+// otro. Se compara solo el nombre del host, sin puerto ni mayúsculas.
+export function canonicalHost(host) {
+  const name = String(host || '').split(':')[0].trim().toLowerCase();
+  return name === 'www.rivect.net' ? 'rivect.net' : null;
+}
+// Ruta y consulta de la petición, sin reconstruirla desde el texto crudo: un request target
+// absoluto (`GET http://otro/ HTTP/1.1`) no debe convertirse en un destino ajeno.
+export function relativeTarget(raw, base = 'https://rivect.net') {
+  let url; try { url = new URL(String(raw || '/'), base); } catch { return '/'; }
+  if (!['rivect.net', 'www.rivect.net'].includes(url.hostname)) return '/';
+  return url.pathname + url.search;
+}
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 export const isLoopbackOrigin = value => /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(String(value || ''));
 // Sin cabecera `Origin` (navegadores viejos, clientes que no la mandan) solo se acepta si el

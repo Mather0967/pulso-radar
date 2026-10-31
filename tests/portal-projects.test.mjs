@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {availableProjects,mergeProjectGrants,projectAccess,renderProjectsPage} from '../namecheap/server/projects.mjs';
 import {clientAddress,sessionCookie,SESSION_COOKIES,originAllowed} from '../namecheap/server/auth.mjs';
@@ -123,6 +124,19 @@ test('el origen de escritura se compara por host, no por la cadena exacta',()=>{
   assert.equal(originAllowed(post({origin:'https://rivect.net'}),{local:true}),false,'en local no entra el sitio real');
   assert.equal(originAllowed(post({origin:'http://localhost:8080'}),{base:'http://localhost:4180'}),true,'el montaje de LANDUR deduce el modo local del origen base');
   assert.equal(originAllowed({method:'GET',headers:new Headers()}),true,'leer nunca se bloquea');
+});
+test('www redirige al ápex conservando método y ruta, y no copia un destino ajeno',async()=>{
+  const f=await portalFixture();try{
+    const port=f.server.address().port;
+    const call=(method,path,host)=>new Promise((resolve,reject)=>{
+      const req=http.request({port,host:'127.0.0.1',path,method,headers:{host}},res=>{res.resume();res.on('end',()=>resolve({status:res.statusCode,location:res.headers.location}))});
+      req.on('error',reject);req.end();
+    });
+    assert.deepEqual(await call('GET','/login','www.rivect.net'),{status:308,location:'https://rivect.net/login'},'la página de acceso queda en un solo nombre');
+    assert.deepEqual(await call('POST','/auth/login?x=1','www.rivect.net:443'),{status:308,location:'https://rivect.net/auth/login?x=1'},'308 conserva el método y el cuerpo del acceso');
+    assert.equal((await call('GET','/login','rivect.net')).status,200,'el ápex no redirige');
+    assert.equal((await call('GET','//evil.example/x','www.rivect.net')).location,'https://rivect.net/','un destino absoluto no se copia');
+  }finally{await f.close();}
 });
 test('el acceso no falla por entrar con otro nombre del mismo servidor',async()=>{
   const f=await portalFixture();try{

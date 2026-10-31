@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {AuthStore,digest,token,publicUser,clientAddress,sessionCookie,originAllowed} from './auth.mjs';
+import {AuthStore,digest,token,publicUser,clientAddress,sessionCookie,originAllowed,canonicalHost,relativeTarget} from './auth.mjs';
 import {diskBucket} from '../scripts/storage.mjs';
 import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
@@ -102,7 +102,13 @@ export async function readBody(req){
 }
 export function createServer(){return http.createServer(async(req,res)=>{try{
  if(!local&&!['rivect.net','www.rivect.net'].includes((req.headers.host||'').split(':')[0])){res.writeHead(400);res.end('Host no admitido');return}
- if(!local&&req.headers['x-forwarded-proto']==='http'){res.writeHead(308,{Location:'https://rivect.net'+req.url});res.end();return}
+ if(!local&&req.headers['x-forwarded-proto']==='http'){res.writeHead(308,{Location:'https://rivect.net'+relativeTarget(req.url)});res.end();return}
+ // Un solo nombre para el sitio: `www` pasa al ápex con 308, que conserva método y cuerpo, así
+ // el acceso enviado por POST llega al host canónico y la sesión no queda partida en dos.
+ const canonical=canonicalHost(req.headers.host);
+ // El cuerpo que no se lee no debe quedar colgado en la conexión: el cliente reenvía la
+ // petición al destino nuevo.
+ if(canonical){res.writeHead(308,{Location:'https://'+canonical+relativeTarget(req.url),Connection:'close'});res.end();return}
  const read=await readBody(req);
  if(read.aborted){if(!res.destroyed&&!res.writableEnded){res.writeHead(400,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'La solicitud se interrumpió antes de completarse.'}))}return}
  if(read.over){res.writeHead(413,{'Content-Type':'application/json','Cache-Control':'no-store','Connection':'close'});res.end(JSON.stringify({error:'La solicitud supera el tamaño permitido.'}));return}

@@ -124,7 +124,7 @@ Las siguientes rutas están documentadas para el portal existente, pero **son va
 | Git de cPanel | `/usr/local/cpanel/3rdparty/bin/git` |
 | Node 22 candidato | `/opt/alt/alt-nodejs22/root/usr/bin/node` |
 | Otro candidato documentado | `$HOME/nodevenv/rivect-portal/22/bin/node` |
-| Dominio permitido por el código actual | `rivect.net` / `www.rivect.net` |
+| Dominio permitido por el código actual | `rivect.net` / `www.rivect.net` (www responde 308 hacia el ápex, que es el único nombre canónico) |
 | Origen de escritura en modo real | `https://rivect.net` y `https://www.rivect.net` (se compara el host, con https obligatorio) |
 
 En cPanel inspeccionar:
