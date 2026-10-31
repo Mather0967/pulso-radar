@@ -116,7 +116,9 @@ test('el origen de escritura se compara por host, no por la cadena exacta',()=>{
   assert.equal(originAllowed(post({origin:'https://evil.example'})),false,'otro sitio sigue rechazado');
   assert.equal(originAllowed(post({origin:'https://rivect.net.evil.example'})),false,'no alcanza con contener el nombre');
   assert.equal(originAllowed(post({origin:'http://rivect.net'})),false,'en producción se exige https');
-  assert.equal(originAllowed(post({origin:'null'})),false,'un origen opaco no sirve');
+  assert.equal(originAllowed(post({origin:'null'})),false,'un origen opaco sin declaración del navegador no sirve');
+  assert.equal(originAllowed(post({origin:'null','sec-fetch-site':'same-origin'})),true,'Origin null solo se acepta si el navegador declara same-origin');
+  assert.equal(originAllowed(post({origin:'null','sec-fetch-site':'cross-site'})),false,'Origin null con cross-site sigue rechazado');
   assert.equal(originAllowed(post({})),false,'sin Origin ni declaración del navegador se rechaza');
   assert.equal(originAllowed(post({'sec-fetch-site':'cross-site'})),false);
   assert.equal(originAllowed(post({'sec-fetch-site':'same-origin'})),true,'sin Origin, el navegador declara que es del mismo sitio');

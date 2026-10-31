@@ -48,6 +48,9 @@ export function originAllowed(request, { local = false, base = null } = {}) {
   const header = request.headers.get('origin');
   const dev = local || isLoopbackOrigin(base);
   if (header) {
+    if (header === 'null') {
+      return request.headers.get('sec-fetch-site') === 'same-origin';
+    }
     let url; try { url = new URL(header); } catch { return false; }
     if (dev) return LOOPBACK_HOSTS.has(url.hostname);
     return url.protocol === 'https:' && PUBLIC_HOSTS.includes(url.hostname);
