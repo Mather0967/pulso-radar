@@ -197,3 +197,47 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - [x] **Pruebas ejecutadas:** raíz `npm test` → 60/60; `projects/landur` `npm test` → 87/87 (antes 85/87, con las dos de baja de cuentas en rojo).
 - [ ] No se ejecutó el QA de navegador (`npm run test:browser`, `test:portal`) ni se verificó el logotipo renderizado en un navegador real.
 - [ ] Siguen sin resolverse los bloqueos de negocio: política del disponible, reinversión 25 % vs 30 %, muestras reales, despliegue en Namecheap, iPhone real y pentesting. El modo privado sigue requiriendo `LANDUR_PASSWORD` y no siembra datos de demostración.
+
+## Rediseño visual móvil — Etapa A (30/10/2026)
+
+- Hecho: `public/styles.css` reescrito como una sola hoja con tokens (claro y oscuro según el iPhone), piezas comunes y bloque de pantallas heredadas. Pasó de 69 KB a 33 KB. Se corrigió un desborde horizontal en Actividad y el filtro de tipo que se veía en blanco.
+- Evidencia: sin desborde horizontal a 375 px en Inicio, Actividad, Cuentas, Egresos, Ventas, Pendientes y Configuración (medido en navegador); capturas revisadas en móvil oscuro, Inicio y Actividad en claro y Inicio a 1280 px. `npm test` en `projects/landur/`: solo fallan las 3 pruebas ya documentadas de Windows (enlace simbólico, ruta POSIX y `chmod`).
+- No probado: iPhone real, instalación como PWA, dictado real, claro en Cuentas/Configuración/detalle. Etapas B–F (Actividad, Pendientes, Cuentas y detalle, Configuración y acceso, revisión final) pendientes. Sin cambios de lógica financiera ni de backend.
+
+## Rediseño visual móvil — Etapa B: Actividad (30/10/2026)
+
+- Hecho: Movimientos, Egresos y Ventas son una sola pantalla, «Actividad», con filtros Todo / Gastos / Ventas / Otros; lista agrupada por día con signo, categoría y cuenta; estado solo si no está resuelto; búsqueda en un icono; importar y exportar CSV en un menú. Los accesos de «Más» a Egresos y Ventas abren el mismo filtro. Sin cambios de lógica financiera ni de backend.
+- Evidencia (navegador): filtros devuelven 11 gastos, 4 ventas/cobros y 3 de otros tipos sobre 18; la búsqueda filtra; el menú abre la importación; sin desborde horizontal a 375 px; capturas en móvil oscuro y claro y en 1280 px.
+- No probado: iPhone real, exportación de archivo, importación completa, detalle de operación (sigue como diálogo; pasa a hoja en la etapa D).
+
+## Rediseño visual móvil — Etapa C: Pendientes (30/10/2026)
+
+- Hecho: Pendientes es una sola lista agrupada: dos totales (por pagar, por cobrar) y los grupos Vencidas, Próximas, Por cobrar y Para revisar (duplicados, cuentas sin verificar, registros sin comprobante). Los grupos vacíos no aparecen; cada fila trae su acción (Pagar o Cobrar) y abre el flujo en pasos. Las decisiones abiertas y los duplicados se leen en hojas, con el mismo texto de antes. Sin cambios de lógica financiera ni de backend.
+- Evidencia (navegador, datos sintéticos): con una obligación vencida, una próxima, una venta por cobrar y un par duplicado aparecen los cuatro grupos; «Pagar» abre el registro de pago con la obligación y pregunta la cuenta; la fila abre el detalle; las hojas de reglas y de duplicados abren; sin desborde horizontal a 375 px; revisado en móvil claro y oscuro.
+- No probado: iPhone real, escritorio ancho de esta pantalla, estado sin ningún pendiente.
+
+## Rediseño visual móvil — Etapa D: Cuentas y detalle (30/10/2026)
+
+- Hecho: Cuentas muestra el total registrado y una fila por cuenta; tocarla abre una hoja con saldo, apertura (verificada o no), fondos, «Datos técnicos» plegados y, dentro, «Ver movimientos» y «Eliminar cuenta». «+ Agregar» abre la creación de cuenta en pasos. El detalle de una operación pasó a la misma estructura: importe grande, estado, solo los datos que existen, movimientos de cuenta, operaciones vinculadas, comprobantes y acciones al pie; origen, referencia externa e identificador quedan en «Datos técnicos». «Ver movimientos» usa la lista agrupada de Actividad. Sin cambios de lógica financiera ni de backend.
+- Evidencia (navegador, datos sintéticos): recorrido de las siete pantallas y de todas las hojas sin errores de JavaScript; la hoja de cuenta lista 13 movimientos de Santander; «Eliminar cuenta» abre su diálogo con opciones; el detalle de una obligación ofrece registrar pago, eliminar y adjuntar; sin desborde horizontal a 375 px. Durante la etapa se perdieron por error cuatro definiciones de Actividad; se detectó con la consola del navegador y se restauraron.
+- No probado: iPhone real, claro en estas pantallas, escritorio ancho, eliminar una cuenta hasta el final, adjuntar un comprobante desde el detalle.
+
+## Rediseño visual móvil — Etapa E: Configuración y acceso (30/10/2026)
+
+- Hecho: Configuración es una lista de ajustes en tres grupos (Datos: importar y exportar CSV; App: instalar en el iPhone y cerrar sesión; Información: alcance del servicio y registro de actividad). Los textos largos pasaron a hojas con el mismo contenido de antes. El acceso comparte tipografía y colores con la app y su cabecera de marca es compacta en móvil. Sin cambios de lógica financiera ni de backend.
+- Corregidos dos manejadores duplicados del cliente que fallaban en silencio: el botón Importar llamaba a `opendialog` (con minúscula) y «Cerrar sesión» hacía un GET a una ruta que solo acepta POST. El comportamiento visible no cambia: el diálogo y el cierre de sesión funcionan por el otro manejador.
+- Evidencia (navegador, datos sintéticos): las seis filas de Configuración abren su hoja o diálogo; entrar a la demo, cerrar sesión desde Configuración y volver al acceso sin errores de JavaScript; sin desborde horizontal a 375 px; acceso revisado en móvil oscuro y claro.
+- Hallazgo de backend, SIN corregir (pendiente de aprobación): `Ledger.purgeDemoWorkspaces()` borra `operations` antes que `evidence`, y SQLite rechaza el borrado por clave foránea cuando un espacio demo vencido tiene comprobantes adjuntos. Efecto: `/api/demo` responde 500 hasta vaciar la base de demostración. Solo afecta al modo demo; el espacio privado no usa esa función. Arreglo propuesto: borrar `evidence` antes que `operations` en esa función, con una prueba que lo cubra.
+- No probado: iPhone real, claro y escritorio ancho de Configuración, importación y exportación de punta a punta.
+
+## Corrección de backend: limpieza de espacios demo (30/10/2026)
+
+- Aprobada por el usuario. `Ledger.purgeDemoWorkspaces()` ahora borra `evidence` antes que `operations`; antes SQLite rechazaba el borrado por clave foránea si un espacio demo vencido tenía comprobantes adjuntos y `/api/demo` respondía 500. Un solo cambio de orden, sin tocar reglas financieras ni el espacio privado.
+- Evidencia: prueba nueva en `tests/ledger.test.mjs` («limpieza de demos…»): falla sin el arreglo con `FOREIGN KEY constraint failed` y pasa con él; también cubre una reversión y que el espacio no demo sobrevive. Suite completa de `projects/landur/`: solo fallan las 3 pruebas ya documentadas de Windows. De punta a punta contra el servidor local: entrar a la demo, adjuntar un comprobante, cerrar sesión y volver a entrar a la demo responde 200.
+
+## Rediseño visual móvil — Etapa F: revisión final (30/10/2026)
+
+- Hecho: revisión de las siete pantallas y del registro en móvil (375 px) en claro y oscuro, y de Inicio, Actividad, Pendientes, Cuentas y Configuración en escritorio (1280 px). Se agrandaron a 44 px el botón «ⓘ» del saldo y las acciones Pagar/Cobrar de Pendientes. En claro se oscurecieron el gris secundario, el verde, el ámbar, el rojo y el azul de texto para llegar a contraste AA (≥ 4,5:1; antes 3,7–4,4).
+- Evidencia (medida en navegador sobre cada pantalla, claro y oscuro): sin desborde horizontal, sin controles táctiles bajo 40 px, sin texto bajo AA y sin errores de JavaScript. `npm test` en la raíz: 78/78. `node --test` en `projects/landur/`: 89/92; fallan solo las 3 pruebas de Windows ya documentadas.
+- No probado: iPhone real (Safari y PWA instalada), dictado de voz real, teclado real con las hojas abiertas, importar y exportar de punta a punta, claro en el escritorio ancho.
+- Quitado antes del commit el botón «Entrar a la demo» de `public/app.js` (era solo para ver la demo en local). Pendiente: decidir si se elimina el código del formulario antiguo, que ya no se alcanza desde la interfaz.
