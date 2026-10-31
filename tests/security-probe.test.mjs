@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import {randomUUID} from 'node:crypto';
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
 const rawRequest = (port, payload) => new Promise((resolve, reject) => {
@@ -286,6 +287,87 @@ test('LANDUR trae su propio acceso: nada del ecosistema y las credenciales de la
     const deniedHtml = await denied.text();
     assert.match(deniedHtml, /LANDUR no está habilitado/);
     assert.doesNotMatch(deniedHtml, /type="password"/, 'no se pide contraseña a quien ya tiene sesión');
+  } finally { await f.close(); }
+});
+
+// Metodología de `offensive-business-logic` y `offensive-api-security`: cada caso ataca una
+// regla del negocio (importes, monedas, carreras, asignación masiva) y no la implementación.
+test('lógica de negocio: importes, monedas y carreras no permiten fabricar dinero', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const send = (body, extra = {}) => f.request('/landur/api/commands', {method: 'POST', cookie, csrf, body, headers: {'Idempotency-Key': randomUUID()}, ...extra});
+    const account = (extra = {}) => send({kind: 'account', name: 'Caja', accountKind: 'cash', currency: 'UYU', opening: '1000', cutoff: '2026-10-01', verified: true, accessible: true, ...extra});
+    const a = (await (await account({name: 'Caja A'})).json()).id;
+    for (const [label, body] of Object.entries({
+      'importe negativo': {kind: 'expense', concept: 'x', amount: '-100', currency: 'UYU', date: '2026-10-24', accountId: a},
+      'importe cero': {kind: 'expense', concept: 'x', amount: '0', currency: 'UYU', date: '2026-10-24', accountId: a},
+      'decimales de más': {kind: 'expense', concept: 'x', amount: '1.001', currency: 'UYU', date: '2026-10-24', accountId: a},
+      'moneda inventada': {kind: 'expense', concept: 'x', amount: '100', currency: 'EUR', date: '2026-10-24', accountId: a},
+      'fecha anterior al corte': {kind: 'expense', concept: 'x', amount: '100', currency: 'UYU', date: '2020-01-01', accountId: a},
+      'tipo de operación inventado': {kind: 'commission', concept: 'x', amount: '100', currency: 'UYU', date: '2026-10-24', accountId: a},
+      'transferencia a la misma cuenta': {kind: 'transfer', concept: 'x', amount: '100', currency: 'UYU', date: '2026-10-24', accountId: a, toAccountId: a},
+    })) assert.equal((await send(body)).status, 400, label);
+    // Asignación masiva: los campos internos del registro se ignoran, no se copian.
+    const forged = await (await account({name: 'Caja inyectada', id: '11111111-1111-1111-1111-111111111111', workspace: 'otro', balance: '999999999', demo: true, opening: '0'})).json();
+    assert.notEqual(forged.id, '11111111-1111-1111-1111-111111111111', 'el id lo elige el servidor');
+    const state = await (await f.request('/landur/api/state', {cookie})).json();
+    assert.equal(state.accounts.find(x => x.id === forged.id).balance, 0, 'nadie puede regalarse saldo');
+    assert.equal(state.accounts.find(x => x.id === forged.id).workspace, 'landur', 'el espacio no se puede cambiar');
+    // Carrera: cinco cobros simultáneos del total de una venta. Solo uno aplica.
+    const sale = (await (await send({kind: 'sale', concept: 'Venta', amount: '1000', currency: 'UYU', date: '2026-10-24'})).json()).id;
+    const raced = await Promise.all([1, 2, 3, 4, 5].map(() => send({kind: 'collection', concept: 'Cobro', amount: '1000', currency: 'UYU', date: '2026-10-24', accountId: a, targetId: sale, commission: '0'})));
+    assert.equal(raced.filter(r => r.status === 200).length, 1, 'una sola cobranza puede aplicar el total');
+    assert.ok(raced.every(r => r.status === 200 || r.status === 409), 'las perdedoras se rechazan con conflicto');
+    const after = await (await f.request('/landur/api/state', {cookie})).json();
+    assert.equal(after.operations.find(o => o.id === sale).applied, 100000, 'lo aplicado no supera el total de la venta');
+    assert.equal(after.accounts.find(x => x.id === a).balance, 200000, 'el saldo refleja un solo cobro');
+    // Carrera: dos reversiones simultáneas de la misma operación.
+    const expense = (await (await send({kind: 'expense', concept: 'Gasto', amount: '500', currency: 'UYU', date: '2026-10-24', accountId: a})).json()).id;
+    const reversals = await Promise.all([1, 2].map(() => send({kind: 'reversal', operationId: expense, date: '2026-10-24'})));
+    assert.deepEqual(reversals.map(r => r.status).sort(), [200, 409], 'la segunda reversión no duplica el contra-asiento');
+    // Baja con movimientos: sin decisión explícita no se borra nada.
+    assert.equal((await send({kind: 'account.delete', accountId: a})).status, 409, 'una cuenta con historial no se borra por omisión');
+    assert.equal((await send({kind: 'account.delete', accountId: a, mode: 'purge'})).status, 400, 'el borrado total exige confirmación');
+    assert.ok((await (await f.request('/landur/api/state', {cookie})).json()).accounts.some(x => x.id === a));
+  } finally { await f.close(); }
+});
+
+// `offensive-api-security` (API3/API8) y `offensive-business-logic` (inyección en exportaciones):
+// nada de lo que escribe el usuario debe llegar activo al navegador ni a una hoja de cálculo.
+test('lo que escribe el usuario no se ejecuta: CSV, login y cabeceras', async () => {
+  const f = await portalFixture();
+  try {
+    const {cookie, csrf} = await f.login('landur');
+    const send = body => f.request('/landur/api/commands', {method: 'POST', cookie, csrf, body, headers: {'Idempotency-Key': randomUUID()}});
+    const a = (await (await send({kind: 'account', name: 'Caja', accountKind: 'cash', currency: 'UYU', opening: '1000', cutoff: '2026-10-01', verified: true, accessible: true})).json()).id;
+    for (const concept of ['=HYPERLINK("http://evil","x")', '+1+1', '@SUM(1+1)', '-2+3', '=cmd|" /C calc"!A0']) {
+      assert.equal((await send({kind: 'expense', concept, amount: '1', currency: 'UYU', date: '2026-10-24', accountId: a})).status, 200);
+    }
+    const csv = await (await f.request('/landur/api/export.csv', {cookie})).text();
+    for (const line of csv.split('\r\n').slice(1)) {
+      if (!line) continue;
+      assert.doesNotMatch(line, /(^|,)"\s*[=+@-]/, 'ninguna celda empieza con un carácter de fórmula');
+    }
+    // La pantalla de acceso no refleja el parámetro de error: solo muestra textos fijos.
+    for (const value of ['<script>alert(1)</script>', '"><img src=x onerror=alert(1)>']) {
+      const html = await (await f.request('/landur/login?e=' + encodeURIComponent(value))).text();
+      assert.ok(!html.includes('onerror'), 'el error no se refleja en el HTML');
+      assert.ok(!html.includes('<script'), 'la pantalla de acceso no incluye scripts en línea');
+    }
+    // Cabeceras del comprobante: el nombre no puede partir la respuesta.
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+    const operation = (await (await send({kind: 'expense', concept: 'evidencia', amount: '5', currency: 'UYU', date: '2026-10-24', accountId: a})).json()).id;
+    const upload = await f.request('/landur/api/evidence', {method: 'POST', cookie, csrf, headers: {'Idempotency-Key': randomUUID()}, body: {operationId: operation, name: 'factura "rara"\r\nX-Injected: 1.png', mime: 'image/png', data: png.toString('base64')}});
+    assert.equal(upload.status, 200, 'la imagen válida se acepta aunque el nombre traiga saltos de línea');
+    const file = await f.request('/landur/api/evidence/' + (await upload.json()).id, {cookie});
+    assert.equal(file.headers.get('x-injected'), null, 'el nombre no crea cabeceras nuevas');
+    assert.match(file.headers.get('content-disposition') || '', /^inline; filename\*=UTF-8''/);
+    assert.equal(file.headers.get('x-content-type-options'), 'nosniff');
+    // Endurecimiento de sesión: sin autenticación por cabecera, sin override de método.
+    assert.equal((await f.request('/landur/api/state', {headers: {'Authorization': 'Bearer ' + csrf}})).status, 401, 'no hay autenticación por Bearer');
+    assert.equal((await f.request('/landur/api/state', {cookie, headers: {'X-HTTP-Method-Override': 'DELETE'}})).status, 200, 'el override de método se ignora');
+    assert.equal((await f.request('/landur/api/state', {cookie: 'rivect_session=basura; ' + cookie})).status, 401, 'una galleta duplicada basura anula la válida, como en cualquier servidor');
   } finally { await f.close(); }
 });
 
