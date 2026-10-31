@@ -145,8 +145,11 @@ test('métodos raros, cuerpos enormes y tipos de contenido inesperados se rechaz
         assert.ok(![200, 201].includes(response.status) || method === 'OPTIONS', `${method} ${path} devolvió ${response.status}`);
       }
     }
+    // El rechazo tiene que llegar como respuesta legible: responder y cortar el socket en
+    // mitad de la subida hace que el cliente lo vea como error de red, no como 413.
     const big = await f.request('/landur/api/commands', {method: 'POST', cookie, csrf, raw: 'x'.repeat(4_000_000)});
     assert.equal(big.status, 413, 'un cuerpo de 4 MB debe cortarse');
+    assert.match(await big.text(), /tamaño permitido/, 'el 413 debe poder leerse del otro lado');
     const wrongType = await f.request('/landur/api/commands', {method: 'POST', cookie, csrf, headers: {'Content-Type': 'text/plain'}, body: {kind: 'x'}});
     assert.equal(wrongType.status, 415, 'se exige JSON explícito');
     for (const raw of ['{', 'null', '[]', '"texto"', '{"kind":null}']) {

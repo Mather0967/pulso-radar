@@ -84,12 +84,29 @@ async function route(req,ip){
  const headers=new Headers(req.headers);headers.delete('oai-authenticated-user-id');headers.set('oai-authenticated-user-id','project-pulso');
  return worker.fetch(new Request(req.url,{method,headers,...(!['GET','HEAD'].includes(method)?{body:await req.arrayBuffer()}:{})}),env,{waitUntil:p=>p.catch(()=>{})});
 }
+// Lee el cuerpo con un tope. Al pasarse del límite se sigue drenando hasta un techo en vez
+// de cortar el socket: si se responde 413 en mitad de la subida, el cliente no llega a leer
+// la respuesta y el error se ve como «fetch failed» (Node 22 lo hace; Node 24 lo tapaba).
+const BODY_LIMIT=3300000,BODY_DRAIN=16000000;
+export async function readBody(req){
+ const chunks=[];let size=0,over=false;
+ try{
+  for await(const chunk of req){
+   size+=chunk.length;
+   if(size>BODY_LIMIT){over=true;if(size>BODY_DRAIN){req.destroy();return {aborted:true,over:true}}continue}
+   chunks.push(chunk);
+  }
+ }catch{return {aborted:true,over:size>BODY_LIMIT}}
+ return over?{over:true}:{body:Buffer.concat(chunks)};
+}
 export function createServer(){return http.createServer(async(req,res)=>{try{
  if(!local&&!['rivect.net','www.rivect.net'].includes((req.headers.host||'').split(':')[0])){res.writeHead(400);res.end('Host no admitido');return}
  if(!local&&req.headers['x-forwarded-proto']==='http'){res.writeHead(308,{Location:'https://rivect.net'+req.url});res.end();return}
- const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>3300000){res.writeHead(413);res.end('Solicitud demasiado grande');return}chunks.push(c)}
+ const read=await readBody(req);
+ if(read.aborted){if(!res.destroyed&&!res.writableEnded){res.writeHead(400,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'La solicitud se interrumpió antes de completarse.'}))}return}
+ if(read.over){res.writeHead(413,{'Content-Type':'application/json','Cache-Control':'no-store','Connection':'close'});res.end(JSON.stringify({error:'La solicitud supera el tamaño permitido.'}));return}
  const headers=new Headers();for(const [k,v]of Object.entries(req.headers))if(v)headers.set(k,Array.isArray(v)?v.join(','):v);
- const request=new Request(new URL(req.url,origin),{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(chunks)}:{})});  const r=await route(request,clientAddress({peer:req.socket.remoteAddress,forwarded:req.headers['x-forwarded-for']}));
+ const request=new Request(new URL(req.url,origin),{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:read.body}:{})});  const r=await route(request,clientAddress({peer:req.socket.remoteAddress,forwarded:req.headers['x-forwarded-for']}));
  const secure={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://generativelanguage.googleapis.com; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};if(!local)secure['Strict-Transport-Security']='max-age=31536000';
  res.writeHead(r.status,{...secure,...Object.fromEntries(r.headers)});res.end(req.method==='HEAD'?undefined:Buffer.from(await r.arrayBuffer()));
  }catch(e){console.error('Request failed:',e.message);res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'No se pudo completar la operación.'}))}}).on('close',()=>landur.close())}
