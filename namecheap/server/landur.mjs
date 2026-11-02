@@ -23,7 +23,8 @@ const publicBrand = new Set(['/wordmark.png','/icon-192.png','/icon-512.png','/a
 // El acceso (`/landur/login`, `/landur/api/login`, `/landur/api/logout`) es propio de este
 // módulo y no se comparte con el servidor autónomo, que usa una contraseña única local.
 export const portalApiRoutes=['GET /api/session','GET /api/state','GET /api/export.csv','GET /api/evidence/*',
-  'POST /api/commands','POST /api/import/preview','POST /api/import/commit','POST /api/evidence'];
+  'POST /api/commands','POST /api/import/preview','POST /api/import/commit','POST /api/evidence',
+  'GET /api/connections','POST /api/connections','POST /api/sync/shopify','POST /api/sync/meta'];
 export const landurLoginPath='/landur/login';
 const actualPath=path=>existsSync(path)?realpathSync(path):resolve(actualPath(dirname(path)),basename(path));
 const within=(parent,child)=>{const rel=relative(parent,child);return rel===''||(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith(`..${sep}`));};
@@ -96,10 +97,11 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       const {Ledger}=await import(pathToFileURL(resolve(root,'server/ledger.mjs')));
       const {exportOperations}=await import(pathToFileURL(resolve(root,'server/csv.mjs')));
       const {createRateLimiter}=await import(pathToFileURL(resolve(root,'server/limits.mjs')));
+      const {createIntegrations}=await import(pathToFileURL(resolve(root,'server/integrations.mjs')));
       await mkdir(directory,{recursive:true,mode:0o700});
       const filename=resolve(directory,'landur.sqlite');
       ledger=new Ledger(filename);await chmod(filename,0o600);ledger.workspace('landur');
-      return {ledger,exportOperations,limiter:createRateLimiter({limit:30,windowMs:60*1000}),
+      return {ledger,exportOperations,connections:createIntegrations(),limiter:createRateLimiter({limit:30,windowMs:60*1000}),
         // Todo comando cuenta contra un tope por usuario: sin esto una sesión válida podía
         // escribir sin límite y hacer crecer la base y la tabla de idempotencia.
         commandLimiter:createRateLimiter({limit:120,windowMs:60*1000}),
@@ -190,28 +192,29 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     }
     // El identificador del comprobante tiene que tener forma de UUID: nada de rutas armadas por el cliente.
     const evidenceId=/^\/api\/evidence\/[A-Za-z0-9-]{1,64}$/.test(path)?path.slice('/api/evidence/'.length):null;
-    if(evidenceId===null&&!['/api/state','/api/export.csv','/api/commands','/api/import/preview','/api/import/commit','/api/evidence'].includes(path))return json({error:'Ruta no encontrada.'},404);
+    if(evidenceId===null&&!['/api/state','/api/export.csv','/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta'].includes(path))return json({error:'Ruta no encontrada.'},404);
     try{
-      if(method==='GET'&&(evidenceId!==null||['/api/state','/api/export.csv'].includes(path))){
-        const {ledger,exportOperations}=await engine();const snapshot=ledger.snapshot('landur');
+      if(method==='GET'&&(evidenceId!==null||['/api/state','/api/export.csv','/api/connections'].includes(path))){
+        const {ledger,exportOperations,connections}=await engine();const snapshot=ledger.snapshot('landur');
         if(evidenceId!==null){
           const file=ledger.evidenceFile('landur',evidenceId);
           return new Response(file.content,{headers:{'Content-Type':file.mime,'Cache-Control':'no-store','Content-Length':String(file.content.length),'Content-Disposition':`${file.mime==='application/pdf'?'attachment':'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`}});
         }
         if(path==='/api/export.csv')return new Response(exportOperations(snapshot),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'no-store','Content-Disposition':'attachment; filename="landur-operaciones.csv"'}});
+        if(path==='/api/connections')return json(connections.status(ledger,'landur'));
         return json({...snapshot,demo:false,portal:true,actor:user.name,access});
       }
-      if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence'].includes(path)){
+      if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta'].includes(path)){
         if(!req.headers.get('content-type')?.startsWith('application/json')||req.headers.get('x-landur-request')!=='1')return json({error:'Se requiere una solicitud JSON de la aplicación.'},415);
         const bytes=new Uint8Array(await req.arrayBuffer());
         const limit=path==='/api/commands'?16384:path==='/api/evidence'?2400000:131072;
         if(bytes.length>limit)return json({error:'La solicitud supera el tamaño permitido.'},413);
         let input;try{input=JSON.parse(new TextDecoder().decode(bytes))}catch{return json({error:'JSON inválido.'},400);}
         if(!input||typeof input!=='object'||Array.isArray(input))return json({error:'Se requiere un objeto JSON.'},400);
-        const {ledger,limiter,commandLimiter,reauthLimiter}=await engine();
+        const {ledger,limiter,commandLimiter,reauthLimiter,connections}=await engine();
         // Mismo tope por sesión que el servidor autónomo: la clave es el usuario del portal.
         if(path==='/api/commands')commandLimiter.check(user.id);
-        if(['/api/import/preview','/api/import/commit','/api/evidence'].includes(path))limiter.check(user.id);
+        if(['/api/import/preview','/api/import/commit','/api/evidence','/api/sync/shopify','/api/sync/meta'].includes(path))limiter.check(user.id);
         // Borrar una cuenta junto con su historial exige reconfirmar la contraseña y escribir
         // el nombre de la cuenta. La contraseña se verifica acá y no entra al asiento ni a la
         // clave de idempotencia: se descarta del objeto antes de ejecutar el comando.
@@ -223,6 +226,8 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
         }
         if(path==='/api/import/preview')return json(ledger.previewImport('landur',user.id,input.csv));
         if(path==='/api/evidence')return json(ledger.attachEvidence('landur',user.id,req.headers.get('idempotency-key'),input));
+        if(path==='/api/connections')return json(connections.save(ledger,'landur',user.id,input));
+        if(path.startsWith('/api/sync/'))return json(await connections.sync(ledger,'landur',user.id,path.slice('/api/sync/'.length),input));
         if(path==='/api/commands'&&input.kind==='import')return json({error:'Usá la importación con vista previa.'},400);
         return json(ledger.command('landur',user.id,req.headers.get('idempotency-key'),path==='/api/import/commit'?{kind:'import',csv:input.csv}:input));
       }
