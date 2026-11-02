@@ -8,6 +8,7 @@ const scryptKey = (password, salt, size = 64) => new Promise((resolve, reject) =
 import { DomainError } from './ledger.mjs';
 import { exportOperations } from './csv.mjs';
 import { createRateLimiter } from './limits.mjs';
+import { createIntegrations } from './integrations.mjs';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const assets = new Map([
@@ -31,7 +32,8 @@ const digest = text => createHash('sha256').update(text).digest('hex');
 // la aplicación en pantalla en blanca en producción.
 export const appApiRoutes = ['GET /api/session','POST /api/demo','POST /api/login','POST /api/logout',
   'GET /api/state','GET /api/export.csv','GET /api/evidence/*','POST /api/evidence',
-  'POST /api/import/preview','POST /api/import/commit','POST /api/commands'];
+  'POST /api/import/preview','POST /api/import/commit','POST /api/commands',
+  'GET /api/connections','POST /api/connections','POST /api/sync/shopify','POST /api/sync/meta'];
 // El proxy del propio host (Passenger/Apache) siempre conecta desde loopback, así que
 // ahí X-Forwarded-For es confiable y se toma el último salto: el que agrega el proxy
 // inmediato. Un cliente directo nunca llega desde loopback y no puede falsearla.
@@ -50,6 +52,7 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
   const salt = randomBytes(32), passwordHash = password ? scryptKey(password, salt) : null;
   passwordHash?.catch(() => {});
   const attempts = new Map();
+  const connections = createIntegrations();
   ledger.db.exec(`CREATE TABLE IF NOT EXISTS sessions (
     hash TEXT PRIMARY KEY, workspace TEXT NOT NULL, actor TEXT NOT NULL, expires INTEGER NOT NULL, mode TEXT NOT NULL
   )`);
@@ -218,6 +221,17 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
           const input = await body(req);
           if (input.kind === 'import') throw new DomainError('Usá la importación con vista previa.');
           return json(res,200,ledger.command(s.workspace,s.actor,req.headers['idempotency-key'],input));
+        }
+        // Conexiones y sincronía con proveedores: solo la sesión, con el mismo
+        // tope por sesión que la importación, porque cada sincronía escribe un lote.
+        if (req.method === 'GET' && url.pathname === '/api/connections')
+          return json(res,200,connections.status(ledger,s.workspace));
+        if (req.method === 'POST' && url.pathname === '/api/connections')
+          return json(res,200,connections.save(ledger,s.workspace,s.actor,await body(req)));
+        if (req.method === 'POST' && ['/api/sync/shopify','/api/sync/meta'].includes(url.pathname)) {
+          bulkLimiter.check(s.hash);
+          const kind = url.pathname === '/api/sync/shopify' ? 'shopify' : 'meta';
+          return json(res,200,await connections.sync(ledger,s.workspace,s.actor,kind,await body(req)));
         }
         throw new DomainError('Ruta no disponible.',404);
       }

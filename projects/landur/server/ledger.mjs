@@ -88,6 +88,14 @@ export const MIGRATIONS = [
       bytes INTEGER NOT NULL CHECK(bytes > 0), sha256 TEXT NOT NULL, content BLOB NOT NULL,
       created_at TEXT NOT NULL, actor TEXT NOT NULL
     )`);
+  },
+  db => {
+    // Conexiones externas por espacio (Shopify, Meta Ads). El token vive solo acá,
+    // dentro del mismo archivo privado que los movimientos y los comprobantes.
+    db.exec(`CREATE TABLE IF NOT EXISTS connections (
+      workspace TEXT NOT NULL REFERENCES workspaces(id), name TEXT NOT NULL,
+      config TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace, name)
+    )`);
   }
 ];
 export class Ledger {

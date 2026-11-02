@@ -167,6 +167,17 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .settings-stack{display:grid;gap:18px}
 .settings-stack .card{padding:20px}
 .settings-stack .card p{margin:8px 0 14px;font-size:14px;line-height:1.7;color:var(--secundario)}
+/* Conexiones externas: misma jerarquía que una fila de ajustes, con una línea fina por servicio. */
+.settings-stack .conn{display:flex;flex-direction:column;gap:14px;padding:18px 0;border-top:1px solid var(--linea-suave)}
+.settings-stack .conn:first-child{border-top:0;padding-top:0}
+.settings-stack .conn .card-head{padding:0}
+.settings-stack .conn .card-head h2{font-size:16px}
+.settings-stack .conn .card-head p{margin:4px 0 0;font-size:13px}
+.conn-note{font-size:12px;line-height:1.65;color:var(--secundario);overflow-wrap:anywhere}
+.conn-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.conn-actions{display:flex;gap:8px;margin-left:auto}
+.conn-actions .mini-button,.conn-actions .primary{min-height:var(--toque)}
+.conn .form-note{margin:0}
 .empty{padding:36px 24px;text-align:center;font-size:14px;line-height:1.7;color:var(--secundario)}
 .empty svg{display:block;width:28px;height:28px;margin:0 auto 14px}
 .empty h2{margin-bottom:8px;font-size:20px;color:var(--tinta)}

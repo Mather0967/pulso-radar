@@ -18,7 +18,7 @@ const paths = {
  cash:'M3 6h18v13H3V6m9 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 12h.1M18 12h.1',wallet:'M3 6h16v14H3V6m0 0 14-3v3m-2 5h6v5h-6v-5',
  close:'m6 6 12 12M6 18 18 6',logout:'M10 4H4v16h6m-1-8h12m-4-4 4 4-4 4',download:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',
  more:'M5 12h.1M12 12h.1M19 12h.1',refresh:'M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 7M4 12l2 7a8 8 0 0 0 13-3',
- phone:'M7 2h10v20H7V2m4 17h2',info:'M12 11v6m0-10h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',shield:'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3m-4 9 3 3 5-6',mic:'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3'
+ phone:'M7 2h10v20H7V2m4 17h2',info:'M12 11v6m0-10h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',shield:'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3m-4 9 3 3 5-6',mic:'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3',plug:'M9 3v6m6-6v6M7 9h10v3a5 5 0 0 1-10 0V9m5 8v4'
 };
 const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.expense}"/></svg>`;
 const labels = {expense:'Gasto pagado',obligation:'Obligación',payment:'Pago',sale:'Venta',collection:'Cobro',commission:'Comisión',transfer:'Transferencia',withdrawal:'Retiro personal',account:'Cuenta'};
@@ -102,6 +102,7 @@ function render() {
     const policyBtn=event.target.closest('[data-action="policy"]'); if(policyBtn){openDialog('Disponible estimado','Reglas pendientes','<div class="rule-list"><div class="rule-item"><strong>Regla aún no activada</strong><p>El cálculo de disponible descontando obligaciones, retiros y reservas todavía no tiene regla definida. Hasta tanto, el valor muestra «Por validar».</div></div>');return;}
     const updateBtn=event.target.closest('[data-action="update"]'); if(updateBtn){return;}
     const menuBtn=event.target.closest('[data-action="menu"]'); if(menuBtn)openMenu('Tu espacio','Elegí una sección.',`<div class="dialog-body settings-stack">${['accounts','expenses','sales','settings'].map(k=>`<button class="secondary" data-view="${k}">${icon(viewIcons[k])} ${viewLabels[k]}</button>`).join('')}</div>`);
+    const connectionsBtn=event.target.closest('[data-action="connections"]'); if(connectionsBtn){openConnections();return;}
     const launchBtn=event.target.closest('[data-action="experiments"]'); if(launchBtn){const base=`${location.origin}${location.pathname}`;const side=`${base}side-by-side/qa.html`;window.open(side,'_blank');return;}
   });
   app.addEventListener('click',event=>{const viewBtn=event.target.closest('[data-view]');if(viewBtn){view=viewBtn.getAttribute('data-view');actOther=false;render();};});
@@ -226,9 +227,112 @@ function settings(){
   const group=(title,body)=>`<section class="hm-sec"><div class="hm-head"><h2>${title}</h2></div>${body}</section>`;
   return `<div class="hm st">
     ${group('Datos',item('wallet','up','Importar CSV','Plantilla acotada, con vista previa','data-action="import"')+item('cash','download','Exportar CSV','Todas las operaciones','data-action="export"'))}
+    ${group('Integraciones',item('cash','plug','Conexiones','Ventas de Shopify y egresos de Meta Ads','data-action="connections"'))}
     ${group('App',item('wallet','phone','Instalar en el iPhone','Desde Safari, con conexión','data-action="install"')+item('bank','logout','Cerrar sesión','Salir de este dispositivo','data-action="logout"',true))}
     ${group('Información',item('wallet','shield','Alcance del servicio','Qué hace y qué no hace esta versión','data-action="scope"')+item('wallet','info','Registro de actividad',`${state.audit.length?state.audit.length+' eventos':'Sin actividad todavía'}`,'data-action="audit"'))}
   </div>`;
+}
+// Conexiones externas: Shopify (ventas) y Meta Ads (egresos). El token se escribe una vez
+// y viaja solo al servidor, que lo guarda en la base privada del espacio: la vista nunca lo
+// recibe de vuelta, solo su máscara. Sincronizar es idempotente (origen + referencia externa),
+// así que repetir la corrida no duplica ventas ni gastos: se informan como omitidos.
+let connections = null;
+const CURRENCIES = ['UYU','USD','BRL'];
+const connectionKinds = {
+  shopify: {title:'Shopify', note:'Cada orden paga entra como venta y su cobro con la comisión indicada.'},
+  meta: {title:'Meta Ads', note:'El gasto diario de cada campaña entra como egreso, en la moneda del ad account.'}
+};
+function connectionAccounts(current){
+  const list = state.accounts.filter(a => !current?.currency || a.currency === current.currency);
+  return list.length
+    ? list.map(a => `<option value="${escape(a.id)}" ${a.id === current?.accountId ? 'selected' : ''}>${escape(a.name)} · ${a.currency}</option>`).join('')
+    : '<option value="">No hay cuentas en esa moneda</option>';
+}
+function connectionBlock(kind){
+  const {title, note} = connectionKinds[kind];
+  const current = connections?.[kind] || {};
+  const connected = Boolean(current.configured);
+  const editable = state.access !== 'viewer';
+  const off = editable ? '' : 'disabled';
+  const fields = kind === 'shopify' ? `
+      <label class="field wide">Tienda<small>El dominio que muestra el admin de Shopify.</small><input name="domain" value="${escape(current.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" ${off}></label>
+      <label class="field">Moneda de la tienda<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+      <label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(current.commission ?? '0')}" maxlength="12" ${off}></label>` : `
+      <label class="field wide">Cuenta publicitaria<small>El número que en Meta aparece como act_&lt;número&gt;.</small><input name="adAccountId" value="${escape(current.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
+  const status = connected
+    ? `Conectado · token ${escape(current.tokenMask || 'guardado')}${current.lastSync ? ` · última sincronía ${dateFmt(current.lastSync.slice(0,10))}` : ''}`
+    : 'Sin conectar. Guardá los datos para habilitar la sincronía.';
+  return `<form class="conn" data-connection="${kind}">
+    <div class="card-head"><div><h2>${title}</h2><p>${note}</p></div>${pill(connected ? 'Conectado' : 'Sin conectar', connected ? 'green' : 'gray')}</div>
+    <div class="form-grid">${fields}
+      <label class="field wide">Cuenta donde se registra<select name="accountId" ${off}>${connectionAccounts(current)}</select></label>
+      <label class="field wide">Token de acceso<input name="accessToken" type="password" autocomplete="off" maxlength="2048" placeholder="${connected ? 'Dejar en blanco conserva el token guardado' : kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label>
+      <p class="form-note">${kind === 'shopify' ? 'Necesita una app privada con permiso de lectura de órdenes. Se cargan las órdenes pagas del período; las de prueba, canceladas y reintegradas se omiten con su contador.' : 'Necesita un token de System User con permiso ads_read. El día en curso no está consolidado en Meta: la ventana cierra ayer.'}</p>
+    </div>
+    <p class="conn-note" data-connection-status="${kind}" role="status">${status}</p>
+    <p class="error" data-connection-error="${kind}" role="alert"></p>
+    <div class="conn-foot"><span class="conn-note">Repetir la sincronía no duplica registros.</span><div class="conn-actions"><button type="button" class="mini-button" data-connection-sync="${kind}" ${connected && editable ? '' : 'disabled'}>Sincronizar</button><button type="submit" class="primary" ${off}>Guardar</button></div></div>
+  </form>`;
+}
+const connectionsBody = () => `<div class="settings-stack">${connectionBlock('shopify')}${connectionBlock('meta')}</div>`;
+async function loadConnections(){
+  const body = $('#connections-body');
+  if (!body) return;
+  try { connections = await api('/api/connections'); body.innerHTML = connectionsBody(); wireConnections(); }
+  catch (error) { body.innerHTML = `<p class="error" role="alert">${escape(error.message)}</p>`; }
+}
+function wireConnections(){
+  const body = $('#connections-body');
+  if (!body) return;
+  body.addEventListener('submit', async event => {
+    const form = event.target.closest('[data-connection]');
+    if (!form) return;
+    event.preventDefault();
+    const kind = form.getAttribute('data-connection');
+    const data = Object.fromEntries(new FormData(form).entries());
+    const button = form.querySelector('button[type="submit"]');
+    const errorLine = form.querySelector('[data-connection-error]');
+    if (errorLine) errorLine.textContent = '';
+    button.disabled = true;
+    try {
+      await api('/api/connections', kind === 'shopify'
+        ? {kind, domain:data.domain, currency:data.currency, commission:data.commission || '0', accountId:data.accountId || '', accessToken:data.accessToken || ''}
+        : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
+      await loadConnections();
+      toast('Conexión guardada.');
+    } catch (error) {
+      if (errorLine) errorLine.textContent = error.message; else toast(error.message);
+      button.disabled = false;
+    }
+  });
+  body.addEventListener('click', async event => {
+    const button = event.target.closest('[data-connection-sync]');
+    if (!button) return;
+    const kind = button.getAttribute('data-connection-sync');
+    const form = button.closest('[data-connection]');
+    const status = form?.querySelector('[data-connection-status]');
+    const errorLine = form?.querySelector('[data-connection-error]');
+    if (errorLine) errorLine.textContent = '';
+    button.disabled = true;
+    if (status) status.textContent = 'Sincronizando con el proveedor…';
+    try {
+      const summary = await api(`/api/sync/${kind}`, {});
+      const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${name}`).join(', ');
+      const failed = (summary.errors || []).length;
+      if (status) status.textContent = `Listo: ${summary.created.length} ${summary.created.length === 1 ? 'registro nuevo' : 'registros nuevos'}${skipped ? ` · omitidos: ${skipped}` : ''}${failed ? ` · ${failed} con aviso` : ''}.`;
+      await refresh();
+      await loadConnections();
+      toast(`Sincronía de ${connectionKinds[kind].title} terminada.`);
+    } catch (error) {
+      if (errorLine) errorLine.textContent = error.message; else toast(error.message);
+      if (status) status.textContent = '';
+      button.disabled = false;
+    }
+  });
+}
+async function openConnections(){
+  openDialog('Conexiones','Ventas desde Shopify y egresos desde Meta Ads.',`<div class="dialog-body"><p class="form-note">Cada servicio se consulta con el token que guardes acá: viaja al servidor, queda en la base privada del espacio y nunca vuelve a la pantalla. La primera sincronía trae los últimos 30 días.</p><div id="connections-body"><p class="hm-quiet">Leyendo el estado de las conexiones…</p></div></div>`);
+  await loadConnections();
 }
 // Comprobantes: el archivo se reduce en el teléfono antes de subir, porque una foto de
 // iPhone pesa varios megabytes y el servidor acepta hasta 1,5 MB. Si el navegador no puede
