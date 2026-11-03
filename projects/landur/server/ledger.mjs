@@ -166,6 +166,8 @@ export class Ledger {
       this.db.prepare(`DELETE FROM evidence WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM operations WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM accounts WHERE workspace IN (${list})`).run(...ids);
+      // Las conexiones (Shopify, Meta) también apuntan al espacio: sin borrarlas, el borrado del espacio falla por clave foránea.
+      this.db.prepare(`DELETE FROM connections WHERE workspace IN (${list})`).run(...ids);
       const removed = this.db.prepare(`DELETE FROM workspaces WHERE id IN (${list})`).run(...ids).changes;
       this.db.exec('COMMIT');
       return removed;
