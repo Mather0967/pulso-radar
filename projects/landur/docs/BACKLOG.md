@@ -241,3 +241,10 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - Evidencia (medida en navegador sobre cada pantalla, claro y oscuro): sin desborde horizontal, sin controles táctiles bajo 40 px, sin texto bajo AA y sin errores de JavaScript. `npm test` en la raíz: 78/78. `node --test` en `projects/landur/`: 89/92; fallan solo las 3 pruebas de Windows ya documentadas.
 - No probado: iPhone real (Safari y PWA instalada), dictado de voz real, teclado real con las hojas abiertas, importar y exportar de punta a punta, claro en el escritorio ancho.
 - Quitado antes del commit el botón «Entrar a la demo» de `public/app.js` (era solo para ver la demo en local). Pendiente: decidir si se elimina el código del formulario antiguo, que ya no se alcanza desde la interfaz.
+
+## Integraciones, interfaz — Etapa 1: que se vea lo que pasó (02/11/2026)
+
+- Hecho: la hoja «Conexiones» conserva y muestra el resultado de la última sincronía de cada servicio: cifra grande de registros nuevos, desglose (ventas y cobros, o gastos), lo omitido en español claro («ya estaban», «de prueba», «sin cobro todavía»…), el período y la hora, y los avisos con el pedido y el motivo. Antes el texto se borraba al volver a pintar el bloque. Además el aviso breve («Sincronía terminada») queda sobre cualquier hoja abierta —antes la propia hoja lo tapaba— usando el popover del navegador. Solo interfaz: sin cambios de backend ni de reglas.
+- Evidencia (navegador, con respuestas de sincronía simuladas; no se llamó a Shopify ni a Meta): éxito parcial con dos avisos, «Nada nuevo» con cuatro ya existentes, y error de token con el botón reactivado y el resultado anterior intacto; singular y plural correctos; sin errores de JavaScript. `npm test` en la raíz: 90/90. `projects/landur/`: 96/99, con las 3 de Windows ya documentadas.
+- No probado: sincronía real con tokens de Shopify o Meta, iPhone real, claro y escritorio de esta hoja. En iOS anteriores a 17 el popover no existe y el aviso queda como antes.
+- Siguiente: etapa 2 (sincronizar como acción principal y configuración plegada).

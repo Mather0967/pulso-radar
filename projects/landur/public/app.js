@@ -30,7 +30,8 @@ const fmt = (cents, currency = unit) => new Intl.NumberFormat('es-UY',{style:'cu
 const dateFmt = date => date ? new Intl.DateTimeFormat('es-UY',{day:'2-digit',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z')) : 'Sin fecha';
 const decimal = cents => { const sign=cents<0?'-':'', abs=Math.abs(cents); return `${sign}${Math.trunc(abs/100)}.${String(abs%100).padStart(2,'0')}`; };
 const pill = (text, cls='gray') => `<span class="pill ${cls}">${escape(text)}</span>`;
-function toast(message) { clearTimeout(timer); $('#toast').textContent=message;$('#toast').hidden=false;timer=setTimeout(()=>$('#toast').hidden=true,6000); }
+// El aviso va en la capa superior (popover) para verse también sobre una hoja abierta; sin soporte queda como antes.
+function toast(message) { clearTimeout(timer); const el=$('#toast'); el.textContent=message; el.hidden=false; try{el.hidePopover?.();el.showPopover?.();}catch{} timer=setTimeout(()=>{el.hidden=true;try{el.hidePopover?.();}catch{}},6000); }
 async function api(path, input, key) {
   if (!navigator.onLine) throw new Error('Sin conexión. No se guardó ningún cambio.');
   let response;
@@ -237,6 +238,7 @@ function settings(){
 // recibe de vuelta, solo su máscara. Sincronizar es idempotente (origen + referencia externa),
 // así que repetir la corrida no duplica ventas ni gastos: se informan como omitidos.
 let connections = null;
+let syncResults = {};
 const CURRENCIES = ['UYU','USD','BRL'];
 const connectionKinds = {
   shopify: {title:'Shopify', note:'Cada orden paga entra como venta y su cobro con la comisión indicada.'},
@@ -270,9 +272,25 @@ function connectionBlock(kind){
       <p class="form-note">${kind === 'shopify' ? 'Necesita una app privada con permiso de lectura de órdenes. Se cargan las órdenes pagas del período; las de prueba, canceladas y reintegradas se omiten con su contador.' : 'Necesita un token de System User con permiso ads_read. El día en curso no está consolidado en Meta: la ventana cierra ayer.'}</p>
     </div>
     <p class="conn-note" data-connection-status="${kind}" role="status">${status}</p>
+    ${syncResultHtml(kind)}
     <p class="error" data-connection-error="${kind}" role="alert"></p>
     <div class="conn-foot"><span class="conn-note">Repetir la sincronía no duplica registros.</span><div class="conn-actions"><button type="button" class="mini-button" data-connection-sync="${kind}" ${connected && editable ? '' : 'disabled'}>Sincronizar</button><button type="submit" class="primary" ${off}>Guardar</button></div></div>
   </form>`;
+}
+// Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
+const SKIP_LABELS = {duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
+const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
+function syncResultHtml(kind){
+  const result = syncResults[kind];
+  if (!result) return '';
+  const summary = result.summary, created = summary.created || [], errors = summary.errors || [];
+  const byKind = {};
+  created.forEach(item => { byKind[item.kind] = (byKind[item.kind] || 0) + 1; });
+  const parts = Object.entries(byKind).map(([name, count]) => `${count} ${(CREATED_LABELS[name] || [name, name])[count === 1 ? 0 : 1]}`);
+  const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${(SKIP_LABELS[name] || [name, name])[value === 1 ? 0 : 1]}`);
+  const when = result.at.toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit', hour12:false});
+  const period = summary.since && summary.until ? `${dateFmt(String(summary.since).slice(0,10))} al ${dateFmt(String(summary.until).slice(0,10))} · ` : '';
+  return `<div class="conn-result" role="status"><div class="conn-big">${created.length ? `${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}` : 'Nada nuevo'}</div>${parts.length ? `<p>${parts.join(' · ')}</p>` : ''}${skipped.length ? `<p class="conn-note">${skipped.join(' · ')}</p>` : ''}<p class="conn-note">${period}sincronizado a las ${when}</p>${errors.length ? `<details class="conn-warn" open><summary>${errors.length === 1 ? '1 con aviso' : errors.length + ' con aviso'}</summary><ul>${errors.map(item => `<li><b>${escape(item.id)}</b> ${escape(item.message)}</li>`).join('')}</ul></details>` : ''}</div>`;
 }
 const connectionsBody = () => `<div class="settings-stack">${connectionBlock('shopify')}${connectionBlock('meta')}</div>`;
 async function loadConnections(){
@@ -317,11 +335,13 @@ function wireConnections(){
     if (status) status.textContent = 'Sincronizando con el proveedor…';
     try {
       const summary = await api(`/api/sync/${kind}`, {});
+      syncResults[kind] = {at: new Date(), summary};
       const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${name}`).join(', ');
       const failed = (summary.errors || []).length;
       if (status) status.textContent = `Listo: ${summary.created.length} ${summary.created.length === 1 ? 'registro nuevo' : 'registros nuevos'}${skipped ? ` · omitidos: ${skipped}` : ''}${failed ? ` · ${failed} con aviso` : ''}.`;
       await refresh();
       await loadConnections();
+      $(`form[data-connection="${kind}"] .conn-result`)?.scrollIntoView({block:'nearest'});
       toast(`Sincronía de ${connectionKinds[kind].title} terminada.`);
     } catch (error) {
       if (errorLine) errorLine.textContent = error.message; else toast(error.message);
@@ -331,6 +351,7 @@ function wireConnections(){
   });
 }
 async function openConnections(){
+  syncResults = {};
   openDialog('Conexiones','Ventas desde Shopify y egresos desde Meta Ads.',`<div class="dialog-body"><p class="form-note">Cada servicio se consulta con el token que guardes acá: viaja al servidor, queda en la base privada del espacio y nunca vuelve a la pantalla. La primera sincronía trae los últimos 30 días.</p><div id="connections-body"><p class="hm-quiet">Leyendo el estado de las conexiones…</p></div></div>`);
   await loadConnections();
 }
