@@ -248,3 +248,9 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - Evidencia (navegador, con respuestas de sincronía simuladas; no se llamó a Shopify ni a Meta): éxito parcial con dos avisos, «Nada nuevo» con cuatro ya existentes, y error de token con el botón reactivado y el resultado anterior intacto; singular y plural correctos; sin errores de JavaScript. `npm test` en la raíz: 90/90. `projects/landur/`: 96/99, con las 3 de Windows ya documentadas.
 - No probado: sincronía real con tokens de Shopify o Meta, iPhone real, claro y escritorio de esta hoja. En iOS anteriores a 17 el popover no existe y el aviso queda como antes.
 - Siguiente: etapa 2 (sincronizar como acción principal y configuración plegada).
+
+## Demo local y limpieza de espacios demo con conexiones (03/11/2026)
+
+- La pantalla de acceso de la demo local volvió a mostrar «Entrar a la demo (datos sintéticos)», solo si el servidor corre en modo demo (`/api/session` devuelve `demo: true`). En modo privado devuelve `demo: false` y el botón no existe; el servidor ya rechaza el modo demo en producción.
+- Defecto de backend, mismo origen que el anterior: `Ledger.purgeDemoWorkspaces()` no borraba `connections` (tabla añadida con las integraciones de Shopify y Meta), y SQLite rechazaba borrar el espacio demo por clave foránea cuando se había guardado una conexión: `/api/demo` respondía 500. Se borra `connections` antes que el espacio. La prueba «limpieza de demos…» ahora también inserta una conexión: falla sin el arreglo y pasa con él. `projects/landur/`: 96/99 (las 3 de Windows de siempre).
+- Evidencia: entrar a la demo, cerrar sesión y volver a entrar funciona con una conexión guardada.

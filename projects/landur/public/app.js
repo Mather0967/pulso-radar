@@ -62,6 +62,8 @@ function lock(message='') {
     location.assign(BASE+'login');
     return;
   }
+  // Solo existe cuando el servidor corre en modo demo (datos sintéticos, nunca en producción): permite ver la app sin contraseña.
+  if(session?.demo){const b=document.createElement('button');b.type='button';b.className='text-btn';b.textContent='Entrar a la demo (datos sintéticos)';b.onclick=async()=>{try{await api('/api/demo',{});await refresh();}catch(e){$('#login-error').textContent=e.message;}};$('.login-box').append(b);}
   $('#login-form').addEventListener('submit',async event=>{
     event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;
     try { await api('/api/login',{password:new FormData(event.currentTarget).get('password')}); await refresh(); }
@@ -1075,7 +1077,7 @@ function importDialog(){
 }
 async function logout(){
   if(busy)return;
-  try{await api('/api/logout',{});if(portalMode){location.assign(BASE+'login');return;}session={authenticated:false};view='home';query='';filter='';unit='';lock('Sesión cerrada.');}
+  try{await api('/api/logout',{});if(portalMode){location.assign(BASE+'login');return;}session={authenticated:false,demo:session?.demo};view='home';query='';filter='';unit='';lock('Sesión cerrada.');}
   catch{lock('No se pudo confirmar el cierre en el servidor. Reconectá y cerrá sesión antes de dejar este dispositivo.');}
 }
 function install(){openDialog('LANDUR en tu iPhone','Instalación desde Safari, con conexión HTTPS.',`<div class="dialog-body"><ol class="install-steps"><li>Abrí el enlace de LANDUR directamente en <strong>Safari</strong>, no dentro de otra aplicación.</li><li>Tocá <strong>Compartir</strong> y luego <strong>Agregar a pantalla de inicio</strong>.</li><li>Confirmá el nombre LANDUR y tocá <strong>Agregar</strong>.</li><li>Abrí el icono e ingresá a tu espacio.</li></ol><p class="form-note">Necesitás conexión para ver o registrar operaciones. Sin conexión se muestra una pantalla bloqueada: nunca se simula un guardado.</p></div>`);}
