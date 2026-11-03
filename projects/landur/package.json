@@ -13,6 +13,7 @@
     "backup": "node scripts/backup.mjs",
     "check:host": "node scripts/check-host.mjs",
     "test:browser": "node scripts/qa-browser.mjs",
+    "test:conexiones": "node scripts/qa-conexiones.mjs",
     "package": "python3 scripts/package-release.py",
     "test:portal": "node scripts/qa-portal.mjs",
     "test:preview": "node scripts/qa-preview-session.mjs"

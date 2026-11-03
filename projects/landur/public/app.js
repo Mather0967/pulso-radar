@@ -18,7 +18,7 @@ const paths = {
  cash:'M3 6h18v13H3V6m9 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 12h.1M18 12h.1',wallet:'M3 6h16v14H3V6m0 0 14-3v3m-2 5h6v5h-6v-5',
  close:'m6 6 12 12M6 18 18 6',logout:'M10 4H4v16h6m-1-8h12m-4-4 4 4-4 4',download:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',
  more:'M5 12h.1M12 12h.1M19 12h.1',refresh:'M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 13-3l2 7M4 12l2 7a8 8 0 0 0 13-3',
- phone:'M7 2h10v20H7V2m4 17h2',info:'M12 11v6m0-10h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',shield:'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3m-4 9 3 3 5-6',mic:'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3',plug:'M9 3v6m6-6v6M7 9h10v3a5 5 0 0 1-10 0V9m5 8v4'
+ phone:'M7 2h10v20H7V2m4 17h2',bag:'M6 7h12l1 13H5L6 7Zm3 0a3 3 0 0 1 6 0',megaphone:'M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Zm13-2a4 4 0 0 1 0 6',alert:'M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',info:'M12 11v6m0-10h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',shield:'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3m-4 9 3 3 5-6',mic:'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3',plug:'M9 3v6m6-6v6M7 9h10v3a5 5 0 0 1-10 0V9m5 8v4'
 };
 const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] || paths.expense}"/></svg>`;
 const labels = {expense:'Gasto pagado',obligation:'Obligación',payment:'Pago',sale:'Venta',collection:'Cobro',commission:'Comisión',transfer:'Transferencia',withdrawal:'Retiro personal',account:'Cuenta'};
@@ -131,10 +131,12 @@ function home(){
   const duplicates=doubtfulDuplicates().length;
   const unverified=accounts.filter(a=>!a.verified).length;
   const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
+  setTimeout(preloadConnections,0);
   const attention=[
     overdue?['red',plural(overdue,'obligación vencida','obligaciones vencidas'),'Sin pago registrado']:null,
     duplicates?['amber',plural(duplicates,'posible duplicado','posibles duplicados'),'Para revisar a mano']:null,
-    unverified?['amber',plural(unverified,'cuenta sin verificar','cuentas sin verificar'),'El saldo inicial no se confirmó']:null
+    unverified?['amber',plural(unverified,'cuenta sin verificar','cuentas sin verificar'),'El saldo inicial no se confirmó']:null,
+    ...staleConnections().map(([kind,current])=>['amber',`${connectionKinds[kind].title} sin sincronizar ${ago(current.lastSync)}`,`Última sincronía el ${dateFmt(current.lastSync.slice(0,10))}`,'connections'])
   ].filter(Boolean);
   const accountRow=a=>`<div class="hm-row"><div class="hm-ico ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div><div class="hm-main"><b>${escape(a.name)}</b>${a.verified?'':'<small class="warn">Sin verificar</small>'}</div><div class="hm-amt">${fmt(a.balance,a.currency)}</div></div>`;
   const opRow=o=>`<button class="hm-row hm-op" data-operation="${o.id}"><div class="hm-main"><b>${escape(o.concept)}</b><small>${labels[o.kind]} · ${dateFmt(o.date)}</small></div><div class="hm-amt${o.reversed_by?' reversed':''}">${fmt(o.amount,o.currency)}<small>${opStatusText(o)}</small></div></button>`;
@@ -142,7 +144,7 @@ function home(){
     <section class="hm-hero" aria-label="Saldo registrado"><div class="hm-label">Saldo registrado<button type="button" class="hm-info" data-action="balanceinfo" aria-label="Cómo se calcula este saldo">${icon('info')}</button></div><div class="hm-balance">${moneyHtml(t.balance,unit)}</div><div class="hm-sub">${plural(accounts.length,'cuenta','cuentas')} · ${unit}</div></section>
     <section class="hm-pair" aria-label="Compromisos"><button type="button" class="hm-tile" data-view="pending"><span>Por pagar</span><b>${fmt(t.payable)}</b><small>${payables.length?plural(payables.length,'compromiso','compromisos'):'Sin compromisos'}</small></button><button type="button" class="hm-tile" data-view="pending"><span>Por cobrar</span><b>${fmt(t.receivable)}</b><small>${receivables.length?plural(receivables.length,'venta','ventas'):'Sin ventas pendientes'}</small></button></section>
     <button type="button" class="hm-notice" data-action="policy"><span>Disponible estimado <b>por validar</b></span><i>Ver reglas ›</i></button>
-    <section class="hm-sec"><div class="hm-head"><h2>Requiere atención</h2>${attention.length?`<span class="hm-count">${attention.length}</span>`:''}</div>${attention.length?attention.map(([tone,main,sub])=>`<button type="button" class="hm-row hm-att" data-view="pending"><i class="dot ${tone}" aria-hidden="true"></i><div class="hm-main"><b>${main}</b><small>${sub}</small></div><span class="hm-go" aria-hidden="true">›</span></button>`).join(''):'<p class="hm-quiet">Nada urgente por revisar.</p>'}</section>
+    <section class="hm-sec"><div class="hm-head"><h2>Requiere atención</h2>${attention.length?`<span class="hm-count">${attention.length}</span>`:''}</div>${attention.length?attention.map(([tone,main,sub,action])=>`<button type="button" class="hm-row hm-att" ${action?`data-action="${action}"`:'data-view="pending"'}><i class="dot ${tone}" aria-hidden="true"></i><div class="hm-main"><b>${main}</b><small>${sub}</small></div><span class="hm-go" aria-hidden="true">›</span></button>`).join(''):'<p class="hm-quiet">Nada urgente por revisar.</p>'}</section>
     <section class="hm-sec"><div class="hm-head"><h2>Cuentas</h2><button type="button" class="hm-link" data-view="accounts">Ver todas</button></div>${accounts.map(accountRow).join('')}</section>
     <section class="hm-sec"><div class="hm-head"><h2>Movimientos recientes</h2><button type="button" class="hm-link" data-view="moves">Ver todos</button></div>${selectedOps().slice(0,5).map(opRow).join('')||'<p class="hm-quiet">Todavía no hay operaciones.</p>'}</section>
   </div>`;
@@ -171,6 +173,8 @@ function activity(){
   const seg=segNow();
   return `<div class="act"><div class="act-bar"><div class="seg" role="group" aria-label="Tipo de operación">${SEGMENTS.map(([k,n])=>`<button type="button" class="${seg===k?'on':''}" data-action="seg" data-v="${k}" aria-pressed="${seg===k}">${n}</button>`).join('')}</div><button type="button" class="icon-btn" data-action="actsearch" aria-label="Buscar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14m9 2-4.3-4.3"/></svg></button><button type="button" class="icon-btn" data-action="actmenu" aria-label="Importar o exportar">${icon('more')}</button></div>${searchOpen||query?`<input class="search act-search" id="search" placeholder="Buscar concepto o referencia…" aria-label="Buscar operaciones" value="${escape(query)}">`:''}${view==='sales'?'<p class="act-note">Se muestran ventas y cobros por separado. Los costos y repartos automáticos todavía no están habilitados.</p>':''}<div id="operation-table">${actList(filteredOps())}</div></div>`;
 }
+// Lo que llegó por sincronía lleva su origen; lo cargado a mano o por voz no lleva etiqueta.
+const ORIGIN_TAGS={shopify:'Shopify','meta-ads':'Meta'};
 function actList(ops){
   if(!ops.length)return '<p class="hm-quiet">No hay operaciones para mostrar.</p>';
   const groups=[];
@@ -179,7 +183,7 @@ function actList(ops){
   const day=d=>d===today()?'Hoy':d===ago(1)?'Ayer':dateFmt(d);
   return groups.map(g=>`<section class="act-group"><h3 class="act-day">${day(g.date)}</h3>${g.ops.map(o=>{
     const st=opStatusText(o),show=['Pendiente','Parcial','Revertido','Reversión'].includes(st)?st:'';
-    const sub=[labels[o.kind],o.category,opAccounts(o)].filter(Boolean).map(escape).join(' · ');
+    const sub=(ORIGIN_TAGS[o.source]?`<span class="cx-tag">${ORIGIN_TAGS[o.source]}</span>`:'')+[labels[o.kind],o.category,opAccounts(o)].filter(Boolean).map(escape).join(' · ');
     return `<button type="button" class="hm-row act-op" data-operation="${o.id}"><div class="act-ico ${opTone(o)}">${opGlyph(o)}</div><div class="hm-main"><b>${escape(o.concept)}</b><small>${sub}</small></div><div class="hm-amt${o.reversed_by?' reversed':opTone(o)==='in'?' in':''}">${opSign(o)}${fmt(o.amount,o.currency)}${show?`<small>${show}</small>`:''}</div></button>`;
   }).join('')}</section>`).join('');
 }
@@ -230,7 +234,7 @@ function settings(){
   const group=(title,body)=>`<section class="hm-sec"><div class="hm-head"><h2>${title}</h2></div>${body}</section>`;
   return `<div class="hm st">
     ${group('Datos',item('wallet','up','Importar CSV','Plantilla acotada, con vista previa','data-action="import"')+item('cash','download','Exportar CSV','Todas las operaciones','data-action="export"'))}
-    ${group('Integraciones',item('cash','plug','Conexiones','Ventas de Shopify y egresos de Meta Ads','data-action="connections"'))}
+    ${group('Integraciones',item('cash','plug','Conexiones',connectionsSummaryHtml(),'data-action="connections"'))}
     ${group('App',item('wallet','phone','Instalar en el iPhone','Desde Safari, con conexión','data-action="install"')+item('bank','logout','Cerrar sesión','Salir de este dispositivo','data-action="logout"',true))}
     ${group('Información',item('wallet','shield','Alcance del servicio','Qué hace y qué no hace esta versión','data-action="scope"')+item('wallet','info','Registro de actividad',`${state.audit.length?state.audit.length+' eventos':'Sin actividad todavía'}`,'data-action="audit"'))}
   </div>`;
@@ -239,77 +243,206 @@ function settings(){
 // y viaja solo al servidor, que lo guarda en la base privada del espacio: la vista nunca lo
 // recibe de vuelta, solo su máscara. Sincronizar es idempotente (origen + referencia externa),
 // así que repetir la corrida no duplica ventas ni gastos: se informan como omitidos.
-let connections = null;
-let syncResults = {};
+// La hoja tiene dos vistas dentro del mismo diálogo: la lista y el detalle de un servicio.
+let connections = null, connLoading = false, connView = '', connUi = {};
 const CURRENCIES = ['UYU','USD','BRL'];
 const connectionKinds = {
-  shopify: {title:'Shopify', note:'Cada orden paga entra como venta y su cobro con la comisión indicada.'},
-  meta: {title:'Meta Ads', note:'El gasto diario de cada campaña entra como egreso, en la moneda del ad account.'}
+  shopify: {title:'Shopify', glyph:'bag', tone:'cash', blurb:'Cada orden paga entra como venta y su cobro con la comisión indicada.', empty:'Cargá las ventas de tu tienda'},
+  meta: {title:'Meta Ads', glyph:'megaphone', tone:'wallet', blurb:'El gasto diario de cada campaña entra como egreso, en la moneda de la cuenta publicitaria.', empty:'Cargá el gasto publicitario de cada día'}
 };
+const connUiOf = kind => connUi[kind] || (connUi[kind] = {phase:'idle'});
+const STALE_DAYS = 3;
+// «hace 2 h», «hace 3 días»: la hora exacta importa menos que cuánto hace.
+function ago(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'hace un momento';
+  const min = Math.floor(ms / 60000), hours = Math.floor(min / 60), days = Math.floor(hours / 24);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  if (hours < 24) return `hace ${hours} h`;
+  return `hace ${days} ${days === 1 ? 'día' : 'días'}`;
+}
+const daysSince = iso => (Date.now() - new Date(iso).getTime()) / 86400000;
+const connStale = current => Boolean(current?.configured && current.lastSync) && daysSince(current.lastSync) >= STALE_DAYS;
+// Resumen de una línea para la fila de Configuración; los textos largos viven en la hoja.
+const staleConnections=()=>Object.keys(connectionKinds).filter(kind=>connStale(connections?.[kind])).map(kind=>[kind,connections[kind]]);
+function connectionsSummary(){
+  if (!connections) return null;
+  const on = Object.keys(connectionKinds).filter(kind => connections[kind]?.configured);
+  const label = kind => `${connectionKinds[kind].title} ${connections[kind]?.configured ? 'conectado' : 'sin conectar'}`;
+  const last = on.map(kind => connections[kind].lastSync).filter(Boolean).sort().pop();
+  return {line: Object.keys(connectionKinds).map(label).join(' · '), last: on.length ? (last ? `Sincronizado ${ago(last)}` : 'Todavía sin sincronizar') : ''};
+}
+async function preloadConnections(){
+  if (connLoading) return;
+  connLoading = true;
+  const before = staleConnections().map(([kind]) => kind).join();
+  try { connections = await api('/api/connections'); } catch { /* la fila conserva su texto fijo */ }
+  connLoading = false;
+  // Si cambió qué conexiones están atrasadas, Inicio se vuelve a pintar (no tiene formularios abiertos).
+  if (view === 'home' && staleConnections().map(([kind]) => kind).join() !== before) render();
+  const summary = connectionsSummary(), slot = $('[data-conn-summary]');
+  if (slot && summary) slot.innerHTML = connectionsSummaryInner(summary);
+}
+const connectionsSummaryInner = summary => `${escape(summary.line)}${summary.last ? `<span class="cx-sub2">${escape(summary.last)}</span>` : ''}`;
+function connectionsSummaryHtml(){
+  setTimeout(preloadConnections, 0);
+  const summary = connectionsSummary();
+  return `<span data-conn-summary>${summary ? connectionsSummaryInner(summary) : 'Ventas de Shopify y egresos de Meta Ads'}</span>`;
+}
 function connectionAccounts(current){
   const list = state.accounts.filter(a => !current?.currency || a.currency === current.currency);
   return list.length
     ? list.map(a => `<option value="${escape(a.id)}" ${a.id === current?.accountId ? 'selected' : ''}>${escape(a.name)} · ${a.currency}</option>`).join('')
     : '<option value="">No hay cuentas en esa moneda</option>';
 }
-function connectionBlock(kind){
-  const {title, note} = connectionKinds[kind];
+// Formulario de alta y edición: mismos campos y mismo envío que antes; solo cambia dónde vive.
+function connectionForm(kind){
   const current = connections?.[kind] || {};
   const connected = Boolean(current.configured);
-  const editable = state.access !== 'viewer';
-  const off = editable ? '' : 'disabled';
+  const off = state.access !== 'viewer' ? '' : 'disabled';
   const fields = kind === 'shopify' ? `
-      <label class="field wide">Tienda<small>El dominio que muestra el admin de Shopify.</small><input name="domain" value="${escape(current.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" ${off}></label>
+      <label class="field wide">Tienda<small>El dominio que muestra el admin de Shopify.</small><input name="domain" value="${escape(current.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" autocapitalize="none" autocorrect="off" ${off}></label>
       <label class="field">Moneda de la tienda<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
       <label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(current.commission ?? '0')}" maxlength="12" ${off}></label>` : `
       <label class="field wide">Cuenta publicitaria<small>El número que en Meta aparece como act_&lt;número&gt;.</small><input name="adAccountId" value="${escape(current.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
-  const status = connected
-    ? `Conectado · token ${escape(current.tokenMask || 'guardado')}${current.lastSync ? ` · última sincronía ${dateFmt(current.lastSync.slice(0,10))}` : ''}`
-    : 'Sin conectar. Guardá los datos para habilitar la sincronía.';
   return `<form class="conn" data-connection="${kind}">
-    <div class="card-head"><div><h2>${title}</h2><p>${note}</p></div>${pill(connected ? 'Conectado' : 'Sin conectar', connected ? 'green' : 'gray')}</div>
     <div class="form-grid">${fields}
       <label class="field wide">Cuenta donde se registra<select name="accountId" ${off}>${connectionAccounts(current)}</select></label>
-      <label class="field wide">Token de acceso<input name="accessToken" type="password" autocomplete="off" maxlength="2048" placeholder="${connected ? 'Dejar en blanco conserva el token guardado' : kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label>
-      <p class="form-note">${kind === 'shopify' ? 'Necesita una app privada con permiso de lectura de órdenes. Se cargan las órdenes pagas del período; las de prueba, canceladas y reintegradas se omiten con su contador.' : 'Necesita un token de System User con permiso ads_read. El día en curso no está consolidado en Meta: la ventana cierra ayer.'}</p>
+      <label class="field wide">Token de acceso<input name="accessToken" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${connected ? 'Dejar en blanco conserva el token guardado' : kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label>
     </div>
-    <p class="conn-note" data-connection-status="${kind}" role="status">${status}</p>
-    ${syncResultHtml(kind)}
     <p class="error" data-connection-error="${kind}" role="alert"></p>
-    <div class="conn-foot"><span class="conn-note">Repetir la sincronía no duplica registros.</span><div class="conn-actions"><button type="button" class="mini-button" data-connection-sync="${kind}" ${connected && editable ? '' : 'disabled'}>Sincronizar</button><button type="submit" class="primary" ${off}>Guardar</button></div></div>
+    <button type="submit" class="primary" ${off}>${connected ? 'Guardar cambios' : 'Conectar'}</button>
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
 const SKIP_LABELS = {duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
-function syncResultHtml(kind){
-  const result = syncResults[kind];
-  if (!result) return '';
-  const summary = result.summary, created = summary.created || [], errors = summary.errors || [];
-  const byKind = {};
-  created.forEach(item => { byKind[item.kind] = (byKind[item.kind] || 0) + 1; });
-  const parts = Object.entries(byKind).map(([name, count]) => `${count} ${(CREATED_LABELS[name] || [name, name])[count === 1 ? 0 : 1]}`);
-  const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${(SKIP_LABELS[name] || [name, name])[value === 1 ? 0 : 1]}`);
-  const when = result.at.toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit', hour12:false});
-  const period = summary.since && summary.until ? `${dateFmt(String(summary.since).slice(0,10))} al ${dateFmt(String(summary.until).slice(0,10))} · ` : '';
-  return `<div class="conn-result" role="status"><div class="conn-big">${created.length ? `${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}` : 'Nada nuevo'}</div>${parts.length ? `<p>${parts.join(' · ')}</p>` : ''}${skipped.length ? `<p class="conn-note">${skipped.join(' · ')}</p>` : ''}<p class="conn-note">${period}sincronizado a las ${when}</p>${errors.length ? `<details class="conn-warn" open><summary>${errors.length === 1 ? '1 con aviso' : errors.length + ' con aviso'}</summary><ul>${errors.map(item => `<li><b>${escape(item.id)}</b> ${escape(item.message)}</li>`).join('')}</ul></details>` : ''}</div>`;
+const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
+// Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
+function connectionStatus(kind){
+  const {title} = connectionKinds[kind];
+  const current = connections?.[kind] || {}, ui = connUiOf(kind), editable = state.access !== 'viewer';
+  const card = (tone, glyph, body, action) => `<div class="cx-status ${tone}" role="status">${body}${action}</div>`;
+  const head = (glyph, heading, text, spin = false) => `<div class="row"><div class="ico">${spin ? icon(glyph).replace('<svg', '<svg class="spin"') : icon(glyph)}</div><div><h4>${heading}</h4><p>${text}</p></div></div>`;
+  const syncBtn = (label, cls = 'primary') => `<button type="button" class="${cls}" data-connection-sync="${kind}" ${editable ? '' : 'disabled'}>${cls === 'primary' ? SYNC_ICON + ' ' : ''}${label}</button>`;
+  if (ui.phase === 'busy') return card('busy', 'refresh', head('refresh', 'Sincronizando…', `Consultando ${title}. Puede tardar un momento.`, true), '<button type="button" class="primary" disabled>Sincronizando…</button>');
+  if (ui.phase === 'error') {
+    const token = /token no es válido/i.test(ui.error || '');
+    return card('err', 'alert', head('alert', token ? 'El token no es válido o perdió el permiso' : 'No se pudo sincronizar', token ? 'Actualizá el token para volver a traer los datos.' : escape(ui.error || '')), token && editable ? '<button type="button" class="primary" data-connection-edit>Actualizar token</button>' : syncBtn('Probar de nuevo', 'secondary'));
+  }
+  if (ui.phase === 'done') {
+    const summary = ui.summary, created = summary.created || [];
+    const byKind = {};
+    created.forEach(item => { byKind[item.kind] = (byKind[item.kind] || 0) + 1; });
+    const parts = Object.entries(byKind).map(([name, count]) => `${count} ${(CREATED_LABELS[name] || [name, name])[count === 1 ? 0 : 1]}`);
+    const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${(SKIP_LABELS[name] || [name, name])[value === 1 ? 0 : 1]}`);
+    const when = ui.at.toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit', hour12:false});
+    const period = summary.since && summary.until ? `${dateFmt(String(summary.since).slice(0,10))} al ${dateFmt(String(summary.until).slice(0,10))} · ` : '';
+    if (!created.length) {
+      const dup = (summary.skipped || {}).duplicadas;
+      const note = kind === 'meta' ? ' El día en curso no está consolidado en Meta: se carga hasta ayer.' : '';
+      return card('ok', 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}`), syncBtn('Sincronizar de nuevo', 'secondary'));
+    }
+    return card('ok', 'check', `<div class="cx-result"><div class="big">${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div></div>`, syncBtn('Sincronizar de nuevo'));
+  }
+  if (!current.lastSync) return card('ok', 'check', head('check', 'Conectado', `Todavía no sincronizaste. ${connectionKinds[kind].blurb}`), syncBtn('Sincronizar ahora'));
+  if (connStale(current)) return card('warn', 'alert', head('alert', `Sin sincronizar ${ago(current.lastSync)}`, `Última sincronía el ${dateFmt(current.lastSync.slice(0,10))}.`), syncBtn('Sincronizar ahora'));
+  return card('ok', 'check', head('check', 'Al día', `Última sincronía ${ago(current.lastSync)}. ${connectionKinds[kind].blurb}`), syncBtn('Sincronizar ahora'));
 }
-const connectionsBody = () => `<div class="settings-stack">${connectionBlock('shopify')}${connectionBlock('meta')}</div>`;
-async function loadConnections(){
-  const body = $('#connections-body');
-  if (!body) return;
-  try { connections = await api('/api/connections'); body.innerHTML = connectionsBody(); wireConnections(); }
-  catch (error) { body.innerHTML = `<p class="error" role="alert">${escape(error.message)}</p>`; }
+function connectionWarnings(kind){
+  const ui = connUiOf(kind), errors = ui.phase === 'done' ? ui.summary.errors || [] : [];
+  if (!errors.length) return '';
+  return `<details class="cx-warn" open><summary>${icon('alert')}${errors.length === 1 ? '1 con aviso' : errors.length + ' con aviso'}</summary><ul>${errors.map(item => `<li><b>${escape(item.id)}</b> ${escape(item.message)}</li>`).join('')}</ul></details>`;
 }
+function connectionDetail(kind){
+  if (!connections?.[kind]?.configured) return connectionWizard(kind);
+  const current = connections?.[kind] || {}, connected = Boolean(current.configured), ui = connUiOf(kind);
+  const account = state.accounts.find(a => a.id === current.accountId);
+  const kv = (label, value) => value ? `<div class="kv"><span>${label}</span><b>${escape(value)}</b></div>` : '';
+  const tone = ui.phase === 'error' || (connected && connStale(current) && ui.phase === 'idle') ? ['amber', 'Requiere atención'] : connected ? ['green', 'Conectado'] : ['gray', 'Sin conectar'];
+  const rows = kv(kind === 'shopify' ? 'Tienda' : 'Cuenta publicitaria', kind === 'shopify' ? current.domain : current.adAccountId)
+    + kv('Se registra en', account ? `${account.name} · ${account.currency}` : '')
+    + (kind === 'shopify' && connected ? kv('Comisión', `${String(current.commission ?? '0').replace('.', ',')} %`) : '')
+    + kv('Token', current.tokenMask);
+  return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button>${pill(tone[1], tone[0])}</div>
+    ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>
+      <details class="cx-edit" data-connection-details ${ui.edit ? 'open' : ''}><summary class="cx-help">Editar conexión <span aria-hidden="true">⌄</span></summary>${connectionForm(kind)}</details>`
+    : ''}`;
+}
+// Alta de una conexión nueva, un dato por paso (como el registro): origen → dónde se registra → token.
+// Los pasos solo reparten los mismos campos del formulario; el envío al servidor es el de siempre.
+// Los textos de ayuda resumen la documentación de Shopify y de Meta; si cambian sus menús, se actualizan acá.
+const WIZARD_STEPS = {shopify:['Tienda','Dónde','Token'], meta:['Cuenta','Dónde','Token']};
+const CONNECTION_HELP = {
+  shopify: 'Hace falta una app personalizada de tu tienda con permiso de lectura de órdenes (read_orders). En el admin de Shopify, en Apps → Desarrollar apps → tu app → Credenciales de API, aparece el token que empieza con shpat_; se muestra una sola vez, así que copialo al generarlo. Desde 2026 Shopify no deja crear apps personalizadas nuevas desde el admin: si tu tienda no tiene una, consultalo con quien administra la tienda.',
+  meta: 'En Meta Business Suite, entrá a Configuración del negocio → Usuarios del sistema, creá un usuario del sistema y asignale tu cuenta publicitaria. Tocá «Generar token», elegí la app y el permiso ads_read, y copiá el token: se muestra una sola vez.'
+};
+function connectionWizard(kind){
+  const ui = connUiOf(kind), step = ui.step || 0, draft = ui.draft || (ui.draft = kind === 'shopify' ? {currency:'UYU', commission:'0'} : {});
+  const off = state.access !== 'viewer' ? '' : 'disabled';
+  const chips = WIZARD_STEPS[kind].map((label, i) => `<div class="cx-step ${i < step ? 'done' : i === step ? 'now' : ''}">${i < step ? '✓ ' : i === step ? `${i + 1} ` : ''}${label}</div>`).join('');
+  let lead, fields;
+  if (step === 0) {
+    lead = kind === 'shopify' ? 'Escribí el dominio que muestra el admin de tu tienda.' : 'Escribí el número de tu cuenta publicitaria. En Meta aparece como act_ seguido del número; acá va solo el número.';
+    fields = kind === 'shopify'
+      ? `<label class="field wide">Tienda<input name="domain" required value="${escape(draft.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" autocapitalize="none" autocorrect="off" ${off}></label>`
+      : `<label class="field wide">Cuenta publicitaria<input name="adAccountId" required value="${escape(draft.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
+  } else if (step === 1) {
+    lead = 'Elegí la cuenta de LANDUR donde se van a registrar los movimientos.';
+    const current = {currency: kind === 'shopify' ? draft.currency : '', accountId: draft.accountId};
+    fields = (kind === 'shopify' ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(draft.commission ?? '0')}" maxlength="12" ${off}></label></div>` : '')
+      + `<label class="field wide">Cuenta donde se registra<select name="accountId" required ${off}>${connectionAccounts(current)}</select></label>`;
+  } else {
+    lead = 'Pegá el token de acceso. Se guarda en el servidor y no vuelve a mostrarse.';
+    fields = `<div class="cx-paste"><label class="field wide">Token de acceso<input name="accessToken" type="password" required autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label><button type="button" class="mini-button" data-connection-paste ${off}>Pegar</button></div>
+      <details class="cx-how"><summary class="cx-help">Cómo conseguirlo <span aria-hidden="true">⌄</span></summary><p>${escape(CONNECTION_HELP[kind])}</p></details>`;
+  }
+  return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button></div>
+    <div class="cx-steps">${chips}</div>
+    <form class="conn" data-connection="${kind}" data-wizard>
+      <p class="cx-lead">${lead}</p>
+      ${fields}
+      <p class="error" data-connection-error="${kind}" role="alert"></p>
+      <div class="cx-nav">${step ? '<button type="button" class="secondary" data-connection-prev>Atrás</button>' : ''}<button type="submit" class="primary" ${off}>${step < 2 ? 'Siguiente' : 'Conectar'}</button></div>
+    </form>`;
+}
+function connectionsList(){
+  const row = kind => {
+    const {title, glyph, tone, empty} = connectionKinds[kind], current = connections?.[kind] || {}, connected = Boolean(current.configured);
+    const detail = connected ? escape(kind === 'shopify' ? current.domain || '' : `Cuenta ${current.adAccountId || ''}`) : empty;
+    const last = connected ? `<small>${current.lastSync ? `Sincronizado ${ago(current.lastSync)}` : 'Todavía sin sincronizar'}</small>` : '';
+    const pillText = !connected ? ['Sin conectar', 'gray'] : connStale(current) ? ['Sin sincronizar', 'amber'] : ['Conectado', 'green'];
+    return `<button type="button" class="hm-row" data-connection-open="${kind}"><div class="hm-ico ${tone}">${icon(glyph)}</div><div class="hm-main"><b>${title}</b><small>${detail}</small>${last}</div>${pill(pillText[0], pillText[1])}</button>`;
+  };
+  return `${row('shopify')}${row('meta')}<p class="cx-foot">Cada servicio se consulta con un token que queda guardado en el servidor, nunca en el teléfono.</p>`;
+}
+function connectionsBody(){
+  if (!connections) return '<p class="hm-quiet">Leyendo el estado de las conexiones…</p>';
+  return connView ? connectionDetail(connView) : connectionsList();
+}
+// Pinta la vista actual dentro del diálogo; el título cambia con la vista.
+function showConnections(view = connView){
+  connView = view;
+  openDialog(view ? connectionKinds[view].title : 'Conexiones', view ? '' : 'Ventas desde Shopify y egresos desde Meta Ads.', `<div class="dialog-body" id="connections-body">${connectionsBody()}</div>`);
+}
+async function loadConnections(view = connView){
+  try { connections = await api('/api/connections'); showConnections(view); }
+  catch (error) { const body = $('#connections-body'); if (body) body.innerHTML = `<p class="error" role="alert">${escape(error.message)}</p>`; }
+}
+// Un solo juego de escuchas sobre el diálogo (el diálogo se reutiliza entre pantallas):
+// se delega por selector y se guarda la marca para no duplicarlas al reabrir.
 function wireConnections(){
-  const body = $('#connections-body');
-  if (!body) return;
-  body.addEventListener('submit', async event => {
+  if (modal.dataset.connWired) return;
+  modal.dataset.connWired = '1';
+  modal.addEventListener('submit', async event => {
     const form = event.target.closest('[data-connection]');
     if (!form) return;
     event.preventDefault();
     const kind = form.getAttribute('data-connection');
-    const data = Object.fromEntries(new FormData(form).entries());
+    const wizard = form.hasAttribute('data-wizard'), ui = connUiOf(kind);
+    const data = {...(wizard ? ui.draft : {}), ...Object.fromEntries(new FormData(form).entries())};
+    if (wizard && (ui.step || 0) < 2) { ui.draft = data; ui.step = (ui.step || 0) + 1; showConnections(); return; }
     const button = form.querySelector('button[type="submit"]');
     const errorLine = form.querySelector('[data-connection-error]');
     if (errorLine) errorLine.textContent = '';
@@ -318,44 +451,76 @@ function wireConnections(){
       await api('/api/connections', kind === 'shopify'
         ? {kind, domain:data.domain, currency:data.currency, commission:data.commission || '0', accountId:data.accountId || '', accessToken:data.accessToken || ''}
         : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
-      await loadConnections();
+      Object.assign(ui, {phase:'idle', edit:false, step:0, draft:null});
+      await loadConnections(kind);
       toast('Conexión guardada.');
     } catch (error) {
       if (errorLine) errorLine.textContent = error.message; else toast(error.message);
       button.disabled = false;
     }
   });
-  body.addEventListener('click', async event => {
+  // Al cambiar la moneda de la tienda se recalculan las cuentas posibles.
+  modal.addEventListener('change', event => {
+    const select = event.target.closest('[data-connection-currency]');
+    if (!select || !$('#connections-body')) return;
+    const ui = connUiOf(connView), form = select.closest('form');
+    ui.draft = {...ui.draft, ...Object.fromEntries(new FormData(form).entries())};
+    delete ui.draft.accountId;
+    showConnections();
+  });
+  modal.addEventListener('click', async event => {
+    if (!$('#connections-body')) return;
+    const open = event.target.closest('[data-connection-open]');
+    if (open) { showConnections(open.getAttribute('data-connection-open')); return; }
+    if (event.target.closest('[data-connection-back]')) { showConnections(''); return; }
+    if (event.target.closest('[data-connection-prev]')) {
+      const ui = connUiOf(connView), form = $('form[data-wizard]');
+      if (form) ui.draft = {...ui.draft, ...Object.fromEntries(new FormData(form).entries())};
+      ui.step = Math.max(0, (ui.step || 0) - 1);
+      showConnections();
+      return;
+    }
+    if (event.target.closest('[data-connection-paste]')) {
+      // El pegado desde el portapapeles depende del permiso del navegador: si falla, se pega a mano.
+      const input = $('input[name="accessToken"]');
+      try { input.value = (await navigator.clipboard.readText()).trim(); } catch { toast('Mantené apretado el campo y elegí Pegar.'); }
+      input?.focus();
+      return;
+    }
+    if (event.target.closest('[data-connection-edit]')) {
+      connUiOf(connView).edit = true;
+      showConnections();
+      const details = $('[data-connection-details]');
+      details?.scrollIntoView({block:'center'});
+      details?.querySelector('input[name="accessToken"]')?.focus();
+      return;
+    }
     const button = event.target.closest('[data-connection-sync]');
     if (!button) return;
-    const kind = button.getAttribute('data-connection-sync');
-    const form = button.closest('[data-connection]');
-    const status = form?.querySelector('[data-connection-status]');
-    const errorLine = form?.querySelector('[data-connection-error]');
-    if (errorLine) errorLine.textContent = '';
-    button.disabled = true;
-    if (status) status.textContent = 'Sincronizando con el proveedor…';
+    const kind = button.getAttribute('data-connection-sync'), ui = connUiOf(kind);
+    if (ui.phase === 'busy') return;
+    ui.phase = 'busy';
+    showConnections();
     try {
-      const summary = await api(`/api/sync/${kind}`, {});
-      syncResults[kind] = {at: new Date(), summary};
-      const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${name}`).join(', ');
-      const failed = (summary.errors || []).length;
-      if (status) status.textContent = `Listo: ${summary.created.length} ${summary.created.length === 1 ? 'registro nuevo' : 'registros nuevos'}${skipped ? ` · omitidos: ${skipped}` : ''}${failed ? ` · ${failed} con aviso` : ''}.`;
+      ui.summary = await api(`/api/sync/${kind}`, {});
+      ui.at = new Date();
+      ui.phase = 'done';
       await refresh();
-      await loadConnections();
-      $(`form[data-connection="${kind}"] .conn-result`)?.scrollIntoView({block:'nearest'});
+      await loadConnections(kind);
       toast(`Sincronía de ${connectionKinds[kind].title} terminada.`);
     } catch (error) {
-      if (errorLine) errorLine.textContent = error.message; else toast(error.message);
-      if (status) status.textContent = '';
-      button.disabled = false;
+      ui.phase = 'error';
+      ui.error = error.message;
+      if ($('#connections-body')) showConnections(kind);
     }
   });
 }
 async function openConnections(){
-  syncResults = {};
-  openDialog('Conexiones','Ventas desde Shopify y egresos desde Meta Ads.',`<div class="dialog-body"><p class="form-note">Cada servicio se consulta con el token que guardes acá: viaja al servidor, queda en la base privada del espacio y nunca vuelve a la pantalla. La primera sincronía trae los últimos 30 días.</p><div id="connections-body"><p class="hm-quiet">Leyendo el estado de las conexiones…</p></div></div>`);
-  await loadConnections();
+  connUi = {};
+  connView = '';
+  wireConnections();
+  showConnections('');
+  await loadConnections('');
 }
 // Comprobantes: el archivo se reduce en el teléfono antes de subir, porque una foto de
 // iPhone pesa varios megabytes y el servidor acepta hasta 1,5 MB. Si el navegador no puede

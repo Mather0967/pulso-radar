@@ -45,5 +45,11 @@ Rafa es un comerciante ocupado, no técnico. Usa LANDUR desde el iPhone (PWA) pa
 - No incluir ningún dato real de personas, tiendas, cuentas o tokens.
 
 ## Entrega
-- Por cada dirección: las pantallas 1 a 7 en tema oscuro y las pantallas 3 y 4 también en claro. Formato PNG de 1170 × 2532 px (iPhone), guardadas en `docs/diseno-conexiones/propuestas/direccion-A/`, `direccion-B/`, etc., con nombres como `03-hoja-conectada-oscuro.png`.
-- Un archivo corto `NOTAS.md` por dirección: la idea en tres líneas y qué componentes de LANDUR reutiliza.
+Hasta **3 direcciones distintas** (A, B y C). Por cada dirección, **3 tableros** en PNG, cada uno con varios iPhones lado a lado sobre un fondo neutro, con una etiqueta corta bajo cada pantalla:
+- `tablero-1-oscuro.png`: pantallas 1 a 4, tema oscuro.
+- `tablero-2-oscuro.png`: pantallas 5 a 7, tema oscuro.
+- `tablero-3-claro.png`: pantallas 3 y 4, tema claro.
+
+Guardar (rutas desde la raíz del repositorio) en `projects/landur/docs/diseno-conexiones/propuestas/direccion-A/`, `direccion-B/` y `direccion-C/`. Más un `NOTAS.md` corto por dirección: la idea en tres líneas y qué componentes de LANDUR reutiliza.
+
+No modificar ningún archivo fuera de `projects/landur/docs/diseno-conexiones/propuestas/`.
