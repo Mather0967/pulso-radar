@@ -627,7 +627,8 @@ const SPEECH = window.SpeechRecognition || window.webkitSpeechRecognition;
 let dictation = null, invoiceRecognition = null;
 function stopDictation(){
   // El dictado de factura completa se corta con el mismo cierre del diálogo.
-  if(invoiceRecognition){const current=invoiceRecognition;invoiceRecognition=null;try{current.stop();}catch{}}
+  // El dictado de factura se corta con «abort»: en Safari «stop» a veces deja el micrófono tomado.
+  if(invoiceRecognition){const current=invoiceRecognition;invoiceRecognition=null;try{current.abort?current.abort():current.stop();}catch{try{current.stop();}catch{}}}
   if(!dictation)return;
   const current=dictation;dictation=null;
   current.button.classList.remove('recording');
@@ -822,16 +823,64 @@ function quickCapture(kind='expense',targetId='',opts={}){
   };
   // Al llegar a «Revisar» se abre sola la hoja del primer dato que falta: no hay formulario que recorrer.
   const enterReview=()=>{phase='review';sheet=missing();};
+  // Ciclo de vida del micrófono. En iOS/WebKit el reconocimiento puede no disparar
+  // «end» (o quedarse mudo en el segundo dictado), así que la pantalla no depende de
+  // ese evento: el resultado se aplica al llegar, el micrófono se corta con «abort»
+  // —libera la sesión de audio mejor que «stop»— y un vigía acotado reintenta una vez
+  // o avisa, en lugar de dejar «Escuchando…» para siempre y obligar a reabrir la app.
+  let watchdog=0,attempt=0;
+  const clearWatch=()=>{clearTimeout(watchdog);watchdog=0;};
+  const watch=(ms,run,onLate)=>{clearWatch();watchdog=setTimeout(()=>{if(run!==gen||!listening)return;onLate();},ms);};
+  const stopVoice=()=>{
+    const current=recognition;recognition=null;invoiceRecognition=null;listening=false;clearWatch();
+    if(!current)return;
+    current.onresult=current.onerror=current.onend=current.onstart=null;
+    try{current.abort?current.abort():current.stop();}catch{try{current.stop();}catch{}}
+  };
+  const voiceError=message=>{err=message;stopVoice();if(live())render();};
   const listen=()=>{
-    if(listening){try{recognition?.stop();}catch{}return;}
+    if(listening){
+      // Detener a mano: se pide el final para conservar lo dicho; si el navegador no
+      // responde en 1,5 s, se corta y se avisa en vez de dejar el micrófono tomado.
+      const run=gen;clearWatch();
+      try{recognition?.stop();}catch{}
+      watchdog=setTimeout(()=>{if(run!==gen||!listening)return;voiceError('No se escuchó nada. Reintentá o escribí los datos.');},1500);
+      return;
+    }
     if(!SPEECH){typed=true;render();return;}
     stopDictation();const run=++gen;
-    recognition=new SPEECH();recognition.lang='es-UY';recognition.interimResults=false;recognition.continuous=false;
-    invoiceRecognition=recognition;listening=true;err='';render();
-    recognition.onresult=e=>{if(run!==gen)return;const said=[...e.results].map(r=>r[0].transcript).join(' ').trim();if(said)absorb(said);};
-    recognition.onerror=e=>{if(run!==gen)return;err=e.error==='not-allowed'||e.error==='service-not-allowed'?'Permití el micrófono en los ajustes para dictar.':'No te escuché bien. Probá de nuevo.';};
-    recognition.onend=()=>{if(run!==gen)return;invoiceRecognition=null;listening=false;if(live())render();};
-    try{recognition.start();}catch{listening=false;invoiceRecognition=null;err='No se pudo iniciar el micrófono.';render();}
+    stopVoice();
+    const r=new SPEECH();
+    recognition=r;invoiceRecognition=r;listening=true;err='';render();
+    r.lang='es-UY';r.interimResults=false;r.continuous=false;
+    const retryOrFail=()=>{
+      stopVoice();
+      if(attempt++<1)listen();
+      else voiceError('El micrófono no respondió. Reintentá o escribí los datos.');
+    };
+    r.onstart=()=>{
+      if(run!==gen||recognition!==r)return;
+      // Arrancó pero puede quedarse mudo: sin resultado en 15 s, se informa.
+      watch(15000,run,()=>voiceError('No se escuchó nada. Reintentá o escribí los datos.'));
+    };
+    r.onresult=e=>{
+      if(run!==gen||recognition!==r)return;
+      attempt=0;
+      const said=[...e.results].map(x=>x[0].transcript).join(' ').trim();
+      if(said)absorb(said);else err='No se escuchó nada. Reintentá o escribí los datos.';
+      stopVoice();if(live())render();
+    };
+    r.onerror=e=>{
+      if(run!==gen||recognition!==r)return;
+      attempt=0;
+      voiceError(e.error==='not-allowed'||e.error==='service-not-allowed'?'Permití el micrófono en los ajustes para dictar.':'No te escuché bien. Probá de nuevo.');
+    };
+    r.onend=()=>{
+      if(run!==gen||recognition!==r)return;
+      const silent=!err;
+      voiceError(silent?'No se escuchó nada. Reintentá o escribí los datos.':err);
+    };
+    try{r.start();watch(4000,run,retryOrFail);}catch{voiceError('No se pudo iniciar el micrófono. Reintentá.');}
   };
   const option=(attrs,main,sub='',on=false)=>`<button type="button" class="sh-opt${on?' on':''}" ${attrs}><span>${main}</span>${sub?`<small>${sub}</small>`:''}</button>`;
   const accountOpts=(act,list,sel)=>list.length?list.map(a=>option(`data-cap="${act}" data-v="${a.id}"`,`🏦 ${escape(a.name)}`,a.currency,sel===a.id)).join(''):`<p class="sh-note">No hay cuentas en ${d.currency}. Creá una desde Cuentas.</p>`;
