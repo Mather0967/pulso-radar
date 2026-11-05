@@ -139,23 +139,39 @@ export class Ledger {
   migrate() {
     let current = this.db.prepare('PRAGMA user_version').get().user_version;
     while (current < MIGRATIONS.length) {
-      this.db.exec('BEGIN IMMEDIATE');
+      this.begin();
       try {
         MIGRATIONS[current](this.db);
         this.db.exec(`PRAGMA user_version = ${current + 1}`);
         this.db.exec('COMMIT');
-      } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+      } catch (error) { this.rollback(); throw error; }
       current++;
     }
   }
   workspace(id, demo = false) { this.db.prepare('INSERT OR IGNORE INTO workspaces VALUES (?,?)').run(id, Number(demo)); }
+  // `BEGIN IMMEDIATE` falla si la conexión quedó con una transacción abierta por un error
+  // anterior cuyo ROLLBACK también falló. En ese estado toda escritura responde «no se pudo
+  // completar la solicitud» hasta reiniciar el proceso, aunque las lecturas sigan andando.
+  // Antes de rendirse se descarta la transacción pendiente y se reintenta una sola vez.
+  begin() {
+    try { this.db.exec('BEGIN IMMEDIATE'); return; }
+    catch (error) {
+      if (!/within a transaction/i.test(String(error?.message ?? ''))) throw error;
+      this.rollback();
+      // Un solo reintento: si vuelve a fallar, el error sale tal cual en vez de repetirse.
+      this.db.exec('BEGIN IMMEDIATE');
+    }
+  }
+  // El ROLLBACK no puede tapar el error que provocó la salida: si falla (p. ej. porque SQLite
+  // ya deshizo la transacción sola), se conserva el original, que es el que explica la causa.
+  rollback() { try { this.db.exec('ROLLBACK'); } catch {} }
   // Libera los espacios demo cuyas sesiones vencieron. Nunca toca el espacio privado.
   purgeDemoWorkspaces() {
     // Solo cuenta una sesión vencida; las filas vencidas quedan en la tabla hasta el próximo alta.
     const ids = this.db.prepare('SELECT id FROM workspaces WHERE demo=1 AND id NOT IN (SELECT workspace FROM sessions WHERE expires>?)').all(Date.now()).map(row => row.id);
     if (!ids.length) return 0;
     const list = ids.map(() => '?').join(',');
-    this.db.exec('BEGIN IMMEDIATE');
+    this.begin();
     try {
       this.db.prepare(`DELETE FROM audit WHERE workspace IN (${list})`).run(...ids);
       this.db.prepare(`DELETE FROM requests WHERE workspace IN (${list})`).run(...ids);
@@ -171,7 +187,7 @@ export class Ledger {
       const removed = this.db.prepare(`DELETE FROM workspaces WHERE id IN (${list})`).run(...ids).changes;
       this.db.exec('COMMIT');
       return removed;
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    } catch (error) { this.rollback(); throw error; }
   }
   audit(workspace, actor, action, entity) {
     this.db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?)').run(randomUUID(), workspace, actor, action, entity, new Date().toISOString());
@@ -240,7 +256,7 @@ export class Ledger {
     }
     const stored = this.requestKey(actor, key);
     const hash = createHash('sha256').update(JSON.stringify(stable(input))).digest('hex');
-    this.db.exec('BEGIN IMMEDIATE');
+    this.begin();
     try {
       const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, stored);
       if (previous) {
@@ -252,7 +268,7 @@ export class Ledger {
       this.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)').run(workspace, stored, hash, JSON.stringify(result), new Date().toISOString());
       this.db.exec('COMMIT');
       return result;
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    } catch (error) { this.rollback(); throw error; }
   }
   // Adjuntar un comprobante no pasa por `command` porque un archivo no es dinero: se
   // valida, se guarda con su hash y se audita. Reintentar con la misma clave devuelve
@@ -267,7 +283,7 @@ export class Ledger {
     const operationId = String(input?.operationId ?? '');
     const fingerprint = createHash('sha256').update(JSON.stringify(stable({ operationId, name, mime, sha256 }))).digest('hex');
     const stored = this.requestKey(actor, key);
-    this.db.exec('BEGIN IMMEDIATE');
+    this.begin();
     try {
       const previous = this.db.prepare('SELECT * FROM requests WHERE workspace=? AND key=?').get(workspace, stored);
       if (previous) {
@@ -285,7 +301,7 @@ export class Ledger {
       this.audit(workspace, actor, 'evidence.attached', id);
       this.db.exec('COMMIT');
       return result;
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    } catch (error) { this.rollback(); throw error; }
   }
   // Solo el espacio dueño del comprobante puede leerlo: la comprobación va en la consulta.
   evidenceFile(workspace, id) {
@@ -343,9 +359,9 @@ export class Ledger {
     return { id: account.id, into: target.id, entries: moved };
   }
   previewImport(workspace, actor, csv) {
-    this.db.exec('BEGIN IMMEDIATE');
+    this.begin();
     try { return this.execute(workspace, actor, {kind:'import', csv}); }
-    finally { this.db.exec('ROLLBACK'); }
+    finally { this.rollback(); }
   }
   execute(workspace, actor, input) {
     const { kind } = input;

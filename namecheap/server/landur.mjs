@@ -29,6 +29,16 @@ export const landurLoginPath='/landur/login';
 const actualPath=path=>existsSync(path)?realpathSync(path):resolve(actualPath(dirname(path)),basename(path));
 const within=(parent,child)=>{const rel=relative(parent,child);return rel===''||(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith(`..${sep}`));};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+// Los errores de almacenamiento llegan sin `status`, así que antes caían en un texto genérico
+// («revisá el runtime») que no dice nada y obligaba a adivinar. Se reconocen los casos que se
+// arreglan desde el hosting y se explican; el detalle técnico queda en el log, no en la respuesta.
+const storageHint=error=>{
+  const detail=`${error?.code||''} ${error?.errstr||''} ${error?.message||''}`;
+  if(/SQLITE_READONLY|SQLITE_CANTOPEN|readonly|EACCES|EPERM/i.test(detail))return 'La base de datos no acepta escrituras: revisá el dueño y los permisos del directorio de datos y de los archivos landur.sqlite*.';
+  if(/SQLITE_FULL|ENOSPC|disk is full/i.test(detail))return 'El almacenamiento del servidor está lleno: liberá espacio y volvé a intentar.';
+  if(/SQLITE_BUSY|SQLITE_LOCKED|database is locked/i.test(detail))return 'Otro proceso está usando la base de datos: dejá solo el proceso de Passenger y reintentá.';
+  return '';
+};
 const redirect=(to,headers={})=>new Response(null,{status:303,headers:{Location:to,...headers}});
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -234,8 +244,11 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       return json({error:'Método no admitido.'},405);
     }catch(error){
       if(error.status)return json({error:error.message},error.status);
-      console.error('LANDUR portal:',error.code||error.name);
-      return json({error:'LANDUR no pudo completar la solicitud. Revisá el runtime y la instalación; Pulso no se modificó.'},503);
+      // Se registra la causa real (código y mensaje, nunca el contenido del movimiento) y se
+      // responde algo accionable cuando el problema está en el almacenamiento.
+      console.error('LANDUR portal:',JSON.stringify({path,actor:user?.id??null,code:error?.code??null,errcode:error?.errcode??null,name:error?.name??null,message:String(error?.message??'').slice(0,300)}));
+      const hint=storageHint(error);
+      return json({error:hint?`LANDUR no pudo guardar el cambio. ${hint}`:'LANDUR no pudo completar la solicitud. Revisá el runtime y la instalación; Pulso no se modificó.'},503);
     }
   }
   handler.close=()=>{ledger?.close();ledger=undefined;initialized=undefined;};
