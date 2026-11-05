@@ -758,11 +758,21 @@ function takeAccount(said,currency){
   return {id:hit.id,text:(said.slice(0,from)+' '+said.slice(end)).replace(/\s+/g,' ').replace(/[\s,;]+$/,'').trim()};
 }
 // El servidor lee «1.800» como 1,80: aquí «1.800» y «1,5» se normalizan antes de mostrar el importe, que la persona confirma.
+// En es-UY el punto separa miles y la coma es decimal, pero el teclado del iPhone también
+// escribe «60,000» con coma de miles: un grupo final de tres dígitos es miles, no decimales.
+// El tope es el mismo del servidor (9.999.999.999.999,99): por encima no se envía nada.
+const AMOUNT_MAX_CENTS=999999999999999;
 function normAmount(raw,zero=false){
-  let t=String(raw||'').trim().replace(/[^\d.,]/g,'');
-  if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
-  else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
-  const n=Number(t);return Number.isFinite(n)&&(n>0||(zero&&n===0&&t!==''))?n.toFixed(2):'';
+  const text=String(raw||'').trim().replace(/[^\d.,]/g,'');
+  if(!text)return '';
+  let t=text;
+  if(/^\d{1,3}(?:\.\d{3})+$/.test(t)||/^\d{1,3}(?:,\d{3})+$/.test(t))t=t.replace(/[.,]/g,'');
+  else if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
+  const n=Number(t);
+  if(!Number.isFinite(n))return '';
+  const cents=Math.round(n*100);
+  if(!Number.isSafeInteger(cents)||cents>AMOUNT_MAX_CENTS)return '';
+  return n>0||(zero&&n===0&&t!=='')?(cents/100).toFixed(2):'';
 }
 // Registro en pasos para todas las operaciones: capturar (solo gastos nuevos, por voz, foto o texto) →
 // revisar (filas grandes que abren una hoja inferior) → «Más detalles» opcional → resumen y guardar.
@@ -898,7 +908,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
     const capLabel=isAcc?'Saldo inicial':d.kind==='collection'?'Cobro bruto':'';
     const amountBtn=`<button type="button" class="rv-amount${d.amount?'':' need'}" data-cap="open" data-v="amount">${d.amount?moneyHtml(cents,d.currency):`<span>${amountTitle()}</span>`}</button>`;
     if(phase==='review'){
-      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?'Nueva cuenta':'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${isAcc?'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>':''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
+      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?'Nueva cuenta':'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${err?`<p class="cap-err" role="alert">${escape(err)}</p>`:''}${isAcc?'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>':''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
     }else{
       const meta=summaryMeta().filter(Boolean);
       modal.innerHTML=`<div class="cap-head"><button class="icon-btn" data-cap="back" aria-label="Volver a revisar">‹</button>${close}</div><div class="sm"><p class="sm-kind">${KIND_INFO[d.kind][0]}</p><div class="sm-amount">${moneyHtml(cents,d.currency)}</div><p class="sm-concept">${escape(isAcc?d.name:d.concept)}</p><p class="sm-meta">${meta.join('  ·  ')}</p><p class="cap-err" role="alert">${escape(err)}</p></div><div class="cap-foot"><button type="button" class="primary" data-cap="save" ${busy?'disabled':''}>${isAcc?'Crear cuenta':'Guardar registro'}</button></div>${files}`;
@@ -976,7 +986,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
       render();return;
     }
     const f=t.dataset.capfield;if(!f||pendingRequest)return;
-    if(f==='amount'){d.amount=normAmount(t.value,d.kind==='account');resolve();}
+    if(f==='amount'){const v=normAmount(t.value,d.kind==='account');d.amount=v;err=(v||!t.value.trim())?'':'Ese importe no se puede registrar: hasta 9.999.999.999.999,99 y dos decimales.';resolve();}
     else if(f==='commission'){d.commission=normAmount(t.value,true);resolve();}
     else if(f==='concept'){d.concept=cap(t.value.trim());resolve();}
     else if(f==='name'){d.name=t.value.trim();resolve();}

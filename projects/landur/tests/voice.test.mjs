@@ -46,6 +46,20 @@ test('importes dichos con palabras', () => {
   assert.equal(wordsToNumber(['mil', 'pesos']), null, 'una palabra que no es número corta la corrida');
 });
 
+test('las cifras enormes se leen por su escala: mil millones no es mil más un millón', () => {
+  assert.equal(wordsToNumber(['mil', 'millones']), 1000000000);
+  assert.equal(wordsToNumber(['dos', 'mil', 'millones']), 2000000000);
+  assert.equal(wordsToNumber(['mil', 'quinientos', 'millones']), 1500000000);
+  assert.equal(wordsToNumber(['veinte', 'mil', 'millones']), 20000000000);
+  assert.equal(wordsToNumber(['un', 'billon']), 1000000000000);
+  assert.equal(wordsToNumber(['un', 'millon', 'doscientos', 'mil']), 1200000);
+  assert.equal(wordsToNumber(['noventa', 'y', 'nueve', 'mil']), 99000, 'la «y» no corta la cifra');
+  assert.equal(say('pagué dos mil millones de pesos de la planta').amountText, '2000000000.00');
+  assert.equal(say('pagué mil quinientos millones').amountText, '1500000000.00');
+  assert.equal(say('pagué noventa y nueve mil pesos de flete').amountText, '99000.00');
+  assert.equal(say('registré un billón de pesos').amountText, '1000000000000.00');
+});
+
 test('la cifra suelta no se corta por el separador de miles', () => {
   // Regresión: "12.500" se leía como "12" y guardaba 12,00.
   assert.equal(say('12.500').amountText, '12500.00');

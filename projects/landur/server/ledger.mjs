@@ -5,11 +5,17 @@ import { parseImport } from './csv.mjs';
 export class DomainError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
+// Tope del importe: 9.999.999.999.999,99 en unidades menores enteras, siempre dentro de
+// un entero seguro. Antes se cortaba en 10 dígitos sin decir el máximo, así que un saldo
+// inicial grande se rechazaba con el mismo texto genérico que un dato mal escrito.
+export const MONEY_MAX_CENTS = 999999999999999;
 export function money(value, { zero = false } = {}) {
-  if (typeof value !== 'string' || !/^(0|[1-9]\d{0,9})([.,]\d{1,2})?$/.test(value.trim()))
-    throw new DomainError('Ingresá un importe válido, sin separadores de miles y con hasta 2 decimales.');
+  if (typeof value !== 'string' || !/^(0|[1-9]\d{0,12})([.,]\d{1,2})?$/.test(value.trim()))
+    throw new DomainError('Ingresá un importe válido: hasta 9.999.999.999.999,99, sin separadores de miles y con hasta 2 decimales.');
   const [whole, fraction = ''] = value.trim().replace(',', '.').split('.');
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  if (!Number.isSafeInteger(cents) || cents > MONEY_MAX_CENTS)
+    throw new DomainError('El importe supera el máximo admitido: 9.999.999.999.999,99.');
   if (!zero && cents === 0) throw new DomainError('El importe debe ser mayor que cero.');
   return cents;
 }

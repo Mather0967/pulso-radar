@@ -67,7 +67,7 @@ test('límites de tamaño y cantidad rechazados antes de escribir', async t => {
 test('importes inválidos rechazados por el servidor, no por el cliente', async t => {
   const { post, login, state } = await fixture(t);
   const cookie = await login();
-  for (const amount of ['1e3', '-5', '0', '12.345', '1.234,56', 'doce', ' ', '9999999999999']) {
+  for (const amount of ['1e3', '-5', '0', '12.345', '1.234,56', 'doce', ' ', '99999999999999']) {
     const csv = `${header}\nsale,2026-10-24,Importe raro,${amount},UYU,,,hoja,a-${encodeURIComponent(amount)},`;
     assert.equal((await post('/api/import/preview', { csv }, cookie)).status, 400, `importe ${amount}`);
   }
