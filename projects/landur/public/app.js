@@ -627,7 +627,8 @@ const SPEECH = window.SpeechRecognition || window.webkitSpeechRecognition;
 let dictation = null, invoiceRecognition = null;
 function stopDictation(){
   // El dictado de factura completa se corta con el mismo cierre del diálogo.
-  if(invoiceRecognition){const current=invoiceRecognition;invoiceRecognition=null;try{current.stop();}catch{}}
+  // El dictado de factura se corta con «abort»: en Safari «stop» a veces deja el micrófono tomado.
+  if(invoiceRecognition){const current=invoiceRecognition;invoiceRecognition=null;try{current.abort?current.abort():current.stop();}catch{try{current.stop();}catch{}}}
   if(!dictation)return;
   const current=dictation;dictation=null;
   current.button.classList.remove('recording');
@@ -758,11 +759,21 @@ function takeAccount(said,currency){
   return {id:hit.id,text:(said.slice(0,from)+' '+said.slice(end)).replace(/\s+/g,' ').replace(/[\s,;]+$/,'').trim()};
 }
 // El servidor lee «1.800» como 1,80: aquí «1.800» y «1,5» se normalizan antes de mostrar el importe, que la persona confirma.
+// En es-UY el punto separa miles y la coma es decimal, pero el teclado del iPhone también
+// escribe «60,000» con coma de miles: un grupo final de tres dígitos es miles, no decimales.
+// El tope es el mismo del servidor (9.999.999.999.999,99): por encima no se envía nada.
+const AMOUNT_MAX_CENTS=999999999999999;
 function normAmount(raw,zero=false){
-  let t=String(raw||'').trim().replace(/[^\d.,]/g,'');
-  if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
-  else if(/^\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
-  const n=Number(t);return Number.isFinite(n)&&(n>0||(zero&&n===0&&t!==''))?n.toFixed(2):'';
+  const text=String(raw||'').trim().replace(/[^\d.,]/g,'');
+  if(!text)return '';
+  let t=text;
+  if(/^\d{1,3}(?:\.\d{3})+$/.test(t)||/^\d{1,3}(?:,\d{3})+$/.test(t))t=t.replace(/[.,]/g,'');
+  else if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
+  const n=Number(t);
+  if(!Number.isFinite(n))return '';
+  const cents=Math.round(n*100);
+  if(!Number.isSafeInteger(cents)||cents>AMOUNT_MAX_CENTS)return '';
+  return n>0||(zero&&n===0&&t!=='')?(cents/100).toFixed(2):'';
 }
 // Registro en pasos para todas las operaciones: capturar (solo gastos nuevos, por voz, foto o texto) →
 // revisar (filas grandes que abren una hoja inferior) → «Más detalles» opcional → resumen y guardar.
@@ -812,16 +823,64 @@ function quickCapture(kind='expense',targetId='',opts={}){
   };
   // Al llegar a «Revisar» se abre sola la hoja del primer dato que falta: no hay formulario que recorrer.
   const enterReview=()=>{phase='review';sheet=missing();};
+  // Ciclo de vida del micrófono. En iOS/WebKit el reconocimiento puede no disparar
+  // «end» (o quedarse mudo en el segundo dictado), así que la pantalla no depende de
+  // ese evento: el resultado se aplica al llegar, el micrófono se corta con «abort»
+  // —libera la sesión de audio mejor que «stop»— y un vigía acotado reintenta una vez
+  // o avisa, en lugar de dejar «Escuchando…» para siempre y obligar a reabrir la app.
+  let watchdog=0,attempt=0;
+  const clearWatch=()=>{clearTimeout(watchdog);watchdog=0;};
+  const watch=(ms,run,onLate)=>{clearWatch();watchdog=setTimeout(()=>{if(run!==gen||!listening)return;onLate();},ms);};
+  const stopVoice=()=>{
+    const current=recognition;recognition=null;invoiceRecognition=null;listening=false;clearWatch();
+    if(!current)return;
+    current.onresult=current.onerror=current.onend=current.onstart=null;
+    try{current.abort?current.abort():current.stop();}catch{try{current.stop();}catch{}}
+  };
+  const voiceError=message=>{err=message;stopVoice();if(live())render();};
   const listen=()=>{
-    if(listening){try{recognition?.stop();}catch{}return;}
+    if(listening){
+      // Detener a mano: se pide el final para conservar lo dicho; si el navegador no
+      // responde en 1,5 s, se corta y se avisa en vez de dejar el micrófono tomado.
+      const run=gen;clearWatch();
+      try{recognition?.stop();}catch{}
+      watchdog=setTimeout(()=>{if(run!==gen||!listening)return;voiceError('No se escuchó nada. Reintentá o escribí los datos.');},1500);
+      return;
+    }
     if(!SPEECH){typed=true;render();return;}
     stopDictation();const run=++gen;
-    recognition=new SPEECH();recognition.lang='es-UY';recognition.interimResults=false;recognition.continuous=false;
-    invoiceRecognition=recognition;listening=true;err='';render();
-    recognition.onresult=e=>{if(run!==gen)return;const said=[...e.results].map(r=>r[0].transcript).join(' ').trim();if(said)absorb(said);};
-    recognition.onerror=e=>{if(run!==gen)return;err=e.error==='not-allowed'||e.error==='service-not-allowed'?'Permití el micrófono en los ajustes para dictar.':'No te escuché bien. Probá de nuevo.';};
-    recognition.onend=()=>{if(run!==gen)return;invoiceRecognition=null;listening=false;if(live())render();};
-    try{recognition.start();}catch{listening=false;invoiceRecognition=null;err='No se pudo iniciar el micrófono.';render();}
+    stopVoice();
+    const r=new SPEECH();
+    recognition=r;invoiceRecognition=r;listening=true;err='';render();
+    r.lang='es-UY';r.interimResults=false;r.continuous=false;
+    const retryOrFail=()=>{
+      stopVoice();
+      if(attempt++<1)listen();
+      else voiceError('El micrófono no respondió. Reintentá o escribí los datos.');
+    };
+    r.onstart=()=>{
+      if(run!==gen||recognition!==r)return;
+      // Arrancó pero puede quedarse mudo: sin resultado en 15 s, se informa.
+      watch(15000,run,()=>voiceError('No se escuchó nada. Reintentá o escribí los datos.'));
+    };
+    r.onresult=e=>{
+      if(run!==gen||recognition!==r)return;
+      attempt=0;
+      const said=[...e.results].map(x=>x[0].transcript).join(' ').trim();
+      if(said)absorb(said);else err='No se escuchó nada. Reintentá o escribí los datos.';
+      stopVoice();if(live())render();
+    };
+    r.onerror=e=>{
+      if(run!==gen||recognition!==r)return;
+      attempt=0;
+      voiceError(e.error==='not-allowed'||e.error==='service-not-allowed'?'Permití el micrófono en los ajustes para dictar.':'No te escuché bien. Probá de nuevo.');
+    };
+    r.onend=()=>{
+      if(run!==gen||recognition!==r)return;
+      const silent=!err;
+      voiceError(silent?'No se escuchó nada. Reintentá o escribí los datos.':err);
+    };
+    try{r.start();watch(4000,run,retryOrFail);}catch{voiceError('No se pudo iniciar el micrófono. Reintentá.');}
   };
   const option=(attrs,main,sub='',on=false)=>`<button type="button" class="sh-opt${on?' on':''}" ${attrs}><span>${main}</span>${sub?`<small>${sub}</small>`:''}</button>`;
   const accountOpts=(act,list,sel)=>list.length?list.map(a=>option(`data-cap="${act}" data-v="${a.id}"`,`🏦 ${escape(a.name)}`,a.currency,sel===a.id)).join(''):`<p class="sh-note">No hay cuentas en ${d.currency}. Creá una desde Cuentas.</p>`;
@@ -898,7 +957,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
     const capLabel=isAcc?'Saldo inicial':d.kind==='collection'?'Cobro bruto':'';
     const amountBtn=`<button type="button" class="rv-amount${d.amount?'':' need'}" data-cap="open" data-v="amount">${d.amount?moneyHtml(cents,d.currency):`<span>${amountTitle()}</span>`}</button>`;
     if(phase==='review'){
-      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?'Nueva cuenta':'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${isAcc?'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>':''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
+      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?'Nueva cuenta':'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${err?`<p class="cap-err" role="alert">${escape(err)}</p>`:''}${isAcc?'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>':''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
     }else{
       const meta=summaryMeta().filter(Boolean);
       modal.innerHTML=`<div class="cap-head"><button class="icon-btn" data-cap="back" aria-label="Volver a revisar">‹</button>${close}</div><div class="sm"><p class="sm-kind">${KIND_INFO[d.kind][0]}</p><div class="sm-amount">${moneyHtml(cents,d.currency)}</div><p class="sm-concept">${escape(isAcc?d.name:d.concept)}</p><p class="sm-meta">${meta.join('  ·  ')}</p><p class="cap-err" role="alert">${escape(err)}</p></div><div class="cap-foot"><button type="button" class="primary" data-cap="save" ${busy?'disabled':''}>${isAcc?'Crear cuenta':'Guardar registro'}</button></div>${files}`;
@@ -976,7 +1035,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
       render();return;
     }
     const f=t.dataset.capfield;if(!f||pendingRequest)return;
-    if(f==='amount'){d.amount=normAmount(t.value,d.kind==='account');resolve();}
+    if(f==='amount'){const v=normAmount(t.value,d.kind==='account');d.amount=v;err=(v||!t.value.trim())?'':'Ese importe no se puede registrar: hasta 9.999.999.999.999,99 y dos decimales.';resolve();}
     else if(f==='commission'){d.commission=normAmount(t.value,true);resolve();}
     else if(f==='concept'){d.concept=cap(t.value.trim());resolve();}
     else if(f==='name'){d.name=t.value.trim();resolve();}

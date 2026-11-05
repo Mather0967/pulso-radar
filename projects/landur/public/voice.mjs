@@ -70,19 +70,39 @@ export function fold(text) {
   return out;
 }
 
+// Escalas: "mil millones" no es mil más un millón, es mil veces un millón. Por eso
+// cada escala absorbe los grupos de orden menor ya acumulados ("mil quinientos
+// millones" = 1.500 millones) y "billon" entra como 10^12.
+const SCALES = { mil: 1000, millon: 1000000, millones: 1000000, billon: 1000000000000, billones: 1000000000000 };
+
 const bare = token => token.replace(PUNCTUATION, '');
-const isNumberWord = token => Object.hasOwn(SMALL, token) || token === 'mil' || token === 'millon' || token === 'millones';
+const isNumberWord = token => Object.hasOwn(SMALL, token) || Object.hasOwn(SCALES, token);
+// Conector que no cambia la cifra: "treinta y cinco mil" son 35.000, no 5.000.
+const isConnector = token => token === 'y';
+
+// Tope del servidor en unidades menores enteras (9.999.999.999.999,99). Una cifra
+// mayor no se recorta ni se inventa: el campo queda vacío y se avisa.
+export const MAX_CENTS = 999999999999999;
 
 // Suma una corrida de palabras numéricas. Devuelve null si algún token no es un número.
 export function wordsToNumber(tokens) {
-  let total = 0, current = 0, seen = false;
+  const groups = []; // [{ value, scale }], de mayor a menor
+  let current = 0, seen = false;
   for (const token of tokens) {
+    if (isConnector(token)) continue;
     if (Object.hasOwn(SMALL, token)) { current += SMALL[token]; seen = true; continue; }
-    if (token === 'mil') { total += (current || 1) * 1000; current = 0; seen = true; continue; }
-    if (token === 'millon' || token === 'millones') { total += (current || 1) * 1000000; current = 0; seen = true; continue; }
-    return null;
+    const scale = SCALES[token];
+    if (scale === undefined) return null;
+    seen = true;
+    let value = current;
+    while (groups.length && groups[groups.length - 1].scale < scale) {
+      const lower = groups.pop();
+      value += lower.value * lower.scale;
+    }
+    groups.push({ value: value || 1, scale });
+    current = 0;
   }
-  return seen ? total + current : null;
+  return seen ? groups.reduce((sum, group) => sum + group.value * group.scale, current) : null;
 }
 
 // Convención es-UY: el punto separa miles y la coma decimales.
@@ -101,7 +121,7 @@ export function digitsToCents(raw) {
     whole = text;
   } else return null;
   const cents = Number(whole) * 100 + Number((fraction.padEnd(2, '0') || '0'));
-  return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+  return Number.isSafeInteger(cents) && cents > 0 && cents <= MAX_CENTS ? cents : null;
 }
 
 const iso = date => date.toISOString().slice(0, 10);
@@ -181,13 +201,17 @@ function findAmount(text, list) {
   const runs = [];
   let start = -1;
   for (let i = 0; i <= list.length; i++) {
-    const number = i < list.length && isNumberWord(bare(list[i].value));
+    const token = i < list.length ? bare(list[i].value) : '';
+    // La "y" solo mantiene la corrida cuando está entre dos números.
+    const number = i < list.length && (isNumberWord(token) || (isConnector(token) && start !== -1 && i + 1 < list.length && isNumberWord(bare(list[i + 1].value))));
     if (number && start === -1) start = i;
     if (!number && start !== -1) { runs.push([start, i]); start = -1; }
   }
   for (const [from, to] of runs.reverse()) {
     const value = wordsToNumber(list.slice(from, to).map(token => bare(token.value)));
-    if (value) return { cents: value * 100, span: { start: list[from].start, end: list[to - 1].end } };
+    const cents = value ? value * 100 : 0;
+    if (cents && Number.isSafeInteger(cents) && cents <= MAX_CENTS)
+      return { cents, span: { start: list[from].start, end: list[to - 1].end } };
   }
   // Cifra suelta sin moneda ni preposición. Se exige más de un dígito para no
   // tomar un ordinal suelto como importe: antes se prefiere no reconocer nada.

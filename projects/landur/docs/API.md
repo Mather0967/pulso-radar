@@ -42,7 +42,7 @@ Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen per
 
 Estos son los borrados del sistema y son deliberadamente explícitos: nada se borra por omisión, y una operación financiera sigue sin poder borrarse por separado del historial de su cuenta. Lo que se pone mal en un registro se corrige con `reversal` y volviendo a cargar; lo que se pone mal en un comprobante se quita y se vuelve a adjuntar; una cuenta se elimina vacía, trasladando su historial o confirmando el borrado de ese historial. Nada de esto altera una cifra de forma silenciosa: cada baja queda en la auditoría con su autor y su fecha.
 
-Importes de entrada como strings decimales, sin miles, hasta dos decimales; respuesta monetaria en unidades menores enteras. Monedas admitidas técnicamente: UYU, USD y BRL, separadas sin conversión. Esto no confirma cuáles usa LANDUR en producción.
+Importes de entrada como strings decimales, sin miles, hasta dos decimales y con máximo 9.999.999.999.999,99 (por encima, 400 con ese máximo en el mensaje); respuesta monetaria en unidades menores enteras. El cliente normaliza antes los separadores de miles que escribe el teclado, incluido «60,000» con coma de miles. Monedas admitidas técnicamente: UYU, USD y BRL, separadas sin conversión. Esto no confirma cuáles usa LANDUR en producción.
 
 ## Comprobantes
 

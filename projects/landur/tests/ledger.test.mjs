@@ -16,6 +16,14 @@ function fixture(t) {
   return {ledger,run,account,op};
 }
 
+test('un saldo inicial grande se registra y el tope informa su máximo', (t) => {
+  const {ledger,account} = fixture(t);
+  const big = account({opening:'20000000000'});
+  assert.equal(ledger.snapshot('a').accounts.find(a => a.id === big).opening, 2000000000000);
+  // Antes el límite era de 10 dígitos y el rechazo no decía cuál era el máximo.
+  assert.throws(() => account({opening:'10000000000000'}), /9\.999\.999\.999\.999,99/);
+});
+
 test('precision monetaria y rechazo de importes inválidos', () => {
   assert.equal(money('0,10') + money('0.20'), 30);
   assert.equal(money('10.3'), 1030);
