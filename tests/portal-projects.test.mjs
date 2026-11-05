@@ -6,7 +6,7 @@ import http from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {availableProjects,mergeProjectGrants,projectAccess,renderProjectsPage} from '../namecheap/server/projects.mjs';
 import {clientAddress,sessionCookie,SESSION_COOKIES,originAllowed} from '../namecheap/server/auth.mjs';
-import {createLandurPortal} from '../namecheap/server/landur.mjs';
+import {createLandurPortal,storageDiagnosis} from '../namecheap/server/landur.mjs';
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
 test('catálogo: permisos independientes y administradores ven ambos proyectos',()=>{
@@ -242,5 +242,30 @@ test('falla de runtime o ruta LANDUR no derriba el selector de proyectos',async(
   assert.equal((await handler(new Request('https://rivect.net/landur/api/state'),user)).status,503);
   assert.equal((await handler(new Request('https://rivect.net/landur/'),user)).status,503);
   assert.equal((await handler(new Request('https://rivect.net/landur/api/session'),user)).status,200);
+  // La respuesta de una falla inesperada ya no manda a «revisar el runtime»: dice qué pasó
+  // con la referencia que aparece en el log y que el reintento no duplica nada.
+  const failed=await handler(new Request('https://rivect.net/landur/api/commands',{method:'POST',
+    headers:{'content-type':'application/json','x-landur-request':'1','x-csrf-token':'test','sec-fetch-site':'same-origin'},
+    body:JSON.stringify({kind:'account',name:'Banco',accountKind:'bank',currency:'UYU',opening:'100',cutoff:'2026-11-05',verified:true,accessible:true})}),user);
+  assert.equal(failed.status,503);
+  const {error}=await failed.json();
+  assert.doesNotMatch(error,/runtime/i,'el texto que confundía no puede volver');
+  assert.match(error,/referencia [0-9a-f]{8}/,'el mensaje se puede cruzar con el log');
+  assert.match(error,/no se duplica/,'el reintento seguro queda dicho');
   handler.close();
+});
+test('el error de almacenamiento se explica según su causa',()=>{
+  const typed=(code,message)=>({code,message});
+  assert.match(storageDiagnosis(typed('ERR_SQLITE_READONLY','attempt to write a readonly database')),/permisos/i);
+  assert.match(storageDiagnosis(Object.assign(Error('disk I/O error'),{code:'ENOSPC'})),/lleno/i);
+  assert.match(storageDiagnosis(typed('ERR_SQLITE_ERROR','database is locked')),/Otro proceso/i);
+  assert.match(storageDiagnosis(typed('ERR_SQLITE_ERROR','database disk image is malformed')),/dañada/i);
+  assert.match(storageDiagnosis(typed('ERR_SQLITE_ERROR','no such table: connections')),/faltan las tablas/i);
+  // `node:sqlite` deja el nombre del código solo en el mensaje y el número en `errcode`.
+  assert.match(storageDiagnosis({code:'ERR_SQLITE_ERROR',errcode:526,message:'unable to open database file'}),/permisos/i);
+  assert.match(storageDiagnosis({code:'ERR_SQLITE_ERROR',errcode:8,message:'attempt to write a readonly database'}),/permisos/i);
+  assert.match(storageDiagnosis({code:'ERR_SQLITE_ERROR',errcode:13,message:'database or disk is full'}),/lleno/i);
+  assert.match(storageDiagnosis({code:'ERR_SQLITE_ERROR',errcode:5,message:'database is locked'}),/Otro proceso/i);
+  assert.match(storageDiagnosis(typed('ERR_SQLITE_ERROR','cannot start a transaction within a transaction')),/No se pudo escribir/i);
+  assert.equal(storageDiagnosis(Error('boom')),'','lo desconocido no inventa una causa');
 });

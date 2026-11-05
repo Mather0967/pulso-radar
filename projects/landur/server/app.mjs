@@ -244,7 +244,9 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
       }
       throw new DomainError('No encontrado.',404);
     } catch (err) {
-      if (!(err instanceof DomainError)) console.error('LANDUR request failed:', err.code || err.name);
+      // El código solo no alcanzaba para diagnosticar: se registra también el mensaje, que es lo
+      // que distingue un permiso de un disco lleno o de una base bloqueada.
+      if (!(err instanceof DomainError)) console.error('LANDUR request failed:', err.code || err.name, String(err.message ?? '').slice(0, 300));
       if (!res.headersSent) json(res,err.status || 500,{error:err.status ? err.message : 'No se pudo completar la operación. No repitas el registro sin revisar su estado.'});
       else res.end();
     }

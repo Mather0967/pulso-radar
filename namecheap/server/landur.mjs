@@ -2,6 +2,7 @@ import { readFile, mkdir, chmod } from 'node:fs/promises';
 import { resolve, relative, sep, isAbsolute, dirname, basename } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { projectAccess } from './projects.mjs';
 import { originAllowed, rejectOrigin } from './auth.mjs';
 
@@ -30,13 +31,27 @@ const actualPath=path=>existsSync(path)?realpathSync(path):resolve(actualPath(di
 const within=(parent,child)=>{const rel=relative(parent,child);return rel===''||(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith(`..${sep}`));};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 // Los errores de almacenamiento llegan sin `status`, así que antes caían en un texto genérico
-// («revisá el runtime») que no dice nada y obligaba a adivinar. Se reconocen los casos que se
-// arreglan desde el hosting y se explican; el detalle técnico queda en el log, no en la respuesta.
-const storageHint=error=>{
-  const detail=`${error?.code||''} ${error?.errstr||''} ${error?.message||''}`;
-  if(/SQLITE_READONLY|SQLITE_CANTOPEN|readonly|EACCES|EPERM/i.test(detail))return 'La base de datos no acepta escrituras: revisá el dueño y los permisos del directorio de datos y de los archivos landur.sqlite*.';
-  if(/SQLITE_FULL|ENOSPC|disk is full/i.test(detail))return 'El almacenamiento del servidor está lleno: liberá espacio y volvé a intentar.';
-  if(/SQLITE_BUSY|SQLITE_LOCKED|database is locked/i.test(detail))return 'Otro proceso está usando la base de datos: dejá solo el proceso de Passenger y reintentá.';
+// («revisá el runtime y la instalación») que no decía nada y obligaba a adivinar. Cada familia
+// tiene su causa y su arreglo: se reconoce acá y se responde qué hacer. Lo que no se reconoce
+// igual sale con una referencia corta que coincide con la línea del log.
+export const storageDiagnosis=error=>{
+  const detail=[error?.code,error?.errstr,error?.errno,error?.message].filter(Boolean).join(' ');
+  // `node:sqlite` informa el código extendido en `errcode` (p. ej. 526 = no puede abrir el
+  // archivo) y deja el nombre SQLite solo en la constante interna: mirar los bytes bajos evita
+  // depender de que el texto del motor esté en inglés.
+  const code=Number(error?.errcode??error?.errno??0)&0xff;
+  if(code===11||code===26||/SQLITE_CORRUPT|SQLITE_NOTADB|malformed|not a database/i.test(detail))
+    return 'La base de datos de LANDUR está dañada. Restaurá el último respaldo del directorio de datos antes de seguir registrando movimientos.';
+  if(code===8||code===14||/SQLITE_READONLY|SQLITE_CANTOPEN|readonly|unable to open database|EACCES|EPERM/i.test(detail))
+    return 'La base de datos no acepta escrituras: revisá el dueño y los permisos del directorio de datos y de los archivos landur.sqlite*.';
+  if(code===13||/SQLITE_FULL|ENOSPC|disk is full/i.test(detail))
+    return 'El almacenamiento del servidor está lleno: liberá espacio y volvé a intentar.';
+  if(code===5||code===6||/SQLITE_BUSY|SQLITE_LOCKED|database is locked/i.test(detail))
+    return 'Otro proceso está usando la base de datos: dejá solo el proceso de Passenger y reintentá.';
+  if(/no such table|no such column|has no column named/i.test(detail))
+    return 'A la base de datos le faltan las tablas de la versión instalada: restaurá el respaldo o avisá a quien administra el servidor.';
+  if(/SQLITE_|ERR_SQLITE/i.test(detail))
+    return 'No se pudo escribir en la base de datos de LANDUR.';
   return '';
 };
 const redirect=(to,headers={})=>new Response(null,{status:303,headers:{Location:to,...headers}});
@@ -119,7 +134,20 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     })().catch(error=>{ledger?.close();ledger=undefined;initialized=undefined;throw error;});
     return initialized;
   }
-  async function handler(req,user,ip) {
+  // Una sola salida de error para todo el portal. Antes solo el tramo de API la tenía: lo que
+  // fallaba al leer un formulario o al abrir el acceso salía por el `catch` de `main.mjs` como
+  // «No se pudo completar la operación.», sin causa ni referencia. Se registra el detalle real
+  // (nunca el contenido de un movimiento) y se responde algo que se pueda accionar.
+  const failure=(error,{path,actor=null}={})=>{
+    const reference=randomUUID().slice(0,8);
+    console.error('LANDUR portal',reference,JSON.stringify({path:String(path??'').slice(0,200),actor,code:error?.code??null,errcode:error?.errcode??null,name:error?.name??null,message:String(error?.message??'').slice(0,300)}));
+    const diagnosis=storageDiagnosis(error);
+    if(diagnosis)return json({error:`LANDUR no pudo completar la solicitud. ${diagnosis}`},503);
+    // Un 503 no dice ni que sí ni que no: la clave de idempotencia del cliente permite reintentar
+    // sin duplicar, y eso es lo que se le indica.
+    return json({error:`LANDUR no pudo completar la solicitud (referencia ${reference}). No se confirmó el cambio: volvé a intentar y, si ya se había registrado, no se duplica.`},503);
+  };
+  async function route(req,user,ip) {
     const url=new URL(req.url),method=req.method;
     // Ninguna escritura sin el origen correcto, ni siquiera el ingreso: un formulario de otro
     // sitio no debe poder iniciar sesión en nombre de un visitante.
@@ -244,11 +272,14 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       return json({error:'Método no admitido.'},405);
     }catch(error){
       if(error.status)return json({error:error.message},error.status);
-      // Se registra la causa real (código y mensaje, nunca el contenido del movimiento) y se
-      // responde algo accionable cuando el problema está en el almacenamiento.
-      console.error('LANDUR portal:',JSON.stringify({path,actor:user?.id??null,code:error?.code??null,errcode:error?.errcode??null,name:error?.name??null,message:String(error?.message??'').slice(0,300)}));
-      const hint=storageHint(error);
-      return json({error:hint?`LANDUR no pudo guardar el cambio. ${hint}`:'LANDUR no pudo completar la solicitud. Revisá el runtime y la instalación; Pulso no se modificó.'},503);
+      return failure(error,{path,actor:user?.id??null});
+    }
+  }
+  async function handler(req,user,ip){
+    try{return await route(req,user,ip);}
+    catch(error){
+      if(error.status)return json({error:error.message},error.status);
+      return failure(error,{path:req?.url,actor:user?.id??null});
     }
   }
   handler.close=()=>{ledger?.close();ledger=undefined;initialized=undefined;};
