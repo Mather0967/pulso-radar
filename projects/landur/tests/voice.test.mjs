@@ -98,6 +98,24 @@ test('el vencimiento no reemplaza a la fecha de la operación', () => {
   assert.equal(result.amountText, '3400.00');
 });
 
+test('el vencimiento solo consume su fecha: un importe dicho después se conserva', () => {
+  for (const frase of [
+    'deuda con el proveedor de embalaje vence el 30 de octubre por 3.400 pesos',
+    'deuda con el proveedor de embalaje vence el 30 de octubre por tres mil cuatrocientos pesos',
+    'deuda con el proveedor de embalaje vence el 30 de octubre 3 mil 400 pesos'
+  ]) {
+    const result = say(frase);
+    assert.equal(result.due, '2026-10-30', frase);
+    assert.equal(result.amountText, '3400.00', frase);
+    assert.equal(result.concept, 'Proveedor de embalaje', frase);
+  }
+  // Si la fecha del vencimiento no se entiende, se avisa pero no se traga el importe.
+  const sinFecha = say('deuda con el proveedor de embalaje vence pronto por 3.400 pesos');
+  assert.equal(sinFecha.due, null);
+  assert.equal(sinFecha.amountText, '3400.00');
+  assert.ok(sinFecha.warnings.some(w => /vencimiento/.test(w)));
+});
+
 test('nunca inventa un importe: sin cifra, el campo queda vacío y se avisa', () => {
   const result = say('factura de proveedor sin importe');
   assert.equal(result.cents, null);

@@ -283,8 +283,12 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   let due = null;
   const dueClause = working.match(/\bvence\b(?:\s+el)?\s+(.+)$/);
   if (dueClause) {
-    due = findDate(dueClause[1], today).date;
-    const span = { start: dueClause.index, end: folded.length };
+    const dueDate = findDate(dueClause[1], today);
+    due = dueDate.date;
+    // Solo se consume «vence [el] <fecha>»: lo que se diga después (un importe, por ejemplo)
+    // sigue disponible. Sin fecha legible se consume apenas «vence [el]».
+    const bodyStart = dueClause.index + dueClause[0].length - dueClause[1].length;
+    const span = { start: dueClause.index, end: dueDate.span ? bodyStart + dueDate.span.end : bodyStart };
     removed.push(span); working = mask(working, span);
     if (!due) warnings.push('Escuché un vencimiento pero no pude leer la fecha.');
   }
