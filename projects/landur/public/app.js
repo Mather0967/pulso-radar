@@ -24,7 +24,7 @@ const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${pat
 const labels = {expense:'Gasto pagado',obligation:'Obligación',payment:'Pago',sale:'Venta',collection:'Cobro',commission:'Comisión',transfer:'Transferencia',withdrawal:'Retiro personal',account:'Cuenta'};
 const viewLabels = {home:'Inicio',moves:'Movimientos',accounts:'Cuentas',expenses:'Egresos',sales:'Ventas',pending:'Pendientes',settings:'Configuración'};
 const viewIcons = {home:'home',moves:'moves',accounts:'accounts',expenses:'expense',sales:'sales',pending:'pending',settings:'settings'};
-let state = null, session = null, view = 'home', unit = '', query = '', filter = '', loadedAt = null, busy = false, actOther = false, searchOpen = false, pendingRequest = null, updateWorker = null, timer, authEpoch = 0;
+let appWired = false, state = null, session = null, view = 'home', unit = '', query = '', filter = '', loadedAt = null, busy = false, actOther = false, searchOpen = false, pendingRequest = null, updateWorker = null, timer, authEpoch = 0;
 const today = () => new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const fmt = (cents, currency = unit) => new Intl.NumberFormat('es-UY',{style:'currency',currency:currency || 'UYU',minimumFractionDigits:2}).format(cents/100);
 const dateFmt = date => date ? new Intl.DateTimeFormat('es-UY',{day:'2-digit',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z')) : 'Sin fecha';
@@ -86,6 +86,9 @@ function render() {
   }
   $('#currency').addEventListener('change',e=>{unit=e.target.value;render();});
   $('#search')?.addEventListener('input',e=>{query=e.target.value;$('#operation-table').innerHTML=actList(filteredOps());});
+  // `app` no se recrea al pintar: estas escuchas se registran una sola vez. Si se agregaran en cada
+  // render, cada pulsación las duplicaría y la página se congelaría tras unas doce.
+  if(!appWired){appWired=true;
   app.addEventListener('click',async event=>{
     const opBtn=event.target.closest('[data-operation]');
     if(opBtn){detail(opBtn.getAttribute('data-operation'));return;}
@@ -111,6 +114,7 @@ function render() {
   app.addEventListener('click',event=>{const viewBtn=event.target.closest('[data-view]');if(viewBtn){view=viewBtn.getAttribute('data-view');actOther=false;render();};});
   app.addEventListener('click',event=>{const formBtn=event.target.closest('[data-form]');if(formBtn){quickCapture(formBtn.getAttribute('data-form')==='account'?'account':'expense');};});
   app.addEventListener('click',event=>{const installBtn=event.target.closest('[data-action="install"]');if(installBtn)install();});
+  }
 }
 function content(){
   if(view==='home')return home();
