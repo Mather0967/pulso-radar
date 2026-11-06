@@ -134,3 +134,36 @@ test('fold pliega sin cambiar la longitud, para poder recortar el original', () 
   assert.equal(fold('Iluminación'), 'iluminacion');
   assert.equal(fold('AÑO 2026'), 'ano 2026');
 });
+
+test('una cifra seguida de «mil» o «millón» se lee completa: «80 mil» son 80.000, no 80 ni 1.000', () => {
+  // iOS y Android dictan a menudo mezclando dígitos y escala. Quedarse con el 80 (o con el
+  // «mil» suelto) guarda un importe equivocado sin avisar.
+  const cases = [
+    ['80 mil pesos en comida', '80000.00'],
+    ['gasté 80 mil en publicidad', '80000.00'],
+    ['pagué por 80 mil el alquiler', '80000.00'],
+    ['$ 80 mil de envíos', '80000.00'],
+    ['80 mil quinientos pesos de luz', '80500.00'],
+    ['compré filamento por 2 mil 500', '2500.00'],
+    ['1 millón 200 mil pesos de alquiler', '1200000.00'],
+    ['3 millones de capital', '3000000.00']
+  ];
+  for (const [said, amount] of cases) {
+    const result = say(said);
+    assert.equal(result.amountText, amount, said);
+    assert.equal(result.warnings.includes('No reconocí un importe. Escribilo a mano: es el dato que más cuidado necesita.'), false, said);
+  }
+  assert.equal(say('80 mil pesos en comida').concept, 'Comida');
+});
+
+test('un dígito suelto cerca de «mil» no se pega al importe de otra cosa', () => {
+  // «2 rollos» no es la cola de «80 mil»: solo se suman grupos de tres dígitos tras la escala.
+  assert.equal(say('80 mil pesos por 2 rollos de filamento').amountText, '80000.00');
+  assert.equal(say('3 rollos de filamento por 1500 pesos').amountText, '1500.00');
+});
+
+test('una cifra con decimales y escala («1,5 millones», «2,5 mil») se lee completa', () => {
+  assert.equal(say('1,5 millones de capital').amountText, '1500000.00');
+  assert.equal(say('2,5 mil pesos de nafta').amountText, '2500.00');
+  assert.equal(say('2,5 mil pesos de nafta').concept, 'Nafta');
+});
