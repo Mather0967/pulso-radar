@@ -73,7 +73,7 @@ function lock(message='') {
 const selectedOps = () => state.operations.filter(o=>!unit || o.currency===unit);
 // Una operación revertida conserva su contra-asiento en el saldo, pero deja de ser un pendiente.
 const outstanding = kind => selectedOps().filter(o=>o.kind===kind && o.amount>o.applied && !o.reversed_by);
-function navButton(key){return `<button class="nav-button ${view===key?'active':''}" data-view="${key}" ${view===key?'aria-current="page"':''}>${icon(viewIcons[key])}<span>${viewLabels[key]}</span>${key==='pending'?`<span class="nav-count">${outstanding('obligation').length+outstanding('sale').length+2}</span>`:''}</button>`;}
+function navButton(key){return `<button class="nav-button ${view===key?'active':''}" data-view="${key}" ${view===key?'aria-current="page"':''}>${icon(viewIcons[key])}<span>${viewLabels[key]}</span>${key==='pending'?`<span class="nav-count">${outstanding('obligation').length+outstanding('sale').length}</span>`:''}</button>`;}
 function render() {
   if(!state)return;
   const lite=['home','moves','expenses','sales','pending','accounts','settings'].includes(view);
@@ -1012,7 +1012,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
     if(k==='mic')listen();
     else if(k==='photo')modal.querySelector('#cap-file').click();
     else if(k==='pickfile')modal.querySelector('#cap-file2').click();
-    else if(k==='type'){phase='review';sheet='amount';render();}
+    else if(k==='type'){stopVoice();phase='review';sheet='amount';render();}
     else if(k==='open'&&!locked){sheet=v;render();}
     else if(k==='toggle'&&!locked){d[v]=!d[v];render();}
     else if(k==='closesheet'){sheet='';render();}
@@ -1356,12 +1356,14 @@ async function boot(){
   try{session=await api('/api/session');if(session.authenticated)await refresh();else lock();}
   catch(error){lock(error.message);}
 }
-window.addEventListener('offline',()=>{if(!busy)lock('Sin conexión. No se puede consultar ni guardar. Volvé a conectarte.');else toast('Se perdió la conexión. No cierres el formulario hasta verificar el resultado.');});
-window.addEventListener('online',()=>{if(!busy&&!modal.open)boot();});
+// Un corte de red no es una sesión vencida: no se cierra el formulario ni se pierde lo escrito.
+// Guardar sin red falla con su propio aviso; solo un 401 del servidor bloquea la aplicación.
+window.addEventListener('offline',()=>toast(busy?'Se perdió la conexión. No cierres el formulario hasta verificar el resultado.':'Sin conexión. No se puede consultar ni guardar hasta volver a conectarte.'));
+window.addEventListener('online',()=>{if(busy||modal.open)return;if(state)refresh().catch(()=>{});else boot();});
 window.addEventListener('beforeunload',e=>{if(busy||pendingRequest){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pagehide',()=>{authEpoch++;state=null;app.innerHTML='';modal.close();modal.innerHTML='';});
 window.addEventListener('pageshow',e=>{if(e.persisted)boot();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state&&!busy&&!modal.open)refresh().catch(()=>lock('No se pudo verificar la sesión. Volvé a ingresar.'));});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state&&!busy&&!modal.open)refresh().catch(error=>{if(error.status!==401)toast('No se pudo actualizar. Se muestran los últimos datos cargados.');});});
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register(endpoint('/sw.js'),{scope:BASE}).then(reg=>{
     const update=()=>{if(reg.waiting&&navigator.serviceWorker.controller){updateWorker=reg.waiting;if(state)render();}};
