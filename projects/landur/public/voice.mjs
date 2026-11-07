@@ -90,6 +90,7 @@ export function wordsToNumber(tokens) {
   let current = 0, seen = false;
   for (const token of tokens) {
     if (isConnector(token)) continue;
+    if (/^\d+$/.test(token)) { current += Number(token); seen = true; continue; }
     if (Object.hasOwn(SMALL, token)) { current += SMALL[token]; seen = true; continue; }
     const scale = SCALES[token];
     if (scale === undefined) return null;
@@ -185,6 +186,52 @@ function validDate(year, month, day) {
   return iso(date);
 }
 
+// «80 mil», «2 mil 500», «1 millón 200 mil»: cifras mezcladas con una escala, como las dictan
+// iOS y Android. Se reemplazan por la cifra completa («80000») rellenando con espacios para
+// que los índices del texto no cambien, y se devuelve la zona reemplazada para que el importe
+// la consuma entera. Solo se suman cifras de tres dígitos tras una escala: «80 mil por 2 rollos»
+// no convierte el 2 en parte del importe.
+function expandScaledDigits(text) {
+  const regions = [];
+  // «1,5 millones», «2,5 mil»: un decimal corto seguido de una escala.
+  const withDecimals = text.replace(/\b(\d+)[,.](\d{1,2})\s+(millones|millon|mil)\b/g, (match, whole, fraction, word, start) => {
+    const value = Math.round(Number(`${whole}.${fraction}`) * SCALES[word]);
+    const digits = String(value);
+    if (!Number.isSafeInteger(value * 100) || value * 100 > MAX_CENTS || digits.length > match.length) return match;
+    regions.push({ start, end: start + match.length });
+    return digits.padStart(match.length);
+  });
+  const list = tokenize(withDecimals);
+  let out = withDecimals, i = 0;
+  while (i < list.length) {
+    const run = [];
+    let hasDigit = false, hasScale = false, j = i;
+    for (; j < list.length; j++) {
+      const token = bare(list[j].value);
+      const prev = run.length ? bare(list[run[run.length - 1]].value) : '';
+      const digit = /^\d+$/.test(token);
+      const accepted = digit
+        ? (run.length === 0 ? token.length <= 4 : Object.hasOwn(SCALES, prev) && token.length === 3)
+        : isNumberWord(token) || (isConnector(token) && run.length > 0 && j + 1 < list.length && isNumberWord(bare(list[j + 1].value)));
+      if (!accepted) break;
+      run.push(j);
+      if (digit) hasDigit = true;
+      if (Object.hasOwn(SCALES, token)) hasScale = true;
+    }
+    if (hasDigit && hasScale) {
+      const value = wordsToNumber(run.map(k => bare(list[k].value)));
+      const start = list[run[0]].start, end = list[run[run.length - 1]].end;
+      const digits = String(value);
+      if (value && Number.isSafeInteger(value * 100) && value * 100 <= MAX_CENTS && digits.length <= end - start) {
+        out = out.slice(0, start) + digits.padStart(end - start) + out.slice(end);
+        regions.push({ start, end });
+      }
+    }
+    i = Math.max(j, i + 1);
+  }
+  return { text: out, regions };
+}
+
 function findAmount(text, list) {
   const patterns = [
     /\$\s*([\d.,]+)/,
@@ -236,8 +283,12 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   let due = null;
   const dueClause = working.match(/\bvence\b(?:\s+el)?\s+(.+)$/);
   if (dueClause) {
-    due = findDate(dueClause[1], today).date;
-    const span = { start: dueClause.index, end: folded.length };
+    const dueDate = findDate(dueClause[1], today);
+    due = dueDate.date;
+    // Solo se consume «vence [el] <fecha>»: lo que se diga después (un importe, por ejemplo)
+    // sigue disponible. Sin fecha legible se consume apenas «vence [el]».
+    const bodyStart = dueClause.index + dueClause[0].length - dueClause[1].length;
+    const span = { start: dueClause.index, end: dueDate.span ? bodyStart + dueDate.span.end : bodyStart };
     removed.push(span); working = mask(working, span);
     if (!due) warnings.push('Escuché un vencimiento pero no pude leer la fecha.');
   }
@@ -245,7 +296,12 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   const dated = findDate(working, today);
   if (dated.span) { removed.push(dated.span); working = mask(working, dated.span); }
 
-  const amountMatch = findAmount(working, tokenize(working));
+  const scaled = expandScaledDigits(working);
+  const amountMatch = findAmount(scaled.text, tokenize(scaled.text));
+  if (amountMatch.span) for (const region of scaled.regions) {
+    if (region.start < amountMatch.span.end && region.end > amountMatch.span.start)
+      amountMatch.span = { start: Math.min(region.start, amountMatch.span.start), end: Math.max(region.end, amountMatch.span.end) };
+  }
   if (amountMatch.span) { removed.push(amountMatch.span); working = mask(working, amountMatch.span); }
 
   const concept = buildConcept(original, folded, removed, tokenize(folded));
