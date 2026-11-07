@@ -68,10 +68,39 @@ function evidenceBytes(value) {
   return bytes;
 }
 
+// Las tablas que agregaron las migraciones se declaran acá con nombre propio porque la
+// reparación de esquema las vuelve a aplicar en cada apertura: `IF NOT EXISTS` las hace
+// idempotentes y una marca de versión adelantada no debe dejar tablas sin crear.
+const ensureEvidence = db => {
+  db.exec(`CREATE TABLE IF NOT EXISTS evidence (
+      id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
+      operation TEXT NOT NULL REFERENCES operations(id), name TEXT NOT NULL, mime TEXT NOT NULL,
+      bytes INTEGER NOT NULL CHECK(bytes > 0), sha256 TEXT NOT NULL, content BLOB NOT NULL,
+      created_at TEXT NOT NULL, actor TEXT NOT NULL
+    )`);
+};
+// Conexiones externas por espacio (Shopify, Meta Ads). El token vive solo acá,
+// dentro del mismo archivo privado que los movimientos y los comprobantes.
+const ensureConnections = db => {
+  db.exec(`CREATE TABLE IF NOT EXISTS connections (
+      workspace TEXT NOT NULL REFERENCES workspaces(id), name TEXT NOT NULL,
+      config TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace, name)
+    )`);
+};
+// Columnas que el código necesita sí o sí. Se comprueban contra el esquema real y no contra
+// `user_version`, porque la marca puede estar adelantada (ver `repair`).
+const REQUIRED_COLUMNS = [
+  ['operations', 'reversed_by', 'TEXT'],
+  ['operations', 'reversed_at', 'TEXT'],
+  ['applications', 'reversed', 'INTEGER NOT NULL DEFAULT 0'],
+  ['requests', 'created_at', 'TEXT']
+];
 // Esquema versionado con `PRAGMA user_version`. Cada paso se aplica una sola vez y
 // dentro de una transacción: si falla, la base queda como estaba. La versión 1 es el
 // esquema original del constructor (creado con IF NOT EXISTS), así que el mismo punto
 // de partida sirve para una base nueva y para una que ya existía sin marca de versión.
+// Una migración nueva se agrega SOLO al final: insertarla en el medio corre los índices y
+// las bases que ya estaban al día se saltan el paso nuevo sin que nadie lo note.
 export const MIGRATIONS = [
   () => {},
   db => {
@@ -87,22 +116,8 @@ export const MIGRATIONS = [
     const has = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(entry => entry.name === column);
     if (!has('requests', 'created_at')) db.exec('ALTER TABLE requests ADD COLUMN created_at TEXT');
   },
-  db => {
-    db.exec(`CREATE TABLE IF NOT EXISTS evidence (
-      id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
-      operation TEXT NOT NULL REFERENCES operations(id), name TEXT NOT NULL, mime TEXT NOT NULL,
-      bytes INTEGER NOT NULL CHECK(bytes > 0), sha256 TEXT NOT NULL, content BLOB NOT NULL,
-      created_at TEXT NOT NULL, actor TEXT NOT NULL
-    )`);
-  },
-  db => {
-    // Conexiones externas por espacio (Shopify, Meta Ads). El token vive solo acá,
-    // dentro del mismo archivo privado que los movimientos y los comprobantes.
-    db.exec(`CREATE TABLE IF NOT EXISTS connections (
-      workspace TEXT NOT NULL REFERENCES workspaces(id), name TEXT NOT NULL,
-      config TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace, name)
-    )`);
-  }
+  ensureEvidence,
+  ensureConnections
 ];
 export class Ledger {
   constructor(filename = ':memory:') {
@@ -141,6 +156,7 @@ export class Ledger {
       );
     `);
     this.migrate();
+    this.repair();
   }
   migrate() {
     let current = this.db.prepare('PRAGMA user_version').get().user_version;
@@ -153,6 +169,31 @@ export class Ledger {
       } catch (error) { this.rollback(); throw error; }
       current++;
     }
+  }
+  // `user_version` puede mentir: si una migración se insertó en el medio de la lista, o si se
+  // restauró un respaldo marcado como al día, la marca queda adelantada respecto del esquema
+  // real. En ese estado el motor rechaza cada comando —«table requests has 4 columns but 5
+  // values were supplied»— y la aplicación deja de guardar mientras las lecturas siguen
+  // andando, que es la falla más difícil de leer desde afuera. Se compara el esquema real con
+  // lo que el código necesita y se agrega lo que falte: todo es idempotente.
+  repair() {
+    for (const ensure of [ensureEvidence, ensureConnections]) ensure(this.db);
+    const columns = table => new Set(this.db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name));
+    const missing = [];
+    const seen = new Map();
+    for (const [table, column, type] of REQUIRED_COLUMNS) {
+      if (!seen.has(table)) seen.set(table, columns(table));
+      const present = seen.get(table);
+      // Una tabla inexistente no se completa a ciegas: la crean el constructor o las migraciones.
+      if (present.size && !present.has(column)) missing.push([table, column, type]);
+    }
+    if (!missing.length) return [];
+    this.begin();
+    try {
+      for (const [table, column, type] of missing) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      this.db.exec('COMMIT');
+    } catch (error) { this.rollback(); throw error; }
+    return missing.map(([table, column]) => `${table}.${column}`);
   }
   workspace(id, demo = false) { this.db.prepare('INSERT OR IGNORE INTO workspaces VALUES (?,?)').run(id, Number(demo)); }
   // `BEGIN IMMEDIATE` falla si la conexión quedó con una transacción abierta por un error
@@ -271,7 +312,9 @@ export class Ledger {
         return { ...JSON.parse(previous.result), replayed: true };
       }
       const result = this.execute(workspace, actor, input);
-      this.db.prepare('INSERT INTO requests VALUES (?,?,?,?,?)').run(workspace, stored, hash, JSON.stringify(result), new Date().toISOString());
+      // Columnas explícitas: con `VALUES (…)` a secas, cualquier columna de más o de menos en la
+      // base rompe todos los comandos con un error que no nombra la causa.
+      this.db.prepare('INSERT INTO requests (workspace,key,fingerprint,result,created_at) VALUES (?,?,?,?,?)').run(workspace, stored, hash, JSON.stringify(result), new Date().toISOString());
       this.db.exec('COMMIT');
       return result;
     } catch (error) { this.rollback(); throw error; }

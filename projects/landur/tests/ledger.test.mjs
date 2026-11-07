@@ -16,6 +16,37 @@ function fixture(t) {
   return {ledger,run,account,op};
 }
 
+// Reproducción del estado real de producción: la marca `user_version` quedó adelantada (la
+// migración se insertó en el medio de la lista) y la tabla `requests` se quedó sin su columna.
+// Así, todo comando fallaba con «table requests has 4 columns but 5 values were supplied»
+// mientras las lecturas seguían andando.
+test('una base marcada al día pero sin la columna nueva se repara al abrir', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'landur-reparacion-'));
+  const file = join(dir, 'landur.sqlite');
+  // En Windows la carpeta no se puede borrar con la base abierta: se cierra primero y la
+  // limpieza no hace fallar la prueba.
+  let reparada;
+  t.after(() => { try { reparada?.close(); } catch {} try { rmSync(dir, {recursive: true, force: true}); } catch {} });
+  const original = new Ledger(file); original.workspace('landur'); original.close();
+
+  const raw = new DatabaseSync(file);
+  raw.exec(`PRAGMA foreign_keys=OFF;
+    BEGIN IMMEDIATE;
+    CREATE TABLE requests_vieja (workspace TEXT NOT NULL, key TEXT NOT NULL, fingerprint TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(workspace, key));
+    DROP TABLE requests;
+    ALTER TABLE requests_vieja RENAME TO requests;
+    PRAGMA user_version = ${MIGRATIONS.length};
+    COMMIT;`);
+  raw.close();
+
+  reparada = new Ledger(file);
+  assert.ok(reparada.db.prepare('PRAGMA table_info(requests)').all().some(row => row.name === 'created_at'), 'la columna que faltaba vuelve a existir');
+  assert.deepEqual(reparada.repair(), [], 'una segunda pasada no tiene nada que reparar');
+  // Lo que fallaba en producción: crear una cuenta.
+  const id = reparada.command('landur', 'tester', randomUUID(), {kind:'account', name:'Banco', accountKind:'bank', currency:'UYU', opening:'1000', cutoff:'2026-11-06', verified:true, accessible:true}).id;
+  assert.ok(reparada.snapshot('landur').accounts.some(cuenta => cuenta.id === id));
+});
+
 test('un saldo inicial grande se registra y el tope informa su máximo', (t) => {
   const {ledger,account} = fixture(t);
   const big = account({opening:'20000000000'});
