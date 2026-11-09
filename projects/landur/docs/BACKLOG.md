@@ -333,3 +333,10 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - Corrección: `voice.mjs` expone `amountFromText`, que interpreta cualquier importe escrito o dictado con las mismas reglas del resto de la app («25 mil», «veinticinco mil», «1,5 millones», «60,000», «1.800»), y `normAmount` la usa cuando el texto trae letras. Los números sueltos y el cero de la comisión conservan el comportamiento anterior. Caché del service worker a v18.
 - Evidencia: prueba nueva en `tests/voice.test.mjs` (11 casos de dictado al campo más los rechazos sin cifra y del cero); `node --test tests/*.test.mjs` en `projects/landur/`: 111 pruebas, 108 en verde y los 3 fallos conocidos de Windows; raíz 92/92.
 - No probado: el dictado real del sistema operativo en la PC. Se verificó la interpretación del texto que ese dictado produce.
+
+## Un valor viejo en el campo de importe se mezclaba con lo dictado (09/11/2026)
+
+- Reporte del usuario: al probar «25 mil» el importe quedó en 20.500,00. No era la escala: el campo ya traía un valor y lo dictado se pegó detrás, así que el texto era «20500.0025 mil». `normAmount` descartaba las letras, `Number()` se quedaba con la parte numérica y el importe salía 20.500 sin ningún aviso.
+- Corrección: con letras o símbolos en el texto manda el intérprete del dictado; si no reconoce una cifra, el campo queda vacío y se avisa, en lugar de reutilizar el número que hubiera quedado. Además, al abrir la hoja del importe el valor existente queda seleccionado, de modo que lo dictado lo reemplaza. La cifra suelta toma la última del texto, así «20500.00 25 mil» se lee 25.000 y no 20.500. Caché del service worker a v19.
+- Evidencia: prueba nueva en `tests/voice.test.mjs` con los cuatro casos de mezcla; verificado en navegador sobre la demo sintética (importes dictados en el campo y caso de valor previo).
+- No probado: dictado real del sistema operativo; se verifica el texto que ese dictado inserta.

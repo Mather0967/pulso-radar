@@ -272,12 +272,13 @@ function findAmount(text, list) {
     if (cents && Number.isSafeInteger(cents) && cents <= MAX_CENTS)
       return { cents, span: { start: list[from].start, end: list[to - 1].end } };
   }
-  // Cifra suelta sin moneda ni preposición. Se toma el número completo, con sus separadores:
-  // antes «100,000» se cortaba en «100» y guardaba cien. Sigue exigiendo más de un dígito para
-  // no tomar un ordinal suelto como importe.
-  const loose = text.match(/\b\d[\d.,]*\d\b/);
-  const cents = loose && digitsToCents(loose[0]);
-  return cents ? { cents, span: spanOf(loose) } : { cents: null, span: null };
+  // Cifra suelta sin moneda ni preposición: el número completo con sus separadores y, si hay
+  // más de uno, el último (donde cae lo último que se dictó cuando el campo ya traía un valor).
+  // Antes «100,000» se cortaba en «100». Sigue exigiendo más de un dígito para no tomar un
+  // ordinal suelto como importe.
+  const loose = [...text.matchAll(/\b\d[\d.,]*\d\b/g)].reverse().find(match => digitsToCents(match[0]));
+  const cents = loose ? digitsToCents(loose[0]) : null;
+  return cents ? { cents, span: { start: loose.index, end: loose.index + loose[0].length } } : { cents: null, span: null };
 }
 
 // Importe que entra al campo como texto: lo que escribe el dictado del sistema («25 mil»,
@@ -286,6 +287,9 @@ function findAmount(text, list) {
 export function amountFromText(raw) {
   const text = fold(String(raw ?? ''));
   if (!text.trim()) return '';
+  // Un número con cuatro o más decimales no es un importe: el texto viene mezclado (un valor
+  // viejo pegado a lo dictado). En vez de adivinar con la parte legible, no se toma nada.
+  if (/\d[.,]\d{4,}/.test(text)) return '';
   const scaled = expandScaledDigits(text);
   const found = findAmount(scaled.text, tokenize(scaled.text));
   return found.cents ? (found.cents / 100).toFixed(2) : '';

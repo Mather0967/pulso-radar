@@ -242,3 +242,12 @@ test('un importe que entra al campo como texto («25 mil») se interpreta comple
   assert.equal(amountFromText('sin importe'), '');
   assert.equal(amountFromText('0'), '');
 });
+
+test('si el campo traía un valor viejo, vale la última cifra dictada y nunca una mezcla', () => {
+  // Regresión: «20500.0025 mil» (un valor previo pegado a lo dictado) terminaba en 20.500 porque
+  // se descartaban las letras y se guardaba el número que quedaba. Con texto manda el intérprete.
+  assert.equal(amountFromText('20500.00 25 mil'), '25000.00');
+  assert.equal(amountFromText('20500.0025 mil'), '');
+  assert.equal(amountFromText('20 mil 500'), '20500.00', 'una sola frase con escala suma sus partes');
+  assert.equal(amountFromText('3500 25 mil'), '25000.00');
+});

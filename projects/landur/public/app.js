@@ -774,9 +774,12 @@ function takeAccount(said,currency){
 const AMOUNT_MAX_CENTS=999999999999999;
 function normAmount(raw,zero=false){
   const said=String(raw||'').trim();
-  // El dictado del sistema (Win+H o el micrófono del teclado) escribe «25 mil» dentro del campo:
-  // se interpreta igual que el dictado de la app, en vez de quedarse con el número suelto.
-  if(/[a-záéíóúñ]/i.test(said)){const value=amountFromText(said);if(value)return value;}
+  if(!said)return '';
+  // El dictado del sistema (Win+H o el micrófono del teclado) escribe la frase dentro del campo.
+  // Con letras o símbolos manda el intérprete del dictado y, si no reconoce una cifra, el campo
+  // queda vacío. Antes se descartaban las letras y se guardaba el número que hubiera quedado
+  // pegado al texto: «20500.0025 mil» terminaba en 20.500 sin avisar.
+  if(/[^\d.,\s]/.test(said))return amountFromText(said);
   const text=said.replace(/[^\d.,]/g,'');
   if(!text)return '';
   let t=text;
@@ -981,6 +984,9 @@ function quickCapture(kind='expense',targetId='',opts={}){
     }
     const field=modal.querySelector('.sheet [data-capfield]');
     if(field&&field.tagName==='INPUT'&&field.type!=='date'&&sheet!=='category')field.focus({preventScroll:true});
+    // El importe se selecciona al abrir la hoja: lo que llegue dictado reemplaza al valor
+    // anterior en vez de pegarse detrás y mezclar dos cifras.
+    if(field&&(sheet==='amount'||sheet==='commission'))field.select?.();
   };
   const buildInput=()=>{
     const k=d.kind,date=d.date||today();
