@@ -269,3 +269,19 @@ test('el error de almacenamiento se explica según su causa',()=>{
   assert.match(storageDiagnosis(typed('ERR_SQLITE_ERROR','cannot start a transaction within a transaction')),/No se pudo escribir/i);
   assert.equal(storageDiagnosis(Error('boom')),'','lo desconocido no inventa una causa');
 });
+
+test('el micrófono solo se habilita dentro de LANDUR: el portal sigue bloqueándolo', async () => {
+  // Con `microphone=()` en todo el portal, el navegador bloquea el dictado de LANDUR sin
+  // preguntar; habilitarlo a mano en los ajustes del sitio no cambia nada, porque la política
+  // del servidor manda sobre el permiso del usuario.
+  const f = await portalFixture();
+  try {
+    const landur = await f.login('landur');
+    const app = await f.request('/landur/', landur);
+    const policy = app.headers.get('permissions-policy') || '';
+    assert.match(policy, /microphone=\(self\)/);
+    assert.doesNotMatch(policy, /microphone=\(\)/);
+    const login = await f.request('/login');
+    assert.match(login.headers.get('permissions-policy') || '', /microphone=\(\)/);
+  } finally { await f.close(); }
+});

@@ -627,6 +627,11 @@ function select(label,name,options,wide=false){return `<label class="field ${wid
 // Dictación: complementa al teclado, no lo reemplaza. Solo campos de texto libre;
 // importes y fechas se tipean a mano porque el reconocimiento de números no es fiable.
 // Chrome delega el reconocimiento en su proveedor: requiere conexión y, en producción, HTTPS.
+// El micrófono puede estar bloqueado por el navegador o por la política del sitio. El aviso
+// tiene que decir qué hacer: «permití en los ajustes» no daba salida, y habilitarlo a mano no
+// alcanza cuando el servidor manda `Permissions-Policy: microphone=()`.
+const MICROPHONE_BLOCKED='El navegador bloqueó el micrófono. Abrí el candado de la barra de direcciones → Micrófono → Permitir, recargá la página y volvé a intentar.';
+const microphoneBlocked=error=>error==='not-allowed'||error==='service-not-allowed';
 const SPEECH = window.SpeechRecognition || window.webkitSpeechRecognition;
 let dictation = null, invoiceRecognition = null;
 function stopDictation(){
@@ -654,8 +659,8 @@ function dictate(button,input){
   };
   recognition.onerror=event=>{
     stopDictation();
-    toast(event.error==='not-allowed'||event.error==='service-not-allowed'
-      ? 'Permití el micrófono en los ajustes del navegador para dictar.'
+    toast(microphoneBlocked(event.error)
+      ? MICROPHONE_BLOCKED
       : 'No se pudo dictar. Escribí el campo a mano.');
   };
   recognition.onend=()=>{if(dictation?.recognition===recognition)stopDictation();};
@@ -702,8 +707,8 @@ function wireVoice(formEl,kind){
     };
     recognition.onerror=event=>{
       if(run!==generation||invoiceRecognition!==recognition)return;
-      toast(event.error==='not-allowed'||event.error==='service-not-allowed'
-        ? 'Permití el micrófono en los ajustes del navegador para dictar.'
+      toast(microphoneBlocked(event.error)
+        ? MICROPHONE_BLOCKED
         : 'No se pudo dictar. Escribí los campos a mano.');
     };
     recognition.onend=()=>{
@@ -881,7 +886,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
     r.onerror=e=>{
       if(run!==gen||recognition!==r)return;
       attempt=0;
-      voiceError(e.error==='not-allowed'||e.error==='service-not-allowed'?'Permití el micrófono en los ajustes para dictar.':'No te escuché bien. Probá de nuevo.');
+      voiceError(microphoneBlocked(e.error)?MICROPHONE_BLOCKED:e.error==='audio-capture'?'No se encontró un micrófono en este equipo.':'No te escuché bien. Probá de nuevo.');
     };
     r.onend=()=>{
       if(run!==gen||recognition!==r)return;
