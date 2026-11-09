@@ -111,9 +111,15 @@ export function digitsToCents(raw) {
   const text = String(raw ?? '').replace(/\s/g, '');
   if (!text) return null;
   let whole, fraction = '';
-  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(text)) {
-    const [w, f = ''] = text.split(',');
-    whole = w.replace(/\./g, ''); fraction = f;
+  // Espacios de miles: es-UY usa el punto («100.000»), pero el dictado y el teclado del iPhone
+  // también escriben «100,000», y eso se leía como decimal: «100,000» quedaba en 100,00. Si todos
+  // los grupos intermedios tienen tres dígitos, el separador es de miles; un tramo final de uno
+  // o dos dígitos sigue siendo decimal («1.234,56» y «12,5» no cambian).
+  const grouped = /^(\d{1,3})((?:[.,]\d{3})+)(?:[.,](\d{1,2}))?$/.exec(text);
+  // «0,005» no es un espacio de miles: con la parte entera en cero el último tramo es decimal
+  // y con tres dígitos no llega a ser un importe válido, así que se rechaza como antes.
+  if (grouped && grouped[1] !== '0') {
+    whole = grouped[1] + grouped[2].replace(/[.,]/g, ''); fraction = grouped[3] || '';
   } else if (/^\d+(?:,\d{1,2})?$/.test(text)) {
     [whole, fraction = ''] = text.split(',');
   } else if (/^\d+\.\d{1,2}$/.test(text)) {
@@ -210,16 +216,22 @@ function expandScaledDigits(text) {
       const token = bare(list[j].value);
       const prev = run.length ? bare(list[run[run.length - 1]].value) : '';
       const digit = /^\d+$/.test(token);
+      // «100mil» pegado: el reconocedor a veces no separa la cifra de su escala.
+      const glued = /^(\d{1,7})(mil|millon|millones)$/.exec(token);
       const accepted = digit
         ? (run.length === 0 ? token.length <= 4 : Object.hasOwn(SCALES, prev) && token.length === 3)
+        : glued ? (run.length === 0 || Object.hasOwn(SCALES, prev))
         : isNumberWord(token) || (isConnector(token) && run.length > 0 && j + 1 < list.length && isNumberWord(bare(list[j + 1].value)));
       if (!accepted) break;
       run.push(j);
-      if (digit) hasDigit = true;
-      if (Object.hasOwn(SCALES, token)) hasScale = true;
+      if (digit || glued) hasDigit = true;
+      if (Object.hasOwn(SCALES, token) || glued) hasScale = true;
     }
     if (hasDigit && hasScale) {
-      const value = wordsToNumber(run.map(k => bare(list[k].value)));
+      const value = wordsToNumber(run.flatMap(k => {
+        const said = bare(list[k].value), split = /^(\d{1,7})(mil|millon|millones)$/.exec(said);
+        return split ? [split[1], split[2]] : [said];
+      }));
       const start = list[run[0]].start, end = list[run[run.length - 1]].end;
       const digits = String(value);
       if (value && Number.isSafeInteger(value * 100) && value * 100 <= MAX_CENTS && digits.length <= end - start) {
@@ -260,10 +272,11 @@ function findAmount(text, list) {
     if (cents && Number.isSafeInteger(cents) && cents <= MAX_CENTS)
       return { cents, span: { start: list[from].start, end: list[to - 1].end } };
   }
-  // Cifra suelta sin moneda ni preposición. Se exige más de un dígito para no
-  // tomar un ordinal suelto como importe: antes se prefiere no reconocer nada.
-  const loose = text.match(/\b(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d{2,}(?:[.,]\d{1,2})?)\b/);
-  const cents = loose && digitsToCents(loose[1]);
+  // Cifra suelta sin moneda ni preposición. Se toma el número completo, con sus separadores:
+  // antes «100,000» se cortaba en «100» y guardaba cien. Sigue exigiendo más de un dígito para
+  // no tomar un ordinal suelto como importe.
+  const loose = text.match(/\b\d[\d.,]*\d\b/);
+  const cents = loose && digitsToCents(loose[0]);
   return cents ? { cents, span: spanOf(loose) } : { cents: null, span: null };
 }
 

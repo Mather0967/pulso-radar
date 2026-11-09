@@ -185,3 +185,39 @@ test('una cifra con decimales y escala («1,5 millones», «2,5 mil») se lee co
   assert.equal(say('2,5 mil pesos de nafta').amountText, '2500.00');
   assert.equal(say('2,5 mil pesos de nafta').concept, 'Nafta');
 });
+
+test('una cifra con coma de miles se lee completa: «100,000» son 100.000 y no 100', () => {
+  // El dictado del iPhone escribe la coma de miles y se leía como decimal: «100,000» quedaba
+  // en 100,00 sin avisar. El espacio de miles se reconoce con coma o con punto.
+  const cases = [
+    ['pagué 100,000 pesos de flete', '100000.00'],
+    ['pagué 100,000 de flete', '100000.00'],
+    ['pagué 180,000 pesos', '180000.00'],
+    ['pagué 250,000 pesos de alquiler', '250000.00'],
+    ['pagué 1,000,000 pesos de la planta', '1000000.00'],
+    ['pagué 1.000,00 pesos', '1000.00'],
+    ['pagué 12,5 pesos', '12.50']
+  ];
+  for (const [said, amount] of cases) assert.equal(say(said).amountText, amount, said);
+  assert.equal(digitsToCents('100,000'), 10000000);
+  assert.equal(digitsToCents('1,000,000'), 100000000);
+  assert.equal(digitsToCents('12,5'), 1250, 'la coma decimal se conserva');
+  assert.equal(digitsToCents('100,00'), 10000);
+});
+
+test('cualquier cifra hasta un millón se lee completa, con dígitos o con palabras', () => {
+  const cases = [
+    ['pagué 150 mil pesos', '150000.00'],
+    ['pagué 150,000 pesos', '150000.00'],
+    ['pagué doscientos cincuenta mil pesos', '250000.00'],
+    ['pagué quinientos mil pesos', '500000.00'],
+    ['pagué setecientos veinticinco mil pesos', '725000.00'],
+    ['pagué novecientos noventa y nueve mil pesos', '999000.00'],
+    ['pagué 999.999 pesos', '999999.00'],
+    ['pagué un millón de pesos', '1000000.00'],
+    ['pagué 1.000.000 pesos', '1000000.00'],
+    ['pagué 100mil pesos', '100000.00'],
+    ['pagué 250mil pesos', '250000.00']
+  ];
+  for (const [said, amount] of cases) assert.equal(say(said).amountText, amount, said);
+});
