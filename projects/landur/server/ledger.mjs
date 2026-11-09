@@ -441,6 +441,35 @@ export class Ledger {
       if (payment.reversed_by) ids.add(payment.reversed_by);
       return this.deleteOperations(workspace, actor, ids, 'payment.deleted');
     }
+    // Corregir una cuenta no es crear otra ni borrarla: se cambia el dato cargado mal (nombre,
+    // tipo, saldo inicial, corte, verificación o accesibilidad) y el saldo se reconstruye con
+    // los movimientos que ya existen. Queda auditado con el valor anterior y el nuevo, así
+    // corregir no borra historia. La moneda solo se puede corregir si la cuenta está sin
+    // movimientos: cambiarla con historial mezclaría importes de dos monedas.
+    if (kind === 'account.update') {
+      const account = this.account(workspace, String(input.accountId ?? ''));
+      const accountKind = input.accountKind === undefined ? account.kind : input.accountKind;
+      if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
+      if (typeof input.verified !== 'boolean' || typeof input.accessible !== 'boolean') throw new DomainError('Indicá verificación y accesibilidad del saldo.');
+      const name = text(input.name, 'Nombre', 60);
+      const opening = money(input.opening, { zero: true });
+      const cutoff = date(input.cutoff);
+      const unit = input.currency === undefined ? account.currency : currency(input.currency);
+      if (unit !== account.currency && this.db.prepare('SELECT 1 FROM entries WHERE account=? LIMIT 1').get(account.id))
+        throw new DomainError(`La cuenta ya tiene movimientos en ${account.currency}: la moneda no se puede cambiar. Si está mal, creá la cuenta correcta y trasladá el historial.`);
+      // El saldo inicial vale al inicio del día del corte: un movimiento anterior quedaría antes
+      // del saldo y se contaría dos veces. Se rechaza antes de tocar la fila.
+      const earlier = this.db.prepare('SELECT COUNT(*) n FROM entries e JOIN operations o ON o.id=e.operation WHERE e.account=? AND o.date < ?').get(account.id, cutoff).n;
+      if (earlier) throw new DomainError(`Hay ${earlier} ${earlier === 1 ? 'movimiento' : 'movimientos'} anteriores al ${cutoff}. Elegí una fecha de corte igual o anterior a la de esos movimientos.`);
+      const next = { name, kind: accountKind, currency: unit, opening, cutoff, verified: Number(input.verified), accessible: Number(input.accessible) };
+      const before = { name: account.name, kind: account.kind, currency: account.currency, opening: account.opening, cutoff: account.cutoff, verified: account.verified, accessible: account.accessible };
+      // Guardar sin cambios no ensucia la auditoría: se responde igual, sin asiento nuevo.
+      if (!Object.keys(next).some(key => next[key] !== before[key])) return { id: account.id, changed: false };
+      this.db.prepare('UPDATE accounts SET name=?, kind=?, currency=?, opening=?, cutoff=?, verified=?, accessible=? WHERE workspace=? AND id=?')
+        .run(next.name, next.kind, next.currency, next.opening, next.cutoff, next.verified, next.accessible, workspace, account.id);
+      this.audit(workspace, actor, 'account.updated', JSON.stringify({ account: account.id, before, after: next }));
+      return { id: account.id, changed: true };
+    }
     if (kind === 'account.delete') {
       const account = this.account(workspace, String(input.accountId ?? ''));
       const ids = new Set(this.db.prepare('SELECT DISTINCT operation FROM entries WHERE account=?').all(account.id).map(row => row.operation));

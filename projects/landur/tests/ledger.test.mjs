@@ -457,3 +457,43 @@ test('limpieza de demos: borra espacios demo vencidos aunque tengan comprobantes
   assert.equal(ledger.snapshot('demo-1').evidence.length, 0);
   assert.ok(ledger.db.prepare('SELECT 1 FROM workspaces WHERE id=?').get('privado'), 'el espacio no demo sigue ahí');
 });
+
+test('una cuenta se corrige sin borrarla y el cambio queda auditado', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const id=account({name:'Banco mal escrito',opening:'1000'});
+  run(op('expense',{accountId:id,amount:'250'}));
+  assert.equal(ledger.snapshot('a').accounts[0].balance,75000,'saldo inicial menos el gasto');
+  const changed=run({kind:'account.update',accountId:id,name:'Banco Bien Escrito',accountKind:'cash',currency:'UYU',opening:'1200',cutoff:'2026-10-01',verified:false,accessible:false});
+  assert.deepEqual(changed,{id,changed:true});
+  const updated=ledger.snapshot('a').accounts.find(a=>a.id===id);
+  assert.equal(updated.name,'Banco Bien Escrito');
+  assert.equal(updated.kind,'cash');
+  assert.equal(updated.opening,120000,'el saldo inicial corregido queda en unidades menores');
+  assert.equal(updated.balance,95000,'el saldo se recalcula con los movimientos existentes');
+  assert.equal(updated.verified,0);assert.equal(updated.accessible,0);
+  const state=ledger.snapshot('a');
+  assert.equal(state.entries.length,1,'los movimientos no se tocan');
+  const entry=state.audit.find(a=>a.action==='account.updated');
+  assert.match(entry.entity,/Banco mal escrito/,'la auditoría conserva el valor anterior');
+  assert.match(entry.entity,/Banco Bien Escrito/,'y guarda el nuevo');
+  // Repetir el mismo contenido no ensucia la auditoría ni inventa un cambio.
+  assert.deepEqual(run({kind:'account.update',accountId:id,name:'Banco Bien Escrito',accountKind:'cash',currency:'UYU',opening:'1200',cutoff:'2026-10-01',verified:false,accessible:false}),{id,changed:false});
+  assert.equal(ledger.snapshot('a').audit.filter(a=>a.action==='account.updated').length,1);
+});
+
+test('corregir una cuenta valida corte, moneda e importe antes de tocar nada', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const id=account({name:'Caja',opening:'1000'});
+  run(op('expense',{accountId:id,amount:'100',date:'2026-10-15'}));
+  const base={kind:'account.update',accountId:id,name:'Caja',accountKind:'bank',opening:'1000',cutoff:'2026-10-01',verified:true,accessible:true};
+  assert.throws(()=>run({...base,currency:'USD'}),/moneda/,'la moneda no cambia si hay movimientos');
+  assert.throws(()=>run({...base,currency:'UYU',cutoff:'2026-10-20'}),/anteriores al/,'el corte no puede quedar después de un movimiento');
+  assert.throws(()=>run({...base,currency:'UYU',verified:'sí'}),/verificación/);
+  assert.throws(()=>run({...base,accountId:'ajena',currency:'UYU'}),error=>error.status===404);
+  const kept=ledger.snapshot('a').accounts.find(a=>a.id===id);
+  assert.equal(kept.currency,'UYU');assert.equal(kept.cutoff,'2026-10-01');assert.equal(kept.opening,100000);
+  // Sin movimientos, la moneda sí se puede corregir: no hay importes que reinterpretar.
+  const empty=account({name:'Caja nueva',opening:'0'});
+  assert.equal(run({kind:'account.update',accountId:empty,name:'Caja nueva',accountKind:'cash',currency:'USD',opening:'0',cutoff:'2026-10-01',verified:true,accessible:true}).changed,true);
+  assert.equal(ledger.snapshot('a').accounts.find(a=>a.id===empty).currency,'USD');
+});

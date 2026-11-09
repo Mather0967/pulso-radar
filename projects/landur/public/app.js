@@ -799,6 +799,10 @@ function quickCapture(kind='expense',targetId='',opts={}){
   const currencies=[...new Set(state.accounts.map(a=>a.currency))];
   const target0=state.operations.find(o=>o.id===targetId);
   const d={kind,concept:'',amount:'',currency:target0?.currency||unit||currencies[0]||'UYU',date:'',due:'',category:'',accountId:'',toAccountId:'',targetId:'',commission:'',name:'',accountKind:'bank',cutoff:today(),verified:false,accessible:false,file:null};
+  // Editar una cuenta reutiliza este mismo flujo: se abre directo en «Revisá» con los datos
+  // ya cargados y solo se corrige lo que haga falta, sin borrar la cuenta ni rehacer el alta.
+  const editing=opts.account?state.accounts.find(a=>a.id===opts.account)||null:null;
+  if(editing){kind='account';d.kind='account';d.name=editing.name;d.accountKind=editing.kind;d.currency=editing.currency;d.amount=decimal(editing.opening);d.cutoff=editing.cutoff;d.verified=!!editing.verified;d.accessible=!!editing.accessible;}
   let phase=kind==='expense'&&!targetId?'capture':'review',sheet='',listening=false,typed=false,err='',recognition=null,gen=0,shown='';
   const live=()=>modal.open&&modal.classList.contains('capture');
   const has=k=>({amount:()=>!!d.amount,account:()=>!!d.accountId,toAccount:()=>!!d.toAccountId&&d.toAccountId!==d.accountId,target:()=>!!d.targetId,commission:()=>d.commission!=='',concept:()=>!!d.concept,name:()=>!!d.name})[k]();
@@ -810,7 +814,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
   const accountName=id=>state.accounts.find(a=>a.id===id)?.name||'';
   const pickTarget=o=>{d.targetId=o.id;d.currency=o.currency;d.amount=decimal(o.amount-o.applied);d.concept=`${d.kind==='payment'?'Pago':'Cobro'} · ${o.concept}`;};
   if(target0&&['payment','collection'].includes(kind))pickTarget(target0);
-  if(kind==='account'){d.currency=unit||currencies[0]||'UYU';}
+  if(kind==='account'&&!editing){d.currency=unit||currencies[0]||'UYU';}
   const absorb=said=>{
     const {id,text}=takeAccount(said,d.currency);
     const p=parseSpokenInvoice(text,{today:today(),currency:d.currency});
@@ -961,17 +965,17 @@ function quickCapture(kind='expense',targetId='',opts={}){
     const capLabel=isAcc?'Saldo inicial':d.kind==='collection'?'Cobro bruto':'';
     const amountBtn=`<button type="button" class="rv-amount${d.amount?'':' need'}" data-cap="open" data-v="amount">${d.amount?moneyHtml(cents,d.currency):`<span>${amountTitle()}</span>`}</button>`;
     if(phase==='review'){
-      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?'Nueva cuenta':'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${err?`<p class="cap-err" role="alert">${escape(err)}</p>`:''}${isAcc?'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>':''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
+      modal.innerHTML=`<div class="cap-head"><span class="cap-title">${isAcc?(editing?'Editar cuenta':'Nueva cuenta'):'Revisá'}</span>${close}</div><div class="rv">${capLabel&&d.amount?`<p class="rv-cap">${capLabel}</p>`:''}${amountBtn}<div class="rv-list">${reviewRows()}</div>${err?`<p class="cap-err" role="alert">${escape(err)}</p>`:''}${isAcc?(editing?'<p class="rv-note">Se corrigen los datos de la cuenta. Los movimientos no se tocan: el saldo se vuelve a calcular con ellos.</p>':'<p class="rv-note">Una cuenta nueva no es un ingreso. No cargues de nuevo movimientos anteriores al corte.</p>'):''}</div><div class="cap-foot"><button type="button" class="primary" data-cap="next" ${need?'disabled':''}>Continuar</button>${voiceOk?`<button type="button" class="cap-voice${listening?' on':''}" data-cap="mic">${icon('mic')}<span>${listening?'Escuchando… tocá para detener':'Corregir por voz'}</span></button>`:''}</div>${files}${sheetHtml()}`;
     }else{
       const meta=summaryMeta().filter(Boolean);
-      modal.innerHTML=`<div class="cap-head"><button class="icon-btn" data-cap="back" aria-label="Volver a revisar">‹</button>${close}</div><div class="sm"><p class="sm-kind">${KIND_INFO[d.kind][0]}</p><div class="sm-amount">${moneyHtml(cents,d.currency)}</div><p class="sm-concept">${escape(isAcc?d.name:d.concept)}</p><p class="sm-meta">${meta.join('  ·  ')}</p><p class="cap-err" role="alert">${escape(err)}</p></div><div class="cap-foot"><button type="button" class="primary" data-cap="save" ${busy?'disabled':''}>${isAcc?'Crear cuenta':'Guardar registro'}</button></div>${files}`;
+      modal.innerHTML=`<div class="cap-head"><button class="icon-btn" data-cap="back" aria-label="Volver a revisar">‹</button>${close}</div><div class="sm"><p class="sm-kind">${editing?'Editar cuenta':KIND_INFO[d.kind][0]}</p><div class="sm-amount">${moneyHtml(cents,d.currency)}</div><p class="sm-concept">${escape(isAcc?d.name:d.concept)}</p><p class="sm-meta">${meta.join('  ·  ')}</p><p class="cap-err" role="alert">${escape(err)}</p></div><div class="cap-foot"><button type="button" class="primary" data-cap="save" ${busy?'disabled':''}>${isAcc?(editing?'Guardar cambios':'Crear cuenta'):'Guardar registro'}</button></div>${files}`;
     }
     const field=modal.querySelector('.sheet [data-capfield]');
     if(field&&field.tagName==='INPUT'&&field.type!=='date'&&sheet!=='category')field.focus({preventScroll:true});
   };
   const buildInput=()=>{
     const k=d.kind,date=d.date||today();
-    if(k==='account')return {kind:'account',name:d.name,accountKind:d.accountKind,currency:d.currency,opening:d.amount,cutoff:d.cutoff,verified:d.verified,accessible:d.accessible};
+    if(k==='account')return editing?{kind:'account.update',accountId:editing.id,name:d.name,accountKind:d.accountKind,currency:d.currency,opening:d.amount,cutoff:d.cutoff,verified:d.verified,accessible:d.accessible}:{kind:'account',name:d.name,accountKind:d.accountKind,currency:d.currency,opening:d.amount,cutoff:d.cutoff,verified:d.verified,accessible:d.accessible};
     const i={kind:k,concept:d.concept,amount:d.amount,currency:d.currency,date};
     if(k==='obligation')i.due=d.due||today();
     if(['expense','sale'].includes(k)&&d.category)i.category=d.category;
@@ -989,7 +993,7 @@ function quickCapture(kind='expense',targetId='',opts={}){
       const result=await api('/api/commands',pendingRequest.input,pendingRequest.key);
       const {key,file}=pendingRequest;pendingRequest=null;busy=false;modal.close();modal.innerHTML='';
       if(file)try{await uploadEvidence(result.id,file,`${key}-ev`);}catch(error){toast(`El registro se guardó, pero el comprobante no se adjuntó: ${error.message}`);}
-      try{await refresh();toast(d.kind==='account'?'Cuenta creada correctamente.':'Registro guardado correctamente.');}catch{lock('El registro se guardó, pero no se pudo actualizar la vista. Reconectá antes de registrar otra operación.');}
+      try{await refresh();toast(editing?'Cuenta actualizada correctamente.':d.kind==='account'?'Cuenta creada correctamente.':'Registro guardado correctamente.');}catch{lock('El registro se guardó, pero no se pudo actualizar la vista. Reconectá antes de registrar otra operación.');}
     }catch(error){
       busy=false;err=error.message;if(!error.uncertain)pendingRequest=null;render();
     }
@@ -1320,6 +1324,7 @@ document.addEventListener('click',async e=>{
   if(b.dataset.attach){$('#evidence-file')?.click();return;}
   if(b.dataset.operation){detail(b.dataset.operation);return;}
   if(b.dataset.account){const a=state.accounts.find(a=>a.id===b.dataset.account);if(!a)return;const ids=new Set(state.entries.filter(e=>e.account===a.id).map(e=>e.operation));openDialog(a.name,`Saldo registrado: ${fmt(a.balance,a.currency)}`,`<div class="dialog-body">${actList(state.operations.filter(o=>ids.has(o.id)))}</div>`);return;}
+  if(b.dataset.editAccount){quickCapture('account','',{account:b.dataset.editAccount});return;}
   if(b.dataset.deleteAccount){accountDeleteDialog(b.dataset.deleteAccount);return;}
   if(b.dataset.removeEvidence){removeEvidenceDialog(b.dataset.removeEvidence);return;}
   if(b.dataset.deletePayment){deletePaymentDialog(b.dataset.deletePayment);return;}
@@ -1336,7 +1341,7 @@ document.addEventListener('click',async e=>{
     case 'accsheet':{
       const a=state.accounts.find(a=>a.id===b.dataset.v);if(!a)break;
       const kv=(k,v)=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`;
-      openDialog(a.name,`${ACCOUNT_KIND_NAME[a.kind]||'Cuenta'} · ${a.currency}`,`<div class="dialog-body"><div class="sh-hero"><div class="sh-amount">${moneyHtml(a.balance,a.currency)}</div>${pill(a.verified?'Apertura verificada':'Apertura sin verificar',a.verified?'green':'amber')}</div><div class="kv-list">${kv('Saldo inicial',`${fmt(a.opening,a.currency)} al inicio del ${dateFmt(a.cutoff)}`)}${kv('Fondos',a.accessible?'Accesibles':'Restringidos')}</div><details class="tech"><summary>Datos técnicos</summary><p>Identificador para importación CSV</p><code>${escape(a.id)}</code></details></div><div class="dialog-footer"><button type="button" class="text-btn" data-account="${a.id}">Ver movimientos ${icon('arrow')}</button>${state.access==='viewer'?'':`<button type="button" class="text-btn danger" data-delete-account="${a.id}">Eliminar cuenta</button>`}</div>`);
+      openDialog(a.name,`${ACCOUNT_KIND_NAME[a.kind]||'Cuenta'} · ${a.currency}`,`<div class="dialog-body"><div class="sh-hero"><div class="sh-amount">${moneyHtml(a.balance,a.currency)}</div>${pill(a.verified?'Apertura verificada':'Apertura sin verificar',a.verified?'green':'amber')}</div><div class="kv-list">${kv('Saldo inicial',`${fmt(a.opening,a.currency)} al inicio del ${dateFmt(a.cutoff)}`)}${kv('Fondos',a.accessible?'Accesibles':'Restringidos')}</div><details class="tech"><summary>Datos técnicos</summary><p>Identificador para importación CSV</p><code>${escape(a.id)}</code></details></div><div class="dialog-footer"><button type="button" class="text-btn" data-account="${a.id}">Ver movimientos ${icon('arrow')}</button>${state.access==='viewer'?'':`<button type="button" class="text-btn" data-edit-account="${a.id}">Editar cuenta</button><button type="button" class="text-btn danger" data-delete-account="${a.id}">Eliminar cuenta</button>`}</div>`);
       break;}
     case 'seg':{const k=b.dataset.v;view=k==='expenses'?'expenses':k==='sales'?'sales':'moves';actOther=k==='other';render();break;}
     case 'actsearch':searchOpen=!searchOpen;if(!searchOpen)query='';render();$('#search')?.focus();break;
