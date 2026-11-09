@@ -325,3 +325,11 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - Corrección: las respuestas de `/landur` envían `microphone=(self)` y el resto del portal conserva `microphone=()`. El aviso del cliente ahora dice qué hacer (candado de la barra de direcciones → Micrófono → Permitir → recargar) en vez de mandar a unos ajustes donde no había nada que cambiar. Caché del service worker a v17.
 - Evidencia: prueba nueva en `tests/portal-projects.test.mjs` (LANDUR permite el micrófono, `/login` lo sigue bloqueando) contra el servidor del portal con datos sintéticos; `node --check` en `app.js`; raíz 92/92 y `projects/landur/` 107/110 (los 3 fallos conocidos de Windows).
 - No probado: el pedido de permiso real de Chrome en rivect.net. Se verifica después del despliegue: al tocar el micrófono tiene que aparecer el pedido del navegador.
+
+## El importe dictado en el campo se quedaba con el número suelto (09/11/2026)
+
+- Pedido del usuario: al decir «25 mil», «100 mil» o «150 mil» el importe queda en 25, 100 o 150; con 3500 funciona bien.
+- Causa: el dictado del sistema (Win+H en Windows, micrófono del teclado en el iPhone) escribe la frase **dentro del campo de importe**, y `normAmount` descartaba todo lo que no fueran dígitos, puntos y comas: «25 mil» quedaba en «25» y «150 mil» en «150». El intérprete de la app (`parseSpokenInvoice`) ya leía bien esas frases; el campo de importe no pasaba por él. El valor 3500 funcionaba porque no lleva palabras.
+- Corrección: `voice.mjs` expone `amountFromText`, que interpreta cualquier importe escrito o dictado con las mismas reglas del resto de la app («25 mil», «veinticinco mil», «1,5 millones», «60,000», «1.800»), y `normAmount` la usa cuando el texto trae letras. Los números sueltos y el cero de la comisión conservan el comportamiento anterior. Caché del service worker a v18.
+- Evidencia: prueba nueva en `tests/voice.test.mjs` (11 casos de dictado al campo más los rechazos sin cifra y del cero); `node --test tests/*.test.mjs` en `projects/landur/`: 111 pruebas, 108 en verde y los 3 fallos conocidos de Windows; raíz 92/92.
+- No probado: el dictado real del sistema operativo en la PC. Se verificó la interpretación del texto que ese dictado produce.

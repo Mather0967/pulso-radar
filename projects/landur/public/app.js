@@ -1,4 +1,4 @@
-import { parseSpokenInvoice, fold } from './voice.mjs';
+import { parseSpokenInvoice, fold, amountFromText } from './voice.mjs';
 
 const BASE = new URL('./', import.meta.url).pathname;
 const endpoint = path => BASE + path.replace(/^\//, '');
@@ -773,7 +773,11 @@ function takeAccount(said,currency){
 // El tope es el mismo del servidor (9.999.999.999.999,99): por encima no se envía nada.
 const AMOUNT_MAX_CENTS=999999999999999;
 function normAmount(raw,zero=false){
-  const text=String(raw||'').trim().replace(/[^\d.,]/g,'');
+  const said=String(raw||'').trim();
+  // El dictado del sistema (Win+H o el micrófono del teclado) escribe «25 mil» dentro del campo:
+  // se interpreta igual que el dictado de la app, en vez de quedarse con el número suelto.
+  if(/[a-záéíóúñ]/i.test(said)){const value=amountFromText(said);if(value)return value;}
+  const text=said.replace(/[^\d.,]/g,'');
   if(!text)return '';
   let t=text;
   if(/^\d{1,3}(?:\.\d{3})+$/.test(t)||/^\d{1,3}(?:,\d{3})+$/.test(t))t=t.replace(/[.,]/g,'');

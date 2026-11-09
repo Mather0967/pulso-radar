@@ -280,6 +280,17 @@ function findAmount(text, list) {
   return cents ? { cents, span: spanOf(loose) } : { cents: null, span: null };
 }
 
+// Importe que entra al campo como texto: lo que escribe el dictado del sistema («25 mil»,
+// «veinticinco mil»), lo pegado de un mensaje («60,000») o lo tipeado («1.800»). Devuelve ''
+// si no hay una cifra reconocible, para no inventar un importe.
+export function amountFromText(raw) {
+  const text = fold(String(raw ?? ''));
+  if (!text.trim()) return '';
+  const scaled = expandScaledDigits(text);
+  const found = findAmount(scaled.text, tokenize(scaled.text));
+  return found.cents ? (found.cents / 100).toFixed(2) : '';
+}
+
 export function parseSpokenInvoice(transcript, { today = new Date().toISOString().slice(0, 10), currency = '' } = {}) {
   const original = String(transcript ?? '');
   const folded = fold(original);

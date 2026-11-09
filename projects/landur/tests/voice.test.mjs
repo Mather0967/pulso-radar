@@ -3,7 +3,7 @@
 // cuando no lo entiende: un número mal escuchado es un error contable.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpokenInvoice, wordsToNumber, digitsToCents, fold } from '../public/voice.mjs';
+import { parseSpokenInvoice, wordsToNumber, digitsToCents, fold, amountFromText } from '../public/voice.mjs';
 
 const today = '2026-10-27';
 const say = (text, options = {}) => parseSpokenInvoice(text, { today, ...options });
@@ -220,4 +220,25 @@ test('cualquier cifra hasta un millón se lee completa, con dígitos o con palab
     ['pagué 250mil pesos', '250000.00']
   ];
   for (const [said, amount] of cases) assert.equal(say(said).amountText, amount, said);
+});
+
+test('un importe que entra al campo como texto («25 mil») se interpreta completo', () => {
+  // El dictado del sistema escribe la frase dentro del campo de importe, y ahí se descartaba
+  // todo lo que no fueran dígitos: «25 mil» quedaba en 25. Ahora usa las mismas reglas.
+  const cases = [
+    ['25 mil', '25000.00'],
+    ['100 mil', '100000.00'],
+    ['150 mil', '150000.00'],
+    ['veinticinco mil', '25000.00'],
+    ['ciento cincuenta mil', '150000.00'],
+    ['1,5 millones', '1500000.00'],
+    ['60,000', '60000.00'],
+    ['1.800', '1800.00'],
+    ['3500', '3500.00'],
+    ['25,50', '25.50'],
+    ['$ 150 mil', '150000.00']
+  ];
+  for (const [said, amount] of cases) assert.equal(amountFromText(said), amount, said);
+  assert.equal(amountFromText('sin importe'), '');
+  assert.equal(amountFromText('0'), '');
 });
