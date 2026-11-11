@@ -1,4 +1,5 @@
-// Conexiones externas: Shopify (ventas) y Meta Ads (gasto publicitario).
+// Conexiones externas: Shopify (ventas), Meta Ads (gasto publicitario) y Google Sheets
+// (las ventas que el cliente carga a mano en su planilla).
 //
 // Cada conexión guarda su configuración —token incluido— en la base privada del
 // propio espacio (`connections`), nunca en localStorage, cookies ni logs. Los
@@ -11,6 +12,7 @@
 // la configuración nunca construye URLs arbitrarias, así que la conexión no
 // puede convertirse en SSRF. Los errores del proveedor llegan como mensajes
 // accionables, sin exponer el token.
+import { createHash, createSign } from 'node:crypto';
 import { DomainError } from './ledger.mjs';
 
 const CURRENCIES = ['UYU', 'USD', 'BRL'];
@@ -18,6 +20,10 @@ const SHOPIFY_VERSION = '2026-10';
 const META_VERSION = 'v26.0';
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_SYNC_DAYS = 92;
+const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const MAX_SHEET_ROWS = 5000;
 
 const formatDate = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new DomainError('Indicá una fecha válida (AAAA-MM-DD).');
@@ -80,6 +86,146 @@ async function readProviderJson(response, label) {
 
 const mask = value => (typeof value === 'string' && value.length >= 10 ? `${value.slice(0, 6)}…${value.slice(-4)}` : '');
 
+// ................ Google Sheets: validación ................
+const foldCell = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// El enlace del navegador, el de «compartir» y el identificador suelto dicen lo mismo.
+function normalizeSpreadsheet(value) {
+  const text = String(value ?? '').trim();
+  if (!text) throw new DomainError('Pegá el enlace o el identificador de la planilla de Google.');
+  const fromUrl = text.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/);
+  const id = fromUrl ? fromUrl[1] : text.replace(/[?#].*$/, '');
+  if (!/^[A-Za-z0-9_-]{20,}$/.test(id))
+    throw new DomainError('El identificador de la planilla no se reconoce: es la parte entre /d/ y /edit del enlace de Google Sheets.');
+  return id;
+}
+function normalizeSheetName(value) {
+  const name = String(value ?? '').trim();
+  if (!name) throw new DomainError('Indicá el nombre de la pestaña de la planilla (por ejemplo, minorista).');
+  if (name.length > 80 || !/^[\p{L}\p{N} ._-]+$/u.test(name))
+    throw new DomainError('El nombre de la pestaña solo admite letras, números, espacios, puntos, guiones y guiones bajos.');
+  return name;
+}
+function normalizeMonth(value) {
+  const month = String(value ?? '').trim();
+  if (!month) return '';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new DomainError('El mes de la planilla se escribe AAAA-MM (por ejemplo, 2026-11).');
+  return month;
+}
+// De la cuenta de servicio solo se guardan el correo y la clave: el resto del JSON no se usa
+// y no tiene por qué quedar en la base ni volver nunca al navegador.
+function normalizeServiceAccount(value, previous) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) {
+    if (previous?.serviceAccount?.private_key) return previous.serviceAccount;
+    throw new DomainError('Pegá el JSON de la cuenta de servicio de Google (el archivo que se descarga al crear la clave).');
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new DomainError('El texto pegado no es un JSON válido: copiá el archivo completo de la cuenta de servicio.'); }
+  const email = String(parsed?.client_email ?? '').trim();
+  const privateKey = String(parsed?.private_key ?? '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(email))
+    throw new DomainError('El JSON debe ser el de una cuenta de servicio: el correo (client_email) termina en .iam.gserviceaccount.com.');
+  if (!/^-----BEGIN (RSA )?PRIVATE KEY-----/.test(privateKey) || !/-----END (RSA )?PRIVATE KEY-----$/.test(privateKey))
+    throw new DomainError('Al JSON le falta la clave privada completa (private_key). Copialo de nuevo desde Google Cloud.');
+  if (privateKey.length > 4096) throw new DomainError('La clave privada es demasiado larga.');
+  return { client_email: email, private_key: privateKey };
+}
+
+// ................ Google Sheets: lectura ................
+// Los importes llegan como número o como texto con separadores de miles: se aceptan las dos
+// formas y un texto raro es un error de la fila, nunca un cero silencioso.
+function sheetAmount(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return (Math.round(value * 100) / 100).toFixed(2);
+  const raw = String(value ?? '').trim().replace(/[\s$]/g, '');
+  if (!raw) return null;
+  let text = raw;
+  if (/^-?\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(text)) text = text.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(text)) text = text.replace(/,/g, '');
+  else if (/^-?\d+([.,]\d{1,2})?$/.test(text)) text = text.replace(',', '.');
+  else throw new DomainError(`«${truncate(raw, 24)}» no se entiende como importe.`);
+  const number = Number(text);
+  if (!Number.isFinite(number)) throw new DomainError(`«${truncate(raw, 24)}» no se entiende como importe.`);
+  return (Math.round(number * 100) / 100).toFixed(2);
+}
+// La planilla real escribe el día suelto (8, 9) porque el mes está en el título de la pestaña.
+// Con una fecha completa se usa esa; si solo hay día, hace falta el mes configurado: no se
+// supone el mes del sistema, porque eso fecharía ventas en un período equivocado.
+function monthDay(day, month, label) {
+  if (!month) throw new DomainError(`${label}: la planilla trae solo el día (${day}). Indicá el mes de la planilla en la conexión para poder fecharlo.`);
+  const iso = `${month}-${String(day).padStart(2, '0')}`;
+  const parsed = new Date(`${iso}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso)
+    throw new DomainError(`${label}: el día ${day} no existe en ${month}.`);
+  return iso;
+}
+function sheetDate(value, month, label) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Las celdas de fecha de Google llegan como número de serie (días desde 1899-12-30).
+    if (value >= 20000) return new Date(Date.UTC(1899, 11, 30) + Math.round(value) * 864e5).toISOString().slice(0, 10);
+    if (Number.isInteger(value) && value >= 1 && value <= 31) return monthDay(value, month, label);
+    throw new DomainError(`${label}: la fecha «${value}» no se entiende.`);
+  }
+  const text = String(value ?? '').trim();
+  if (!text) throw new DomainError(`${label}: falta la fecha.`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return formatDate(text);
+  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) return formatDate(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`);
+  if (/^\d{1,2}$/.test(text)) return monthDay(Number(text), month, label);
+  throw new DomainError(`${label}: la fecha «${truncate(text, 20)}» no se entiende. Usá una columna de fecha real o indicá el mes de la planilla.`);
+}
+const SHEET_COLUMNS = {
+  date: ['fecha', 'dia', 'date'],
+  customer: ['cliente', 'customer', 'nombre'],
+  order: ['nro pedido', 'nro de pedido', 'numero de pedido', 'n de pedido', 'pedido nro', 'order'],
+  detail: ['pedido', 'producto', 'detalle', 'descripcion'],
+  units: ['unidades', 'cantidad', 'unid'],
+  status: ['estado', 'estado del pedido', 'status'],
+  gross: ['bruto', 'total', 'importe bruto'],
+  fee: ['mp fee', 'fee', 'comision', 'comision mp', 'arancel'],
+  net: ['mp neto', 'neto', 'importe neto'],
+};
+function sheetColumns(header) {
+  const keys = header.map(foldCell);
+  const map = {};
+  for (const [field, names] of Object.entries(SHEET_COLUMNS)) map[field] = names.map(name => keys.indexOf(name)).find(index => index >= 0) ?? -1;
+  return map;
+}
+// La primera fila con «Bruto» y algo que identifique la venta es el encabezado: arriba puede
+// haber un título, una nota o una fila vacía.
+function sheetHeaderIndex(rows) {
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const keys = (rows[i] ?? []).map(foldCell);
+    if (keys.includes('bruto') && (keys.includes('cliente') || keys.includes('producto') || keys.includes('nro pedido') || keys.includes('pedido'))) return i;
+  }
+  return -1;
+}
+// La cuenta de servicio firma un JWT (RS256) y lo cambia por un token de solo lectura: es el
+// único camino que no obliga a publicar la planilla ni a guardar un secreto OAuth de usuario.
+async function googleAccessToken(serviceAccount, fetchImpl) {
+  const now = Math.floor(Date.now() / 1000);
+  const encode = value => Buffer.from(value).toString('base64url');
+  const header = encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claims = encode(JSON.stringify({ iss: serviceAccount.client_email, scope: SHEETS_SCOPE, aud: GOOGLE_TOKEN_URL, iat: now, exp: now + 3600 }));
+  let signature;
+  try {
+    const signer = createSign('RSA-SHA256');
+    signer.update(`${header}.${claims}`);
+    signature = signer.sign(serviceAccount.private_key).toString('base64url');
+  } catch {
+    throw new DomainError('La clave privada de la cuenta de servicio no se pudo usar. Volvé a pegar el JSON completo.');
+  }
+  const payload = new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${header}.${claims}.${signature}` });
+  const response = await callFetch(GOOGLE_TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: String(payload) }, fetchImpl);
+  let data;
+  try { data = await readProviderJson(response, 'Google Sheets'); }
+  catch { throw new DomainError('Google rechazó la clave de la cuenta de servicio. Revisá que el JSON sea el correcto y que la API de Google Sheets esté habilitada en el proyecto.'); }
+  if (typeof data.access_token !== 'string' || !data.access_token)
+    throw new DomainError('Google no devolvió un token para la cuenta de servicio. Revisá la clave y que la API de Google Sheets esté habilitada.');
+  return data.access_token;
+}
+
 function connectionRow(ledger, workspace, name) {
   return ledger.db.prepare('SELECT config, updated_at FROM connections WHERE workspace=? AND name=?').get(workspace, name);
 }
@@ -99,8 +245,8 @@ function externalExists(ledger, workspace, source, externalId) {
 function statusOne(ledger, workspace, name) {
   const row = connectionRow(ledger, workspace, name);
   if (!row) return { kind: name, configured: false };
-  const { accessToken, ...visible } = readConfig(ledger, workspace, name);
-  return { kind: name, configured: true, tokenMask: mask(accessToken), lastSync: visible.lastSync ?? null, updatedAt: row.updated_at, ...visible };
+  const { accessToken, serviceAccount, ...visible } = readConfig(ledger, workspace, name);
+  return { kind: name, configured: true, tokenMask: mask(accessToken), clientEmail: serviceAccount?.client_email ?? null, keyMask: serviceAccount?.private_key ? 'Clave guardada' : null, lastSync: visible.lastSync ?? null, updatedAt: row.updated_at, ...visible };
 }
 
 // ................ validación y guardado ................
@@ -115,7 +261,7 @@ function normalizeShopifyDomain(value) {
 const SHOPIFY_TOKEN = /^shp[a-z]{2,4}_[A-Za-z0-9]{16,64}$/;
 
 function validateSave(ledger, workspace, input) {
-  const name = input?.kind === 'shopify' ? 'shopify' : input?.kind === 'meta' ? 'meta' : null;
+  const name = ['shopify', 'meta', 'sheets'].includes(input?.kind) ? input.kind : null;
   if (!name) throw new DomainError('Conexión no reconocida.', 404);
   const previous = readConfig(ledger, workspace, name);
   const config = {};
@@ -132,7 +278,7 @@ function validateSave(ledger, workspace, input) {
       throw new DomainError('Falta el token de la app de Shopify (shpat_…). Copialo desde Apps desarrolladas → API credentials; se muestra una sola vez.');
     if (!SHOPIFY_TOKEN.test(config.accessToken))
       throw new DomainError('El token de Shopify empieza con "shp" (por ejemplo shpat_…). Revisá que copiaste el token completo de API credentials.');
-  } else {
+  } else if (name === 'meta') {
     const account = String(input.adAccountId ?? previous?.adAccountId ?? '').replace(/^act_/, '').trim();
     if (!/^\d{5,25}$/.test(account)) throw new DomainError('Ingresá el identificador del ad account: solo números, el mismo que aparece como act_<número> en Meta.');
     config.adAccountId = account;
@@ -140,6 +286,14 @@ function validateSave(ledger, workspace, input) {
     config.accessToken = nextToken ?? previous?.accessToken ?? null;
     if (!config.accessToken)
       throw new DomainError('Falta el token de acceso de Meta. Generá uno de larga duración (System User) con el permiso ads_read.');
+  } else {
+    config.spreadsheetId = normalizeSpreadsheet(input.spreadsheetId ?? previous?.spreadsheetId);
+    config.sheetName = normalizeSheetName(input.sheetName ?? previous?.sheetName ?? 'minorista');
+    config.month = input.month === undefined ? previous?.month ?? '' : normalizeMonth(input.month);
+    config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
+    if (!config.currency) throw new DomainError('Seleccioná la moneda de la planilla (UYU, USD o BRL).');
+    config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
+    config.serviceAccount = normalizeServiceAccount(input.serviceAccount, previous);
   }
   return { name, config, previous };
 }
@@ -265,10 +419,97 @@ async function syncMeta(ledger, workspace, actor, config, since, until, fetchImp
   return { source: 'meta-ads', adAccount: { name: truncate(adAccount.name, 60), currency: adAccountCurrency }, rows: rows.length, created, skipped, errors };
 }
 
+// ................ sincronía Google Sheets ................
+// La planilla es la fuente de la venta: cada fila entra como venta y, si la conexión tiene
+// cuenta, también su cobro con la comisión que figura en la propia fila (MP Fee, o Bruto −
+// MP Neto). No se calcula nada que la planilla no diga: sin comisión no hay cobro.
+async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
+  const token = await googleAccessToken(config.serviceAccount, fetchImpl);
+  const range = `${config.sheetName}!A1:BZ${MAX_SHEET_ROWS}`;
+  const url = `${SHEETS_API}/${config.spreadsheetId}/values/${encodeURIComponent(range)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`;
+  const response = await callFetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }, fetchImpl);
+  // 403 no es un token vencido: es la planilla sin compartir con la cuenta de servicio.
+  if (response.status === 403)
+    throw new DomainError(`Google no dio permiso de lectura: compartí la planilla con ${config.serviceAccount.client_email} (permiso de solo lectura) y volvé a sincronizar.`);
+  if (response.status === 404)
+    throw new DomainError('Google no encontró la planilla o la pestaña. Revisá el enlace y el nombre de la pestaña en Configuración.');
+  const data = await readProviderJson(response, 'Google Sheets');
+  const rows = Array.isArray(data.values) ? data.values : [];
+  const headerIndex = sheetHeaderIndex(rows);
+  if (headerIndex < 0)
+    throw new DomainError('La planilla no tiene una fila de encabezados reconocible («Fecha», «Cliente» y «Bruto»). Revisá que la pestaña elegida sea la de ventas.');
+  const columns = sheetColumns(rows[headerIndex]);
+  if (columns.gross < 0) throw new DomainError('La planilla no tiene una columna «Bruto»: no se puede saber el importe de cada venta.');
+  if (columns.date < 0) throw new DomainError('La planilla no tiene una columna «Fecha».');
+
+  let account = null;
+  if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
+  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0 }, errors = [];
+  let read = 0, first = null, last = null;
+  for (let index = headerIndex + 1; index < rows.length; index++) {
+    const row = rows[index] ?? [];
+    const cell = field => (columns[field] >= 0 ? row[columns[field]] : undefined);
+    const customer = String(cell('customer') ?? '').trim();
+    const detail = String(cell('detail') ?? '').trim();
+    const order = String(cell('order') ?? '').trim();
+    const label = truncate([customer, detail].filter(Boolean).join(' · ') || `fila ${index + 1}`, 32);
+    const fail = message => { errors.push({ id: label, message }); };
+    try {
+      const gross = sheetAmount(cell('gross'));
+      if (gross === null || Number(gross) <= 0) { skipped.vacias++; continue; }
+      read++;
+      if (/cancel|anulad|reembols|devol/.test(foldCell(cell('status')))) { skipped.canceladas++; continue; }
+      let date;
+      try { date = sheetDate(cell('date'), config.month, label); }
+      catch (error) { if (error instanceof DomainError) { skipped.sinFecha++; fail(error.message); continue; } throw error; }
+      if (!first || date < first) first = date;
+      if (!last || date > last) last = date;
+      const units = Number(cell('units'));
+      // La referencia de la orden cuando existe; si no, una huella estable de la fila: así
+      // repetir la sincronía no duplica aunque la pestaña no tenga número de pedido.
+      const reference = order || createHash('sha256').update(JSON.stringify([date, customer, detail, gross, Number.isFinite(units) ? units : null])).digest('hex').slice(0, 16);
+      const saleExternal = `row-${reference}`;
+      // La clave de idempotencia admite un juego acotado de caracteres: «#1275» se sanea acá
+      // y la referencia externa (que sí puede llevar #) queda intacta.
+      const keyRef = reference.replace(/[^A-Za-z0-9._:-]+/g, '-');
+      let saleRow = ledger.db.prepare('SELECT id FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', saleExternal);
+      if (!saleRow) {
+        const concept = truncate([order ? `Pedido ${order}` : '', customer, detail].filter(Boolean).join(' · ') || 'Venta de planilla', 115);
+        const run = ledger.command(workspace, actor, truncate(`venta-planilla-${keyRef}`, 100),
+          { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: saleExternal });
+        created.push({ kind: 'sale', id: run.id, ref: label });
+        saleRow = { id: run.id };
+      }
+      // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
+      if (!account) continue;
+      let commission = null;
+      const fee = columns.fee >= 0 ? sheetAmount(cell('fee')) : null;
+      if (fee !== null) commission = fee;
+      else if (columns.net >= 0) {
+        const net = sheetAmount(cell('net'));
+        if (net !== null) commission = (Math.round((Number(gross) - Number(net)) * 100) / 100).toFixed(2);
+      }
+      if (commission === null) { skipped.sinCobro++; continue; }
+      if (Number(commission) < 0) { fail(`La comisión de la fila es negativa (${commission}). Revisá la planilla.`); continue; }
+      if (Number(commission) >= Number(gross)) { fail(`La comisión de la fila (${commission}) no deja saldo por cobrar. Revisá la planilla.`); continue; }
+      if (account.currency !== config.currency) { fail(`La cuenta elegida maneja ${account.currency}; la planilla está en ${config.currency}.`); continue; }
+      const collectionExternal = `${saleExternal}-cobro`;
+      if (externalExists(ledger, workspace, 'sheets', collectionExternal)) { skipped.duplicadas++; continue; }
+      const run = ledger.command(workspace, actor, truncate(`cobro-planilla-${keyRef}`, 100),
+        { kind: 'collection', concept: truncate(`Cobro · ${order || customer || 'planilla'}`, 115), accountId: account.id, targetId: saleRow.id, amount: gross, currency: config.currency, commission, date, source: 'sheets', externalId: collectionExternal });
+      created.push({ kind: 'collection', id: run.id, ref: label });
+    } catch (error) {
+      if (error instanceof DomainError) fail(error.message);
+      else throw error;
+    }
+  }
+  return { source: 'sheets', rows: read, sheet: { name: config.sheetName }, since: first, until: last, created, skipped, errors };
+}
+
 // ................ superficie del módulo ................
 export function createIntegrations({ fetchImpl = fetch } = {}) {
   function status(ledger, workspace) {
-    return { shopify: statusOne(ledger, workspace, 'shopify'), meta: statusOne(ledger, workspace, 'meta') };
+    return { shopify: statusOne(ledger, workspace, 'shopify'), meta: statusOne(ledger, workspace, 'meta'), sheets: statusOne(ledger, workspace, 'sheets') };
   }
   function save(ledger, workspace, actor, input) {
     const { name, config, previous } = validateSave(ledger, workspace, input);
@@ -280,10 +521,16 @@ export function createIntegrations({ fetchImpl = fetch } = {}) {
     return { saved: true, status: statusOne(ledger, workspace, name) };
   }
   async function sync(ledger, workspace, actor, kind, input = {}) {
-    if (kind !== 'shopify' && kind !== 'meta') throw new DomainError('Conexión no reconocida.', 404);
+    if (!['shopify', 'meta', 'sheets'].includes(kind)) throw new DomainError('Conexión no reconocida.', 404);
     const config = readConfig(ledger, workspace, kind);
-    if (!config?.accessToken)
-      throw new DomainError('Primero guardá la configuración de la conexión (token incluido) en Configuración.', 400);
+    const ready = kind === 'sheets' ? config?.serviceAccount?.private_key : config?.accessToken;
+    if (!ready)
+      throw new DomainError('Primero guardá la configuración de la conexión en Configuración.', 400);
+    // La planilla se lee entera (una pestaña por mes o por libro): no hay ventana que recortar.
+    if (kind === 'sheets') {
+      const summary = await syncSheets(ledger, workspace, actor, config, fetchImpl);
+      return finish(ledger, workspace, kind, summary, summary.since, summary.until);
+    }
     let since = input.since !== undefined ? formatDate(input.since)
       : (typeof config.lastSync === 'string' && /^\d{4}-\d{2}-\d{2}/.test(config.lastSync) ? config.lastSync.slice(0, 10) : new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10));
     if (kind === 'shopify') {

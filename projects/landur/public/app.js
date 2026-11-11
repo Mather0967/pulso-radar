@@ -178,7 +178,7 @@ function activity(){
   return `<div class="act"><div class="act-bar"><div class="seg" role="group" aria-label="Tipo de operación">${SEGMENTS.map(([k,n])=>`<button type="button" class="${seg===k?'on':''}" data-action="seg" data-v="${k}" aria-pressed="${seg===k}">${n}</button>`).join('')}</div><button type="button" class="icon-btn" data-action="actsearch" aria-label="Buscar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14m9 2-4.3-4.3"/></svg></button><button type="button" class="icon-btn" data-action="actmenu" aria-label="Importar o exportar">${icon('more')}</button></div>${searchOpen||query?`<input class="search act-search" id="search" placeholder="Buscar concepto o referencia…" aria-label="Buscar operaciones" value="${escape(query)}">`:''}${view==='sales'?'<p class="act-note">Se muestran ventas y cobros por separado. Los costos y repartos automáticos todavía no están habilitados.</p>':''}<div id="operation-table">${actList(filteredOps())}</div></div>`;
 }
 // Lo que llegó por sincronía lleva su origen; lo cargado a mano o por voz no lleva etiqueta.
-const ORIGIN_TAGS={shopify:'Shopify','meta-ads':'Meta'};
+const ORIGIN_TAGS={shopify:'Shopify','meta-ads':'Meta',sheets:'Planilla'};
 function actList(ops){
   if(!ops.length)return '<p class="hm-quiet">No hay operaciones para mostrar.</p>';
   const groups=[];
@@ -252,7 +252,8 @@ let connections = null, connLoading = false, connView = '', connUi = {};
 const CURRENCIES = ['UYU','USD','BRL'];
 const connectionKinds = {
   shopify: {title:'Shopify', glyph:'bag', tone:'cash', blurb:'Cada orden paga entra como venta y su cobro con la comisión indicada.', empty:'Cargá las ventas de tu tienda'},
-  meta: {title:'Meta Ads', glyph:'megaphone', tone:'wallet', blurb:'El gasto diario de cada campaña entra como egreso, en la moneda de la cuenta publicitaria.', empty:'Cargá el gasto publicitario de cada día'}
+  meta: {title:'Meta Ads', glyph:'megaphone', tone:'wallet', blurb:'El gasto diario de cada campaña entra como egreso, en la moneda de la cuenta publicitaria.', empty:'Cargá el gasto publicitario de cada día'},
+  sheets: {title:'Google Sheets', glyph:'sales', tone:'cash', blurb:'Cada fila de la planilla entra como venta; si elegís cuenta, también su cobro con la comisión de la fila.', empty:'Cargá las ventas de tu planilla'}
 };
 const connUiOf = kind => connUi[kind] || (connUi[kind] = {phase:'idle'});
 const STALE_DAYS = 3;
@@ -292,7 +293,7 @@ const connectionsSummaryInner = summary => `${escape(summary.line)}${summary.las
 function connectionsSummaryHtml(){
   setTimeout(preloadConnections, 0);
   const summary = connectionsSummary();
-  return `<span data-conn-summary>${summary ? connectionsSummaryInner(summary) : 'Ventas de Shopify y egresos de Meta Ads'}</span>`;
+  return `<span data-conn-summary>${summary ? connectionsSummaryInner(summary) : 'Ventas de Shopify o Google Sheets y egresos de Meta Ads'}</span>`;
 }
 function connectionAccounts(current){
   const list = state.accounts.filter(a => !current?.currency || a.currency === current.currency);
@@ -308,19 +309,26 @@ function connectionForm(kind){
   const fields = kind === 'shopify' ? `
       <label class="field wide">Tienda<small>El dominio que muestra el admin de Shopify.</small><input name="domain" value="${escape(current.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" autocapitalize="none" autocorrect="off" ${off}></label>
       <label class="field">Moneda de la tienda<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
-      <label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(current.commission ?? '0')}" maxlength="12" ${off}></label>` : `
+      <label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(current.commission ?? '0')}" maxlength="12" ${off}></label>` : kind === 'sheets' ? `
+      <label class="field wide">Planilla<small>El enlace de la hoja de Google o su identificador.</small><input name="spreadsheetId" value="${escape(current.spreadsheetId || '')}" placeholder="https://docs.google.com/spreadsheets/d/…" maxlength="400" autocapitalize="none" autocorrect="off" ${off}></label>
+      <label class="field">Pestaña<input name="sheetName" value="${escape(current.sheetName || '')}" placeholder="minorista" maxlength="80" ${off}></label>
+      <label class="field">Mes de la planilla<small>Solo si la fecha es el día suelto (8, 9).</small><input name="month" value="${escape(current.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label>
+      <label class="field">Moneda de la planilla<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>` : `
       <label class="field wide">Cuenta publicitaria<small>El número que en Meta aparece como act_&lt;número&gt;.</small><input name="adAccountId" value="${escape(current.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
+  const secret = kind === 'sheets'
+    ? `<label class="field wide">Cuenta de servicio (JSON)<small>El archivo que descarga Google al crear la clave. Queda guardado en el servidor.</small><input name="serviceAccount" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="8192" placeholder="${connected ? 'Dejar en blanco conserva la clave guardada' : '{ &quot;type&quot;: &quot;service_account&quot;, … }'}" ${off}></label>`
+    : `<label class="field wide">Token de acceso<input name="accessToken" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${connected ? 'Dejar en blanco conserva el token guardado' : kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label>`;
   return `<form class="conn" data-connection="${kind}">
     <div class="form-grid">${fields}
       <label class="field wide">Cuenta donde se registra<select name="accountId" ${off}>${connectionAccounts(current)}</select></label>
-      <label class="field wide">Token de acceso<input name="accessToken" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${connected ? 'Dejar en blanco conserva el token guardado' : kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label>
+      ${secret}
     </div>
     <p class="error" data-connection-error="${kind}" role="alert"></p>
     <button type="submit" class="primary" ${off}>${connected ? 'Guardar cambios' : 'Conectar'}</button>
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
@@ -365,10 +373,11 @@ function connectionDetail(kind){
   const account = state.accounts.find(a => a.id === current.accountId);
   const kv = (label, value) => value ? `<div class="kv"><span>${label}</span><b>${escape(value)}</b></div>` : '';
   const tone = ui.phase === 'error' || (connected && connStale(current) && ui.phase === 'idle') ? ['amber', 'Requiere atención'] : connected ? ['green', 'Conectado'] : ['gray', 'Sin conectar'];
-  const rows = kv(kind === 'shopify' ? 'Tienda' : 'Cuenta publicitaria', kind === 'shopify' ? current.domain : current.adAccountId)
+  const rows = kv(kind === 'shopify' ? 'Tienda' : kind === 'sheets' ? 'Planilla' : 'Cuenta publicitaria', kind === 'shopify' ? current.domain : kind === 'sheets' ? `${current.sheetName || ''}${current.month ? ' · ' + current.month : ' · mes sin indicar'}` : current.adAccountId)
     + kv('Se registra en', account ? `${account.name} · ${account.currency}` : '')
     + (kind === 'shopify' && connected ? kv('Comisión', `${String(current.commission ?? '0').replace('.', ',')} %`) : '')
-    + kv('Token', current.tokenMask);
+    + (kind === 'sheets' && connected ? kv('Cuenta de servicio', current.clientEmail) : '')
+    + kv(kind === 'sheets' ? 'Clave' : 'Token', kind === 'sheets' ? current.keyMask : current.tokenMask);
   return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button>${pill(tone[1], tone[0])}</div>
     ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>
       <details class="cx-edit" data-connection-details ${ui.edit ? 'open' : ''}><summary class="cx-help">Editar conexión <span aria-hidden="true">⌄</span></summary>${connectionForm(kind)}</details>`
@@ -377,29 +386,40 @@ function connectionDetail(kind){
 // Alta de una conexión nueva, un dato por paso (como el registro): origen → dónde se registra → token.
 // Los pasos solo reparten los mismos campos del formulario; el envío al servidor es el de siempre.
 // Los textos de ayuda resumen la documentación de Shopify y de Meta; si cambian sus menús, se actualizan acá.
-const WIZARD_STEPS = {shopify:['Tienda','Dónde','Token'], meta:['Cuenta','Dónde','Token']};
+const WIZARD_STEPS = {shopify:['Tienda','Dónde','Token'], meta:['Cuenta','Dónde','Token'], sheets:['Planilla','Dónde','Clave']};
 const CONNECTION_HELP = {
   shopify: 'Hace falta una app personalizada de tu tienda con permiso de lectura de órdenes (read_orders). En el admin de Shopify, en Apps → Desarrollar apps → tu app → Credenciales de API, aparece el token que empieza con shpat_; se muestra una sola vez, así que copialo al generarlo. Desde 2026 Shopify no deja crear apps personalizadas nuevas desde el admin: si tu tienda no tiene una, consultalo con quien administra la tienda.',
-  meta: 'En Meta Business Suite, entrá a Configuración del negocio → Usuarios del sistema, creá un usuario del sistema y asignale tu cuenta publicitaria. Tocá «Generar token», elegí la app y el permiso ads_read, y copiá el token: se muestra una sola vez.'
+  meta: 'En Meta Business Suite, entrá a Configuración del negocio → Usuarios del sistema, creá un usuario del sistema y asignale tu cuenta publicitaria. Tocá «Generar token», elegí la app y el permiso ads_read, y copiá el token: se muestra una sola vez.',
+  sheets: 'En Google Cloud, habilitá la API de Google Sheets en el proyecto y creá una cuenta de servicio con una clave JSON (Credenciales → Cuentas de servicio → Claves). Después compartí la planilla con el correo de esa cuenta (termina en .iam.gserviceaccount.com) con permiso de lector: así se lee sin publicarla en la web.'
 };
 function connectionWizard(kind){
-  const ui = connUiOf(kind), step = ui.step || 0, draft = ui.draft || (ui.draft = kind === 'shopify' ? {currency:'UYU', commission:'0'} : {});
+  const ui = connUiOf(kind), step = ui.step || 0, draft = ui.draft || (ui.draft = kind === 'shopify' ? {currency:'UYU', commission:'0'} : kind === 'sheets' ? {currency:'UYU', sheetName:'minorista'} : {});
   const off = state.access !== 'viewer' ? '' : 'disabled';
   const chips = WIZARD_STEPS[kind].map((label, i) => `<div class="cx-step ${i < step ? 'done' : i === step ? 'now' : ''}">${i < step ? '✓ ' : i === step ? `${i + 1} ` : ''}${label}</div>`).join('');
   let lead, fields;
   if (step === 0) {
-    lead = kind === 'shopify' ? 'Escribí el dominio que muestra el admin de tu tienda.' : 'Escribí el número de tu cuenta publicitaria. En Meta aparece como act_ seguido del número; acá va solo el número.';
+    lead = kind === 'shopify' ? 'Escribí el dominio que muestra el admin de tu tienda.' : kind === 'sheets' ? 'Pegá el enlace de la planilla de Google donde cargás las ventas.' : 'Escribí el número de tu cuenta publicitaria. En Meta aparece como act_ seguido del número; acá va solo el número.';
     fields = kind === 'shopify'
       ? `<label class="field wide">Tienda<input name="domain" required value="${escape(draft.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" autocapitalize="none" autocorrect="off" ${off}></label>`
-      : `<label class="field wide">Cuenta publicitaria<input name="adAccountId" required value="${escape(draft.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
+      : kind === 'sheets'
+        ? `<label class="field wide">Planilla<input name="spreadsheetId" required value="${escape(draft.spreadsheetId || '')}" placeholder="https://docs.google.com/spreadsheets/d/…" maxlength="400" autocapitalize="none" autocorrect="off" ${off}></label>`
+        : `<label class="field wide">Cuenta publicitaria<input name="adAccountId" required value="${escape(draft.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
   } else if (step === 1) {
     lead = 'Elegí la cuenta de LANDUR donde se van a registrar los movimientos.';
-    const current = {currency: kind === 'shopify' ? draft.currency : '', accountId: draft.accountId};
-    fields = (kind === 'shopify' ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(draft.commission ?? '0')}" maxlength="12" ${off}></label></div>` : '')
-      + `<label class="field wide">Cuenta donde se registra<select name="accountId" required ${off}>${connectionAccounts(current)}</select></label>`;
+    const current = {currency: kind === 'shopify' || kind === 'sheets' ? draft.currency : '', accountId: draft.accountId};
+    const head = kind === 'shopify'
+      ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(draft.commission ?? '0')}" maxlength="12" ${off}></label></div>`
+      : kind === 'sheets'
+        ? `<div class="form-grid"><label class="field">Pestaña<input name="sheetName" value="${escape(draft.sheetName || 'minorista')}" maxlength="80" ${off}></label><label class="field">Mes de la planilla<input name="month" value="${escape(draft.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label><label class="field">Moneda de la planilla<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>`
+        : '';
+    fields = head
+      + `<label class="field wide">Cuenta donde se registra<select name="accountId" ${kind === 'sheets' ? '' : 'required'} ${off}>${connectionAccounts(current)}</select></label>`;
   } else {
-    lead = 'Pegá el token de acceso. Se guarda en el servidor y no vuelve a mostrarse.';
-    fields = `<div class="cx-paste"><label class="field wide">Token de acceso<input name="accessToken" type="password" required autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label><button type="button" class="mini-button" data-connection-paste ${off}>Pegar</button></div>
+    lead = kind === 'sheets' ? 'Pegá el JSON de la cuenta de servicio. Se guarda en el servidor y no vuelve a mostrarse.' : 'Pegá el token de acceso. Se guarda en el servidor y no vuelve a mostrarse.';
+    fields = kind === 'sheets'
+      ? `<label class="field wide">Cuenta de servicio (JSON)<input name="serviceAccount" type="password" required autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="8192" placeholder="{ &quot;type&quot;: &quot;service_account&quot;, … }" ${off}></label>
+      <details class="cx-how"><summary class="cx-help">Cómo conseguirlo <span aria-hidden="true">⌄</span></summary><p>${escape(CONNECTION_HELP[kind])}</p></details>`
+      : `<div class="cx-paste"><label class="field wide">Token de acceso<input name="accessToken" type="password" required autocomplete="off" autocapitalize="none" autocorrect="off" maxlength="2048" placeholder="${kind === 'shopify' ? 'shpat_…' : 'EAAG…'}" ${off}></label><button type="button" class="mini-button" data-connection-paste ${off}>Pegar</button></div>
       <details class="cx-how"><summary class="cx-help">Cómo conseguirlo <span aria-hidden="true">⌄</span></summary><p>${escape(CONNECTION_HELP[kind])}</p></details>`;
   }
   return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button></div>
@@ -414,12 +434,12 @@ function connectionWizard(kind){
 function connectionsList(){
   const row = kind => {
     const {title, glyph, tone, empty} = connectionKinds[kind], current = connections?.[kind] || {}, connected = Boolean(current.configured);
-    const detail = connected ? escape(kind === 'shopify' ? current.domain || '' : `Cuenta ${current.adAccountId || ''}`) : empty;
+    const detail = connected ? escape(kind === 'shopify' ? current.domain || '' : kind === 'sheets' ? `Pestaña ${current.sheetName || ''}` : `Cuenta ${current.adAccountId || ''}`) : empty;
     const last = connected ? `<small>${current.lastSync ? `Sincronizado ${ago(current.lastSync)}` : 'Todavía sin sincronizar'}</small>` : '';
     const pillText = !connected ? ['Sin conectar', 'gray'] : connStale(current) ? ['Sin sincronizar', 'amber'] : ['Conectado', 'green'];
     return `<button type="button" class="hm-row" data-connection-open="${kind}"><div class="hm-ico ${tone}">${icon(glyph)}</div><div class="hm-main"><b>${title}</b><small>${detail}</small>${last}</div>${pill(pillText[0], pillText[1])}</button>`;
   };
-  return `${row('shopify')}${row('meta')}<p class="cx-foot">Cada servicio se consulta con un token que queda guardado en el servidor, nunca en el teléfono.</p>`;
+  return `${row('shopify')}${row('meta')}${row('sheets')}<p class="cx-foot">Cada servicio se consulta con una credencial que queda guardada en el servidor, nunca en el teléfono.</p>`;
 }
 function connectionsBody(){
   if (!connections) return '<p class="hm-quiet">Leyendo el estado de las conexiones…</p>';
@@ -428,7 +448,7 @@ function connectionsBody(){
 // Pinta la vista actual dentro del diálogo; el título cambia con la vista.
 function showConnections(view = connView){
   connView = view;
-  openDialog(view ? connectionKinds[view].title : 'Conexiones', view ? '' : 'Ventas desde Shopify y egresos desde Meta Ads.', `<div class="dialog-body" id="connections-body">${connectionsBody()}</div>`);
+  openDialog(view ? connectionKinds[view].title : 'Conexiones', view ? '' : 'Ventas desde Shopify o Google Sheets y egresos desde Meta Ads.', `<div class="dialog-body" id="connections-body">${connectionsBody()}</div>`);
 }
 async function loadConnections(view = connView){
   try { connections = await api('/api/connections'); showConnections(view); }
@@ -454,7 +474,9 @@ function wireConnections(){
     try {
       await api('/api/connections', kind === 'shopify'
         ? {kind, domain:data.domain, currency:data.currency, commission:data.commission || '0', accountId:data.accountId || '', accessToken:data.accessToken || ''}
-        : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
+        : kind === 'sheets'
+          ? {kind, spreadsheetId:data.spreadsheetId, sheetName:data.sheetName, month:data.month || '', currency:data.currency, accountId:data.accountId || '', serviceAccount:data.serviceAccount || ''}
+          : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
       Object.assign(ui, {phase:'idle', edit:false, step:0, draft:null});
       await loadConnections(kind);
       toast('Conexión guardada.');

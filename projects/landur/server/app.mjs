@@ -33,7 +33,7 @@ const digest = text => createHash('sha256').update(text).digest('hex');
 export const appApiRoutes = ['GET /api/session','POST /api/demo','POST /api/login','POST /api/logout',
   'GET /api/state','GET /api/export.csv','GET /api/evidence/*','POST /api/evidence',
   'POST /api/import/preview','POST /api/import/commit','POST /api/commands',
-  'GET /api/connections','POST /api/connections','POST /api/sync/shopify','POST /api/sync/meta'];
+  'GET /api/connections','POST /api/connections','POST /api/sync/shopify','POST /api/sync/meta','POST /api/sync/sheets'];
 // El proxy del propio host (Passenger/Apache) siempre conecta desde loopback, así que
 // ahí X-Forwarded-For es confiable y se toma el último salto: el que agrega el proxy
 // inmediato. Un cliente directo nunca llega desde loopback y no puede falsearla.
@@ -228,9 +228,9 @@ export function createApp({ ledger, demo = false, password, publicOrigin, insecu
           return json(res,200,connections.status(ledger,s.workspace));
         if (req.method === 'POST' && url.pathname === '/api/connections')
           return json(res,200,connections.save(ledger,s.workspace,s.actor,await body(req)));
-        if (req.method === 'POST' && ['/api/sync/shopify','/api/sync/meta'].includes(url.pathname)) {
+        if (req.method === 'POST' && url.pathname.startsWith('/api/sync/')) {
           bulkLimiter.check(s.hash);
-          const kind = url.pathname === '/api/sync/shopify' ? 'shopify' : 'meta';
+          const kind = url.pathname.slice('/api/sync/'.length);
           return json(res,200,await connections.sync(ledger,s.workspace,s.actor,kind,await body(req)));
         }
         throw new DomainError('Ruta no disponible.',404);

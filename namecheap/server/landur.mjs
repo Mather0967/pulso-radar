@@ -230,7 +230,7 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     }
     // El identificador del comprobante tiene que tener forma de UUID: nada de rutas armadas por el cliente.
     const evidenceId=/^\/api\/evidence\/[A-Za-z0-9-]{1,64}$/.test(path)?path.slice('/api/evidence/'.length):null;
-    if(evidenceId===null&&!['/api/state','/api/export.csv','/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta'].includes(path))return json({error:'Ruta no encontrada.'},404);
+    if(evidenceId===null&&!['/api/state','/api/export.csv','/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path))return json({error:'Ruta no encontrada.'},404);
     try{
       if(method==='GET'&&(evidenceId!==null||['/api/state','/api/export.csv','/api/connections'].includes(path))){
         const {ledger,exportOperations,connections}=await engine();const snapshot=ledger.snapshot('landur');
@@ -242,7 +242,7 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
         if(path==='/api/connections')return json(connections.status(ledger,'landur'));
         return json({...snapshot,demo:false,portal:true,actor:user.name,access});
       }
-      if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta'].includes(path)){
+      if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path)){
         if(!req.headers.get('content-type')?.startsWith('application/json')||req.headers.get('x-landur-request')!=='1')return json({error:'Se requiere una solicitud JSON de la aplicación.'},415);
         const bytes=new Uint8Array(await req.arrayBuffer());
         const limit=path==='/api/commands'?16384:path==='/api/evidence'?2400000:131072;
@@ -252,7 +252,7 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
         const {ledger,limiter,commandLimiter,reauthLimiter,connections}=await engine();
         // Mismo tope por sesión que el servidor autónomo: la clave es el usuario del portal.
         if(path==='/api/commands')commandLimiter.check(user.id);
-        if(['/api/import/preview','/api/import/commit','/api/evidence','/api/sync/shopify','/api/sync/meta'].includes(path))limiter.check(user.id);
+        if(['/api/import/preview','/api/import/commit','/api/evidence','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path))limiter.check(user.id);
         // Borrar una cuenta junto con su historial exige reconfirmar la contraseña y escribir
         // el nombre de la cuenta. La contraseña se verifica acá y no entra al asiento ni a la
         // clave de idempotencia: se descarta del objeto antes de ejecutar el comando.

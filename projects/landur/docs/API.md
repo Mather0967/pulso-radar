@@ -21,6 +21,7 @@ Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas s
 | `POST /api/connections` | `{kind, ...}`; guarda la conexión del espacio; el token vacío conserva el guardado |
 | `POST /api/sync/shopify` | Órdenes pagas como venta + cobro, deduplicadas por orden; mismo tope por sesión que la importación |
 | `POST /api/sync/meta` | Gasto diario por campaña como egreso, deduplicado por campaña + fecha |
+| `POST /api/sync/sheets` | Lee la pestaña elegida de Google Sheets: cada fila es una venta (deduplicada por Nro. Pedido o huella de fila) y, si la conexión tiene cuenta, también su cobro con la comisión de la propia fila |
 
 Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen permitido. La clave idempotente debe reutilizarse al reintentar **la misma operación**, no generar otra cuando se pierde una respuesta. El servidor devuelve conflicto si la clave existe con un contenido diferente.
 

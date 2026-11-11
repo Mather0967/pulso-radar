@@ -340,3 +340,34 @@ Sin cambios de reglas financieras, importes ni aislamiento por espacio. No se de
 - Corrección: con letras o símbolos en el texto manda el intérprete del dictado; si no reconoce una cifra, el campo queda vacío y se avisa, en lugar de reutilizar el número que hubiera quedado. Además, al abrir la hoja del importe el valor existente queda seleccionado, de modo que lo dictado lo reemplaza. La cifra suelta toma la última del texto, así «20500.00 25 mil» se lee 25.000 y no 20.500. Caché del service worker a v19.
 - Evidencia: prueba nueva en `tests/voice.test.mjs` con los cuatro casos de mezcla; verificado en navegador sobre la demo sintética (importes dictados en el campo y caso de valor previo).
 - No probado: dictado real del sistema operativo; se verifica el texto que ese dictado inserta.
+
+## 11/11/2026 — Ventas desde Google Sheets (segunda fuente, además de Shopify)
+
+**Requisito del cliente:** las ventas no entran solo por Shopify; también las carga a mano en
+una hoja de Google. La conexión debe configurarse desde la misma pantalla de Conexiones.
+
+- Nueva conexión `sheets` en `server/integrations.mjs`: planilla (enlace o identificador),
+  pestaña, mes de la planilla, moneda, cuenta opcional y JSON de la cuenta de servicio.
+  La credencial se guarda en la base privada del espacio y solo se informa enmascarada
+  (`clientEmail` + «Clave guardada»); nunca vuelve al navegador.
+- Lectura con la API v4 de Sheets (`values.get`, `UNFORMATTED_VALUE` + `SERIAL_NUMBER`) y
+  token de solo lectura firmado con JWT RS256: hosts fijos (`oauth2.googleapis.com`,
+  `sheets.googleapis.com`), sin URLs armadas por el cliente.
+- Cada fila es una **venta** (`Bruto`); si la conexión tiene cuenta, además su **cobro** con la
+  comisión que ya figura en la fila (`MP Fee`, o `Bruto − MP Neto`). Sin comisión no hay cobro.
+- Deduplicación por `Nro. Pedido` (`row-#1275`) o, si la pestaña no lo tiene, por huella estable
+  de la fila (fecha, cliente, detalle, bruto, unidades).
+- Fecha: se usa la celda si es fecha real; si la planilla trae solo el día (8, 9), se combina
+  con el **mes configurado**. Sin mes no se fecha nada: se informa la fila, no se supone.
+- UI: el modal de Conexiones gana Google Sheets con los mismos componentes y estilos que
+  Shopify y Meta Ads (lista, alta por pasos, ficha y edición).
+- Rutas: `POST /api/sync/sheets` en el servidor autónomo y en el montaje del portal.
+
+**Pruebas ejecutadas:** `projects/landur/tests/integrations.test.mjs` (6 casos nuevos de Sheets:
+guardado enmascarado, venta + cobro con deduplicación, día suelto sin mes, sin cuenta, planilla
+no compartida y validaciones de alta). Ver conteos en el cierre de la tarea.
+
+**Pendiente / a validar con el cliente:** qué pestaña es la fuente oficial (se usa `minorista`
+por defecto), si el cobro debe registrarse siempre o solo cuando el estado no sea cancelado, y
+si la planilla mayorista también debe entrar como ventas (hoy se puede eligiendo esa pestaña,
+pero no tiene comisión de cobro).

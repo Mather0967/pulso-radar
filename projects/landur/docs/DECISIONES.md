@@ -84,3 +84,16 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
 - **09/11/2026 — Usuario:** pide poder editar una cuenta de banco ya creada (nombre, saldo inicial, verificación y accesibilidad) en vez de borrarla y volver a crearla cuando un dato se cargó mal, usando el mismo modal del alta. **Decisión de implementación:** se agrega el comando `account.update`, que corrige solo la ficha de la cuenta y nunca sus movimientos; el saldo se recalcula como saldo inicial más los movimientos existentes y la auditoría guarda el valor anterior y el nuevo (`account.updated`). Se rechaza un corte posterior a un movimiento ya registrado y el cambio de moneda con historial; editar una operación sigue siendo `reversal`. Efecto: +2 pruebas (105/108 en `projects/landur/` con los 3 fallos conocidos de Windows, 91/91 en la raíz); documentos `docs/API.md`, `docs/BACKLOG.md`; caché del service worker a v15.
 
 - **09/11/2026 — Usuario:** informa que en la computadora el dictado avisa que habilite el micrófono, el navegador no lo pide y hacerlo a mano no cambia nada. **Decisión de implementación:** la política de permisos del portal era `microphone=()` para todo el sitio y el navegador la aplica por encima del permiso del usuario; se habilita `microphone=(self)` únicamente en las respuestas de `/landur`, que es donde vive el dictado, y el resto del portal conserva el bloqueo. No cambia reglas financieras, comandos ni endpoints; el dictado sigue siendo una ayuda de texto y los importes se validan en el servidor.
+
+## Google Sheets como fuente de ventas (11/11/2026)
+
+- **Una fila es una venta, no un cobro.** El importe es `Bruto`. El cobro se registra solo si la
+  conexión tiene una cuenta elegida y la fila trae comisión (`MP Fee`, o `Bruto − MP Neto`).
+  No se deduce el estado de pago a partir de columnas de logística (`Estado: Enviado`).
+- **No se inventa la fecha.** La planilla real escribe el día suelto porque el mes está en el
+  título de la pestaña. Si la celda no es una fecha completa, se usa el mes que el usuario
+  configura en la conexión; si falta, la fila se informa como error y no se registra.
+- **Deduplicación estable.** `Nro. Pedido` cuando existe; si no, una huella de los datos de la
+  fila. Repetir la sincronía no duplica ventas ni cobros.
+- **La credencial no se inventa ni se publica la planilla.** Cuenta de servicio con permiso de
+  lector sobre la hoja; el JSON se guarda en la base privada del espacio y no se devuelve.
