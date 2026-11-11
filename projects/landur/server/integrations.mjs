@@ -120,6 +120,13 @@ function normalizePaidStates(value) {
   for (const item of list) if (item.length > 40) throw new DomainError('Cada estado debe tener 40 caracteres o menos.');
   return [...new Set(list)].join(', ');
 }
+// Qué columna del material se registra como gasto. «real» es el costo efectivo; «plus10»
+// incluye el 10 % que la planilla carga; «none» no registra gasto.
+function normalizeMaterialColumn(value) {
+  const option = String(value ?? 'real').trim();
+  if (!['real', 'plus10', 'none'].includes(option)) throw new DomainError('Elegí qué valor de material se registra como gasto: el real, el que incluye el 10 % o ninguno.');
+  return option;
+}
 // De la cuenta de servicio solo se guardan el correo y la clave: el resto del JSON no se usa
 // y no tiene por qué quedar en la base ni volver nunca al navegador.
 function normalizeServiceAccount(value, previous) {
@@ -193,6 +200,9 @@ const SHEET_COLUMNS = {
   gross: ['bruto', 'total', 'importe bruto'],
   fee: ['mp fee', 'fee', 'comision', 'comision mp', 'arancel'],
   net: ['mp neto', 'neto', 'importe neto'],
+  // La pestaña mayorista separa el costo real del material del valor con 10 % cargado.
+  material: ['material real'],
+  materialPlus: ['material 10', 'material + 10'],
 };
 function sheetColumns(header) {
   const keys = header.map(foldCell);
@@ -299,6 +309,7 @@ function validateSave(ledger, workspace, input) {
     config.sheetName = normalizeSheetName(input.sheetName ?? previous?.sheetName ?? 'minorista');
     config.month = input.month === undefined ? previous?.month ?? '' : normalizeMonth(input.month);
     config.paidStates = input.paidStates === undefined ? previous?.paidStates ?? '' : normalizePaidStates(input.paidStates);
+    config.materialColumn = input.materialColumn === undefined ? previous?.materialColumn ?? 'real' : normalizeMaterialColumn(input.materialColumn);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la planilla (UYU, USD o BRL).');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
@@ -453,7 +464,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
 
   let account = null;
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
-  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0 }, errors = [];
+  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0 }, errors = [];
   let read = 0, first = null, last = null;
   for (let index = headerIndex + 1; index < rows.length; index++) {
     const row = rows[index] ?? [];
@@ -488,6 +499,24 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
           { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: saleExternal });
         created.push({ kind: 'sale', id: run.id, ref: label });
         saleRow = { id: run.id };
+      }
+      // El cliente pidió descontar el material como gasto de lo que entró: se toma de
+      // «Material Real» (o «Material + 10 %» si así se configuró) y sale de la misma cuenta
+      // que los cobros. Sin cuenta no hay caja donde asentarlo, así que no se registra.
+      const materialColumn = config.materialColumn === 'plus10' ? 'materialPlus' : config.materialColumn === 'none' ? null : 'material';
+      if (materialColumn && columns[materialColumn] >= 0) {
+        const material = sheetAmount(cell(materialColumn));
+        if (material !== null && Number(material) > 0) {
+          if (!account) skipped.sinMaterial++;
+          else {
+            const materialExternal = `${saleExternal}-material`;
+            if (!externalExists(ledger, workspace, 'sheets', materialExternal)) {
+              const run = ledger.command(workspace, actor, truncate(`material-planilla-${keyRef}`, 100),
+                { kind: 'expense', concept: truncate(`Material · ${detail || customer || 'planilla'}`, 115), amount: material, currency: config.currency, date, category: 'Materiales', accountId: account.id, source: 'sheets', externalId: materialExternal });
+              created.push({ kind: 'expense', id: run.id, ref: label });
+            }
+          }
+        }
       }
       // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
       if (!account) continue;

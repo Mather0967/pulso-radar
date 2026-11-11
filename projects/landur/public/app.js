@@ -314,6 +314,7 @@ function connectionForm(kind){
       <label class="field">Pestaña<input name="sheetName" value="${escape(current.sheetName || '')}" placeholder="minorista" maxlength="80" ${off}></label>
       <label class="field">Mes de la planilla<small>Solo si la fecha es el día suelto (8, 9).</small><input name="month" value="${escape(current.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label>
       <label class="field">Estados que cuentan como cobrado<small>Separados por coma. Vacío: se cobra toda fila con comisión.</small><input name="paidStates" value="${escape(current.paidStates || '')}" placeholder="Enviado, Entregado" maxlength="200" ${off}></label>
+      <label class="field">Costo de material<select name="materialColumn" ${off}><option value="real" ${(current.materialColumn || 'real') === 'real' ? 'selected' : ''}>Material Real</option><option value="plus10" ${current.materialColumn === 'plus10' ? 'selected' : ''}>Material + 10 %</option><option value="none" ${current.materialColumn === 'none' ? 'selected' : ''}>No registrar gasto</option></select></label>
       <label class="field">Moneda de la planilla<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>` : `
       <label class="field wide">Cuenta publicitaria<small>El número que en Meta aparece como act_&lt;número&gt;.</small><input name="adAccountId" value="${escape(current.adAccountId || '')}" placeholder="1234567890" inputmode="numeric" maxlength="25" ${off}></label>`;
   const secret = kind === 'sheets'
@@ -329,7 +330,7 @@ function connectionForm(kind){
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
@@ -379,6 +380,7 @@ function connectionDetail(kind){
     + (kind === 'shopify' && connected ? kv('Comisión', `${String(current.commission ?? '0').replace('.', ',')} %`) : '')
     + (kind === 'sheets' && connected ? kv('Cuenta de servicio', current.clientEmail) : '')
     + (kind === 'sheets' && connected ? kv('Cobra con', current.paidStates || 'toda fila con comisión') : '')
+    + (kind === 'sheets' && connected ? kv('Material', current.materialColumn === 'none' ? 'No se registra' : current.materialColumn === 'plus10' ? 'Material + 10 %' : 'Material Real') : '')
     + kv(kind === 'sheets' ? 'Clave' : 'Token', kind === 'sheets' ? current.keyMask : current.tokenMask);
   return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button>${pill(tone[1], tone[0])}</div>
     ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>
@@ -412,7 +414,7 @@ function connectionWizard(kind){
     const head = kind === 'shopify'
       ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(draft.commission ?? '0')}" maxlength="12" ${off}></label></div>`
       : kind === 'sheets'
-        ? `<div class="form-grid"><label class="field">Pestaña<input name="sheetName" value="${escape(draft.sheetName || 'minorista')}" maxlength="80" ${off}></label><label class="field">Mes de la planilla<input name="month" value="${escape(draft.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label><label class="field">Estados que cuentan como cobrado<input name="paidStates" value="${escape(draft.paidStates || '')}" placeholder="Enviado, Entregado" maxlength="200" ${off}></label><label class="field">Moneda de la planilla<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>`
+        ? `<div class="form-grid"><label class="field">Pestaña<input name="sheetName" value="${escape(draft.sheetName || 'minorista')}" maxlength="80" ${off}></label><label class="field">Mes de la planilla<input name="month" value="${escape(draft.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label><label class="field">Estados que cuentan como cobrado<input name="paidStates" value="${escape(draft.paidStates || '')}" placeholder="Enviado, Entregado" maxlength="200" ${off}></label><label class="field">Costo de material<select name="materialColumn" ${off}><option value="real" ${(draft.materialColumn || 'real') === 'real' ? 'selected' : ''}>Material Real</option><option value="plus10" ${draft.materialColumn === 'plus10' ? 'selected' : ''}>Material + 10 %</option><option value="none" ${draft.materialColumn === 'none' ? 'selected' : ''}>No registrar gasto</option></select></label><label class="field">Moneda de la planilla<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>`
         : '';
     fields = head
       + `<label class="field wide">Cuenta donde se registra<select name="accountId" ${kind === 'sheets' ? '' : 'required'} ${off}>${connectionAccounts(current)}</select></label>`;
@@ -477,7 +479,7 @@ function wireConnections(){
       await api('/api/connections', kind === 'shopify'
         ? {kind, domain:data.domain, currency:data.currency, commission:data.commission || '0', accountId:data.accountId || '', accessToken:data.accessToken || ''}
         : kind === 'sheets'
-          ? {kind, spreadsheetId:data.spreadsheetId, sheetName:data.sheetName, month:data.month || '', paidStates:data.paidStates || '', currency:data.currency, accountId:data.accountId || '', serviceAccount:data.serviceAccount || ''}
+          ? {kind, spreadsheetId:data.spreadsheetId, sheetName:data.sheetName, month:data.month || '', paidStates:data.paidStates || '', materialColumn:data.materialColumn || 'real', currency:data.currency, accountId:data.accountId || '', serviceAccount:data.serviceAccount || ''}
           : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
       Object.assign(ui, {phase:'idle', edit:false, step:0, draft:null});
       await loadConnections(kind);

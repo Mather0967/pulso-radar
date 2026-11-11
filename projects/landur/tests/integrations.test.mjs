@@ -223,8 +223,8 @@ test('sheets: la pestaña mayorista del Excel entra como venta y no inventa cobr
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista'}));
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual(summary.errors, []);
-  // Sin Nro. Pedido, sin Estado y sin comisión: 3 ventas y ningún cobro.
-  assert.equal(summary.created.length, 3);
+  // Sin Nro. Pedido, sin Estado y sin comisión: 3 ventas, 3 gastos de material y ningún cobro.
+  assert.equal(summary.created.length, 6);
   assert.equal(summary.skipped.sinCobro, 3);
   const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
   assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
@@ -232,7 +232,53 @@ test('sheets: la pestaña mayorista del Excel entra como venta y no inventa cobr
   assert.equal(placa.amount, 294000);
   assert.equal(placa.date, '2026-11-08');
   assert.match(placa.concept, /Mateico/); // usa «Producto» y «Cliente» de esa pestaña
+  // El material entra como gasto con el valor de «Material Real» (750), no del +10 %.
+  const material = ops.find(o => o.kind === 'expense' && o.concept.includes('Ilumimate placa'));
+  assert.equal(material.amount, 75000);
+  assert.equal(material.category, 'Materiales');
+  assert.equal(material.date, '2026-11-08');
   const second = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual(second.created, []);
+  ledger.close();
+});
+
+// El material de la pestaña mayorista se descuenta como gasto: el cliente elige si usa el
+// costo real, el valor con 10 % cargado o ninguno. Sin cuenta no hay caja donde asentarlo.
+test('sheets: el gasto de material puede tomar el «Material + 10 %»', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista', materialColumn: 'plus10'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  assert.equal(summary.created.length, 6);
+  const placa = ledger.snapshot('landur').operations.find(o => o.kind === 'expense' && o.concept.includes('Ilumimate placa'));
+  assert.equal(placa.amount, 82500); // 825, no 750
+  ledger.close();
+});
+
+test('sheets: con «no registrar gasto» el material no entra', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista', materialColumn: 'none'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(summary.created.length, 3); // solo ventas
+  assert.equal(summary.skipped.sinMaterial, 0);
+  assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'expense').length, 0);
+  ledger.close();
+});
+
+test('sheets: sin cuenta no se asienta el material y se informa', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId: '', sheetName: 'mayorista'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(summary.created.length, 3);
+  assert.equal(summary.skipped.sinMaterial, 3);
+  assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'expense').length, 0);
+  ledger.close();
+});
+
+test('sheets: el costo de material se valida al guardar', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({materialColumn: 'inventado'})), /material/i);
+  const saved = connections.save(ledger, 'landur', 'tester', saveSheets({}));
+  assert.equal(saved.status.materialColumn, 'real'); // por defecto, el costo efectivo
   ledger.close();
 });
