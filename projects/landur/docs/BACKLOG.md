@@ -385,3 +385,21 @@ El cliente confirma qué estados de su planilla significan «el dinero entró».
 
 **Pruebas:** 3 casos nuevos en `tests/integrations.test.mjs` (filtro por estado, lista vacía y
 normalización). Sigue pendiente la respuesta del cliente con sus estados reales.
+
+### Material de la planilla mayorista como gasto (11/11/2026)
+
+El cliente confirmó que la pestaña **mayorista** también es venta y pidió descontar el material
+como gasto de lo que entró.
+
+- Cada fila mayorista: **venta** por `Bruto` + **egreso** por el material, en la misma moneda y
+  cuenta de la conexión, con categoría `Materiales` y concepto `Material · <producto>`.
+- Qué valor se usa lo elige la conexión (`materialColumn`, campo «Costo de material»):
+  `Material Real` (por defecto, 750), `Material + 10 %` (825) o `No registrar gasto`.
+- Deduplicación propia (`row-<ref>-material`): repetir la sincronía no duplica el egreso.
+- Sin cuenta elegida no se asienta el material (no hay caja donde registrarlo) y se informa como
+  «sin gasto de material».
+- La pestaña `minorista` no cambia: su columna `Material` no es `Material Real` y no se toca.
+
+**Pruebas:** 4 casos nuevos (material con +10 %, sin gasto, sin cuenta y validación del valor).
+**Pendiente:** confirmar si en minorista también debe descontarse su columna `Material` y si los
+envíos (`Envío`) son gasto.

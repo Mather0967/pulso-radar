@@ -106,3 +106,14 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
   únicamente si corresponde registrar el cobro.
 - **Vacío conserva lo anterior.** No se cambia el comportamiento de una conexión ya guardada sin
   que el usuario lo pida.
+
+### Material como gasto en la planilla mayorista (11/11/2026)
+
+- **Venta y gasto separados.** La fila mayorista produce una venta (`Bruto`) y, además, un
+  egreso por material. No se registra un neto: LANDUR mantiene la venta y el gasto con su origen.
+- **El valor lo confirma el cliente.** `materialColumn` permite `Material Real`, `Material + 10 %`
+  o no registrar; por defecto el costo efectivo. El sistema no elige por su cuenta un recargo.
+- **Sin cuenta no hay egreso.** Un gasto mueve caja: si la conexión no tiene cuenta, el material
+  no se asienta y se informa en el resumen de la sincronía.
+- **Minorista queda igual por ahora.** Su columna `Material` no se descuenta hasta que el cliente
+  lo confirme.
