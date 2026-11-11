@@ -1,4 +1,4 @@
-// Conexiones Shopify y Meta Ads: el mismo motor sirve al servidor autónomo y al
+// Conexiones Shopify, Meta Ads y Google Sheets: el mismo motor sirve al servidor autónomo y al
 // portal, así que sus reglas se prueban acá con proveedores simulados. La clave
 // comercial: sincronizar dos veces no duplica nada (deduplicación por
 // source + external_id) y los errores de una fila no abortan el lote.

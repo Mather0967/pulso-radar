@@ -17,7 +17,7 @@ Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas s
 | `GET /api/export.csv` | CSV de operaciones de todas las monedas del espacio, no del filtro visual |
 | `POST /api/evidence` | `{operationId, name, mime, data}`; adjunta un comprobante, con `Idempotency-Key` |
 | `GET /api/evidence/<id>` | Devuelve el archivo; solo el espacio dueño puede leerlo |
-| `GET /api/connections` | Estado de Shopify y Meta Ads: configuración, token enmascarado y última sincronía |
+| `GET /api/connections` | Estado de Shopify, Meta Ads y Google Sheets: configuración, credencial enmascarada (token o cuenta de servicio) y última sincronía |
 | `POST /api/connections` | `{kind, ...}`; guarda la conexión del espacio; el token vacío conserva el guardado |
 | `POST /api/sync/shopify` | Órdenes pagas como venta + cobro, deduplicadas por orden; mismo tope por sesión que la importación |
 | `POST /api/sync/meta` | Gasto diario por campaña como egreso, deduplicado por campaña + fecha |

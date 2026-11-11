@@ -1,4 +1,4 @@
-// QA de Conexiones (Shopify y Meta Ads) en un iPhone: lista, hoja del servicio, estados de la
+// QA de Conexiones (Shopify, Meta Ads y Google Sheets) en un iPhone: lista, hoja del servicio, estados de la
 // sincronía y alta por pasos. Corre contra la demo local con un navegador real; el token es
 // ficticio y la sincronía se simula en la red, así que nunca llama a Shopify ni a Meta.
 import { chromium } from 'playwright-core';
