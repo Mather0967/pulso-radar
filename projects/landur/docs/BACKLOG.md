@@ -403,3 +403,20 @@ como gasto de lo que entró.
 **Pruebas:** 4 casos nuevos (material con +10 %, sin gasto, sin cuenta y validación del valor).
 **Pendiente:** confirmar si en minorista también debe descontarse su columna `Material` y si los
 envíos (`Envío`) son gasto.
+
+### Revisión de la importación de Google Sheets (11/11/2026)
+
+Pasada completa sobre la conexión nueva. Corregido y cubierto con pruebas:
+
+- La anotación A1 ahora cita el nombre de la pestaña (`'minorista'!A1:BZ5000`): con espacios o
+  puntos, sin comillas Google rechaza la lectura.
+- La clave de idempotencia solo admite letras, números, guion y guion bajo; una referencia con
+  punto o dos puntos (`#12.34`, `#A:1`) hacía fallar la fila. Se sanea sin tocar la referencia
+  externa.
+- Una referencia ya registrada con **otro importe o fecha** ahora se informa por fila en lugar de
+  contarse como «ya estaba»: evita perder una venta en silencio (números de pedido repetidos o
+  filas editadas). Lo mismo para el material ya registrado con otro valor.
+- Material negativo: se informa en vez de omitirse.
+- Si la cuenta elegida para la conexión fue eliminada, se avisa una vez y las ventas siguen
+  entrando.
+- Un 429 de Google ya no se informa como «clave inválida».

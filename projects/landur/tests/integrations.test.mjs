@@ -282,3 +282,25 @@ test('sheets: el costo de material se valida al guardar', async () => {
   assert.equal(saved.status.materialColumn, 'real'); // por defecto, el costo efectivo
   ledger.close();
 });
+
+// Una referencia repetida con otro importe no puede pasar como «ya estaba»: eso perdería plata
+// en silencio. Se informa la fila para que se corrija en la planilla.
+test('sheets: si la referencia ya existe con otro importe, avisa y no duplica', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  ledger.command('landur', 'tester', 'manual-000000001', {kind: 'sale', concept: 'Otra venta con el mismo número', amount: '50.00', currency: 'USD', date: '2026-11-08', source: 'sheets', externalId: 'row-#1275'});
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.ok(summary.errors.some(error => /ya está registrada con otro importe o fecha/.test(error.message)), JSON.stringify(summary.errors));
+  // El resto de la planilla entra igual.
+  assert.equal(summary.created.filter(item => item.kind === 'sale').length, 1);
+  ledger.close();
+});
+
+test('sheets: una referencia con puntos o dos puntos no rompe la clave de la operación', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'referencias'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  assert.equal(summary.created.length, 4); // 2 ventas + 2 cobros
+  ledger.close();
+});

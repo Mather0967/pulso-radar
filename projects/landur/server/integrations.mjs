@@ -238,7 +238,11 @@ async function googleAccessToken(serviceAccount, fetchImpl) {
   const response = await callFetch(GOOGLE_TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: String(payload) }, fetchImpl);
   let data;
   try { data = await readProviderJson(response, 'Google Sheets'); }
-  catch { throw new DomainError('Google rechazó la clave de la cuenta de servicio. Revisá que el JSON sea el correcto y que la API de Google Sheets esté habilitada en el proyecto.'); }
+  catch (error) {
+    // Un 429 no es una clave inválida: se deja pasar el mensaje de pausa.
+    if (error instanceof DomainError && error.status === 429) throw error;
+    throw new DomainError('Google rechazó la clave de la cuenta de servicio. Revisá que el JSON sea el correcto y que la API de Google Sheets esté habilitada en el proyecto.');
+  }
   if (typeof data.access_token !== 'string' || !data.access_token)
     throw new DomainError('Google no devolvió un token para la cuenta de servicio. Revisá la clave y que la API de Google Sheets esté habilitada.');
   return data.access_token;
@@ -445,7 +449,9 @@ async function syncMeta(ledger, workspace, actor, config, since, until, fetchImp
 // MP Neto). No se calcula nada que la planilla no diga: sin comisión no hay cobro.
 async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
   const token = await googleAccessToken(config.serviceAccount, fetchImpl);
-  const range = `${config.sheetName}!A1:BZ${MAX_SHEET_ROWS}`;
+  // El nombre de la pestaña va entre comillas: con espacios o puntos, la anotación A1 sin
+  // comillas no es válida y Google rechaza la lectura.
+  const range = `'${config.sheetName}'!A1:BZ${MAX_SHEET_ROWS}`;
   const url = `${SHEETS_API}/${config.spreadsheetId}/values/${encodeURIComponent(range)}?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`;
   const response = await callFetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }, fetchImpl);
   // 403 no es un token vencido: es la planilla sin compartir con la cuenta de servicio.
@@ -466,6 +472,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
   const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0 }, errors = [];
   let read = 0, first = null, last = null;
+  // La cuenta guardada puede haberse eliminado después: se avisa una vez y se siguen
+  // registrando las ventas, que no dependen de una cuenta.
+  const accountMissing = Boolean(config.accountId) && !account;
+  let accountWarned = false;
   for (let index = headerIndex + 1; index < rows.length; index++) {
     const row = rows[index] ?? [];
     const cell = field => (columns[field] >= 0 ? row[columns[field]] : undefined);
@@ -478,6 +488,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       const gross = sheetAmount(cell('gross'));
       if (gross === null || Number(gross) <= 0) { skipped.vacias++; continue; }
       read++;
+      if (accountMissing && !accountWarned) {
+        fail('La cuenta elegida para la conexión ya no existe: elegí otra en Configuración.');
+        accountWarned = true;
+      }
       if (/cancel|anulad|reembols|devol/.test(foldCell(cell('status')))) { skipped.canceladas++; continue; }
       let date;
       try { date = sheetDate(cell('date'), config.month, label); }
@@ -489,10 +503,17 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       // repetir la sincronía no duplica aunque la pestaña no tenga número de pedido.
       const reference = order || createHash('sha256').update(JSON.stringify([date, customer, detail, gross, Number.isFinite(units) ? units : null])).digest('hex').slice(0, 16);
       const saleExternal = `row-${reference}`;
-      // La clave de idempotencia admite un juego acotado de caracteres: «#1275» se sanea acá
-      // y la referencia externa (que sí puede llevar #) queda intacta.
-      const keyRef = reference.replace(/[^A-Za-z0-9._:-]+/g, '-');
-      let saleRow = ledger.db.prepare('SELECT id FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', saleExternal);
+      // La clave de idempotencia solo admite letras, números, guion y guion bajo: cualquier
+      // otro carácter de la referencia (#, puntos, dos puntos) se reemplaza. La referencia
+      // externa, que sí puede llevarlos, queda intacta.
+      const keyRef = reference.replace(/[^A-Za-z0-9_-]+/g, '-');
+      let saleRow = ledger.db.prepare('SELECT id, amount, date FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', saleExternal);
+      if (saleRow && (saleRow.amount !== Math.round(Number(gross) * 100) || saleRow.date !== date)) {
+        // Misma referencia con otro importe o fecha: puede ser un número de pedido repetido o
+        // una fila editada. No se salta en silencio ni se duplica: se avisa por fila.
+        fail(`La referencia ${reference} ya está registrada con otro importe o fecha (${saleRow.date}, ${(saleRow.amount / 100).toFixed(2)}). Revisá el número de pedido en la planilla.`);
+        continue;
+      }
       if (!saleRow) {
         const concept = truncate([order ? `Pedido ${order}` : '', customer, detail].filter(Boolean).join(' · ') || 'Venta de planilla', 115);
         const run = ledger.command(workspace, actor, truncate(`venta-planilla-${keyRef}`, 100),
@@ -506,11 +527,16 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       const materialColumn = config.materialColumn === 'plus10' ? 'materialPlus' : config.materialColumn === 'none' ? null : 'material';
       if (materialColumn && columns[materialColumn] >= 0) {
         const material = sheetAmount(cell(materialColumn));
-        if (material !== null && Number(material) > 0) {
+        if (material !== null && Number(material) < 0) {
+          fail(`El material de la fila es negativo (${material}). Revisá la planilla.`);
+        } else if (material !== null && Number(material) > 0) {
           if (!account) skipped.sinMaterial++;
           else {
             const materialExternal = `${saleExternal}-material`;
-            if (!externalExists(ledger, workspace, 'sheets', materialExternal)) {
+            const registered = ledger.db.prepare('SELECT amount, date FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', materialExternal);
+            if (registered && (registered.amount !== Math.round(Number(material) * 100) || registered.date !== date))
+              fail(`El material de ${reference} ya está registrado con otro importe o fecha (${registered.date}, ${(registered.amount / 100).toFixed(2)}). Revisá la planilla.`);
+            else if (!registered) {
               const run = ledger.command(workspace, actor, truncate(`material-planilla-${keyRef}`, 100),
                 { kind: 'expense', concept: truncate(`Material · ${detail || customer || 'planilla'}`, 115), amount: material, currency: config.currency, date, category: 'Materiales', accountId: account.id, source: 'sheets', externalId: materialExternal });
               created.push({ kind: 'expense', id: run.id, ref: label });

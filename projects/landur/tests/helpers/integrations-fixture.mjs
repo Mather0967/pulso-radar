@@ -66,6 +66,13 @@ const MAYORISTA_ROWS = [
   [9,'Vale Vieira','Deadpool Joystick',1,840,555,611,true,229,148,81,true,89,60,true,'Rafa',13.35,false],
 ];
 
+// Referencias con caracteres que la clave de idempotencia no admite tal cual.
+const REFERENCIAS_ROWS = [
+  ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto'],
+  [9,'Con Punto','#12.34','1 lámpara',1,'Enviado',100,10,90],
+  [9,'Con Dos Puntos','#A:1','1 lámpara',1,'Enviado',200,20,180],
+];
+
 // Pestaña armada para probar la regla de cobro por estado: mismos pedidos, estados distintos.
 const ESTADO_HEADER = ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto'];
 const ESTADO_ROWS = [
@@ -101,10 +108,15 @@ async function fakeFetch(url, options = {}) {
   if (href.startsWith(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/`)) {
     if (!String(options.headers?.Authorization || '').startsWith('Bearer ya29.'))
       return new Response(JSON.stringify({error: {message: 'Unauthorized'}}), {status: 401});
+    // La anotación A1 con nombre de pestaña va entre comillas: si el servidor la omite, la
+    // prueba falla acá y no en Google.
+    if (!/'[^']+'!A1/.test(href))
+      return new Response(JSON.stringify({error: {message: 'Unable to parse range'}}), {status: 400});
     // Pestaña que no se compartió con la cuenta de servicio.
     if (href.includes('privada'))
       return new Response(JSON.stringify({error: {message: 'The caller does not have permission'}}), {status: 403});
     if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
+    if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }
