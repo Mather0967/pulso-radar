@@ -2,6 +2,9 @@
 // sin red, sin secretos reales. El fetch falso responde JSON con las mismas formas que
 // los proveedores (Link rel="next", paging.next, values de Sheets), porque deduplicación,
 // paginación y errores por fila son lo que LANDUR debe sostener.
+//
+// Las hojas de Google son las del cliente, con sus encabezados tal cual: la pestaña
+// `minorista` y la `mayorista` del archivo que pasó (xlsx y su export csv).
 import { generateKeyPairSync } from 'node:crypto';
 import {Ledger} from '../../server/ledger.mjs';
 import {createIntegrations} from '../../server/integrations.mjs';
@@ -41,21 +44,34 @@ export const serviceAccountJson = JSON.stringify({
 });
 
 export const SHEET_ID = 'SHEET_QA_1234567890abcdefghij';
-// Mismas columnas que la planilla real del cliente (fragmento minorista).
-const SHEET_HEADER = ['Fecha','Cliente','Canal','Nro. Pedido','Metodo de pago','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto','Material'];
-const SHEET_ROWS = [
-  SHEET_HEADER,
-  [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80],
-  [9,'Patricia Martinez','Web','#1276','MP','1 Set Decantador Mundo',1,'Enviado',1680,174,1506,730],
-  [9,'Mónica Elena','Web','#1277','MP','3 ilumimate 2.0 (Verde)',3,'Cancelado',1730,180,1550,120],
+
+// Encabezado exacto de la pestaña minorista del Excel del cliente, incluidas las dos
+// columnas «Transf.» repetidas. Solo se leen las columnas que la importación entiende.
+export const MINORISTA_HEADER = ['Fecha','Cliente','Canal','Nro. Pedido','Metodo de pago','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto','Material','Envío','Metodo de Envío','Pago del envio','Ganancia Bruta','Reinversion','Retention Ratio','Cuenta Landur','Transf.','Ganancia Neta','Rafa','Luis','Transf. reparto'];
+const MINORISTA_ROWS = [
+  MINORISTA_HEADER,
+  [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80,190,'Ues','Cliente',599,360,0.6,630,false,239,239,'',false],
+  [9,'Patricia Martinez','Web','#1276','MP','1 Set Decantador Mundo',1,'Enviado',1680,174,1506,730,190,'Ues','Cliente',586,352,0.6,1272,false,234,234,'',false],
+  [9,'Mónica Elena Pereira','Web','#1277','MP','3 ilumimate 2.0 (Verde)',3,'Cancelado',1730,180,1550,120,260,'Ues','Cliente',1170,702,0.6,1082,false,468,468,'',false],
 ];
-// La planilla real escribe el día suelto: el mes vive en el título de la pestaña.
-const DAY_ONLY_ROWS = [SHEET_HEADER, [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80]];
-// Dos pedidos con pago, en estados distintos: la regla de cobro la confirma el cliente.
+// La pestaña real escribe el día suelto: el mes vive en el título de la pestaña.
+const DAY_ONLY_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1]];
+
+// Pestaña mayorista del mismo archivo: sin Nro. Pedido, sin Estado y sin comisión.
+export const MAYORISTA_HEADER = ['Fecha','Cliente','Producto','Unidades','Bruto','Material Real','Material + 10%','Transf.','Ganancia Bruta','Ganancia Neta','Reinversion','Transf.','Rafa','Parte Vendedor','Transf.','Vendedor','15% Ahorro Personal','15% Ahorro Personal'];
+const MAYORISTA_ROWS = [
+  MAYORISTA_HEADER,
+  [8,'Mateico','Ilumimate placa',30,2940,750,825,true,2115,1374,741,true,825,550,true,'Luis',123.75,false],
+  [8,'Mateico','Ilumimate caja',30,5100,1200,1320,true,3780,2457,1323,true,1475,983,true,'Luis',221.25,false],
+  [9,'Vale Vieira','Deadpool Joystick',1,840,555,611,true,229,148,81,true,89,60,true,'Rafa',13.35,false],
+];
+
+// Pestaña armada para probar la regla de cobro por estado: mismos pedidos, estados distintos.
+const ESTADO_HEADER = ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto'];
 const ESTADO_ROWS = [
-  SHEET_HEADER,
-  [9,'Ana Enviada','Web','#2001','MP','1 lámpara',1,'Enviado',1000,100,900,200],
-  [10,'Beto Pendiente','Web','#2002','MP','1 lámpara',1,'Pendiente',500,50,450,100],
+  ESTADO_HEADER,
+  [9,'Ana Enviada','#2001','1 lámpara',1,'Enviado',1000,100,900],
+  [10,'Beto Pendiente','#2002','1 lámpara',1,'Pendiente',500,50,450],
 ];
 
 async function fakeFetch(url, options = {}) {
@@ -88,8 +104,9 @@ async function fakeFetch(url, options = {}) {
     // Pestaña que no se compartió con la cuenta de servicio.
     if (href.includes('privada'))
       return new Response(JSON.stringify({error: {message: 'The caller does not have permission'}}), {status: 403});
+    if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
-    return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : SHEET_ROWS});
+    return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }
   return new Response(JSON.stringify({error: 'offline'}), {status: 404});
 }

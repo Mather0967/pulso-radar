@@ -197,3 +197,42 @@ test('sheets: los estados de cobro se normalizan y se informan en la conexión',
   assert.ok(!JSON.stringify(saved.status).includes('BEGIN PRIVATE KEY'));
   ledger.close();
 });
+
+// La planilla se lee con los encabezados exactos del Excel del cliente, no con una versión
+// recortada: si una columna cambia de nombre o de lugar, esto lo muestra.
+test('sheets: la pestaña minorista real ubica cada columna en su lugar', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
+  const sale = ops.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
+  assert.equal(sale.amount, 97000);
+  assert.equal(sale.date, '2026-11-08');
+  assert.match(sale.concept, /Esteban Fernandez/);
+  assert.match(sale.concept, /2 ilumimate1/); // usa «Pedido», no «Material» ni «Cuenta Landur»
+  // El cobro sale del MP Fee de esa fila (101 sobre 970), no de una columna vecina.
+  const collection = ops.find(o => o.external_id === 'row-#1275-cobro');
+  assert.equal(collection.amount, 97000);
+  assert.equal(collection.applied ?? 0, 0);
+  ledger.close();
+});
+
+test('sheets: la pestaña mayorista del Excel entra como venta y no inventa cobro', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  // Sin Nro. Pedido, sin Estado y sin comisión: 3 ventas y ningún cobro.
+  assert.equal(summary.created.length, 3);
+  assert.equal(summary.skipped.sinCobro, 3);
+  const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
+  const placa = ops.find(o => o.kind === 'sale' && o.concept.includes('Ilumimate placa'));
+  assert.equal(placa.amount, 294000);
+  assert.equal(placa.date, '2026-11-08');
+  assert.match(placa.concept, /Mateico/); // usa «Producto» y «Cliente» de esa pestaña
+  const second = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(second.created, []);
+  ledger.close();
+});
