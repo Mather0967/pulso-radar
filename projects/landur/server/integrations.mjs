@@ -112,6 +112,14 @@ function normalizeMonth(value) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new DomainError('El mes de la planilla se escribe AAAA-MM (por ejemplo, 2026-11).');
   return month;
 }
+// Los estados que significan «el dinero entró» los confirma el cliente: acá solo se guardan
+// tal como los escribe. Vacío = comportamiento anterior (cobro en toda fila con comisión).
+function normalizePaidStates(value) {
+  const list = String(value ?? '').split(',').map(item => item.trim()).filter(Boolean);
+  if (list.length > 12) throw new DomainError('Son demasiados estados: indicá como máximo 12, separados por coma.');
+  for (const item of list) if (item.length > 40) throw new DomainError('Cada estado debe tener 40 caracteres o menos.');
+  return [...new Set(list)].join(', ');
+}
 // De la cuenta de servicio solo se guardan el correo y la clave: el resto del JSON no se usa
 // y no tiene por qué quedar en la base ni volver nunca al navegador.
 function normalizeServiceAccount(value, previous) {
@@ -290,6 +298,7 @@ function validateSave(ledger, workspace, input) {
     config.spreadsheetId = normalizeSpreadsheet(input.spreadsheetId ?? previous?.spreadsheetId);
     config.sheetName = normalizeSheetName(input.sheetName ?? previous?.sheetName ?? 'minorista');
     config.month = input.month === undefined ? previous?.month ?? '' : normalizeMonth(input.month);
+    config.paidStates = input.paidStates === undefined ? previous?.paidStates ?? '' : normalizePaidStates(input.paidStates);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la planilla (UYU, USD o BRL).');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
@@ -482,6 +491,11 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       }
       // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
       if (!account) continue;
+      // Si el cliente indicó qué estados significan «cobrado», una fila en otro estado deja
+      // su venta y no genera cobro. Sin estados configurados se mantiene el comportamiento
+      // anterior: el cobro se registra siempre que la fila traiga comisión.
+      const paidStates = String(config.paidStates || '').split(',').map(foldCell).filter(Boolean);
+      if (paidStates.length && !paidStates.includes(foldCell(cell('status')))) { skipped.sinCobro++; continue; }
       let commission = null;
       const fee = columns.fee >= 0 ? sheetAmount(cell('fee')) : null;
       if (fee !== null) commission = fee;

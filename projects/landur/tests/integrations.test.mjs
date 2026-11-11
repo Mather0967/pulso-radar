@@ -163,3 +163,37 @@ test('sheets: un enlace, una clave o un mes inválidos se rechazan al guardar', 
   assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({month: '2026-13'})), /AAAA-MM/);
   ledger.close();
 });
+
+// La regla de cobro por estado la confirma el cliente en la conexión: la importación la
+// respeta tal cual y, si no indicó estados, conserva el comportamiento anterior.
+test('sheets: con estados de cobro indicados, solo esas filas generan cobro', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'estados', paidStates: 'Enviado'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  // Una fila Enviado (venta + cobro) y una Pendiente (solo venta).
+  assert.equal(summary.created.length, 3);
+  assert.equal(summary.skipped.sinCobro, 1);
+  const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
+  assert.equal(ops.filter(o => o.kind === 'sale').length, 2);
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 1);
+  assert.match(ops.find(o => o.kind === 'collection').concept, /2001/);
+  ledger.close();
+});
+
+test('sheets: sin estados indicados se mantiene el cobro en toda fila con comisión', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'estados'}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(summary.created.length, 4); // 2 ventas + 2 cobros
+  assert.equal(summary.skipped.sinCobro, 0);
+  ledger.close();
+});
+
+test('sheets: los estados de cobro se normalizan y se informan en la conexión', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  const saved = connections.save(ledger, 'landur', 'tester', saveSheets({paidStates: ' enviado , Entregado , enviado '}));
+  assert.equal(saved.status.paidStates, 'enviado, Entregado');
+  assert.ok(!JSON.stringify(saved.status).includes('BEGIN PRIVATE KEY'));
+  ledger.close();
+});

@@ -97,3 +97,12 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
   fila. Repetir la sincronía no duplica ventas ni cobros.
 - **La credencial no se inventa ni se publica la planilla.** Cuenta de servicio con permiso de
   lector sobre la hoja; el JSON se guarda en la base privada del espacio y no se devuelve.
+
+### Cobro según el estado de la planilla (11/11/2026)
+
+- **El estado lo define el cliente, no el sistema.** `paidStates` es una lista explícita en la
+  conexión; no se infiere «pagado» de un estado de logística ni de la presencia de una fee.
+- **La venta no se filtra por estado** (salvo canceladas, que no se registran): el estado decide
+  únicamente si corresponde registrar el cobro.
+- **Vacío conserva lo anterior.** No se cambia el comportamiento de una conexión ya guardada sin
+  que el usuario lo pida.

@@ -371,3 +371,17 @@ no compartida y validaciones de alta). Ver conteos en el cierre de la tarea.
 por defecto), si el cobro debe registrarse siempre o solo cuando el estado no sea cancelado, y
 si la planilla mayorista también debe entrar como ventas (hoy se puede eligiendo esa pestaña,
 pero no tiene comisión de cobro).
+
+### Regla de cobro por estado (11/11/2026)
+
+El cliente confirma qué estados de su planilla significan «el dinero entró». Se agregó
+`paidStates` a la conexión de Google Sheets (campo «Estados que cuentan como cobrado»):
+
+- Con estados cargados: la fila siempre deja su **venta**; el **cobro** solo se registra si el
+  estado de la fila está en la lista. Las demás se informan como «sin cobro todavía».
+- Sin estados (campo vacío): se mantiene el comportamiento anterior, el cobro se registra en
+  toda fila que traiga comisión. Así el cambio no altera conexiones existentes.
+- La lista se normaliza (sin duplicados, separada por coma) y se muestra en la ficha.
+
+**Pruebas:** 3 casos nuevos en `tests/integrations.test.mjs` (filtro por estado, lista vacía y
+normalización). Sigue pendiente la respuesta del cliente con sus estados reales.

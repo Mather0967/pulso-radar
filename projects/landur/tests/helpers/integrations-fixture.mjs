@@ -51,6 +51,12 @@ const SHEET_ROWS = [
 ];
 // La planilla real escribe el día suelto: el mes vive en el título de la pestaña.
 const DAY_ONLY_ROWS = [SHEET_HEADER, [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80]];
+// Dos pedidos con pago, en estados distintos: la regla de cobro la confirma el cliente.
+const ESTADO_ROWS = [
+  SHEET_HEADER,
+  [9,'Ana Enviada','Web','#2001','MP','1 lámpara',1,'Enviado',1000,100,900,200],
+  [10,'Beto Pendiente','Web','#2002','MP','1 lámpara',1,'Pendiente',500,50,450,100],
+];
 
 async function fakeFetch(url, options = {}) {
   const href = String(url);
@@ -82,6 +88,7 @@ async function fakeFetch(url, options = {}) {
     // Pestaña que no se compartió con la cuenta de servicio.
     if (href.includes('privada'))
       return new Response(JSON.stringify({error: {message: 'The caller does not have permission'}}), {status: 403});
+    if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : SHEET_ROWS});
   }
   return new Response(JSON.stringify({error: 'offline'}), {status: 404});
