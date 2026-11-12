@@ -46,6 +46,9 @@ export function Picker() {
               {sc.id === 'restaurante' && import.meta.env.MODE === 'portal' && (
                 <a className="btn mt-5 w-full justify-center" href="/studio/restaurantes/">Abrir demo de gestión</a>
               )}
+              {sc.id === 'dental' && import.meta.env.MODE === 'portal' && (
+                <a className="btn mt-5 w-full justify-center" href="/studio/odontologia/">Abrir demo de gestión</a>
+              )}
               <div className="mt-6 flex items-center gap-2">
                 <button className="btn primary" onClick={() => A.startScenario(sc.id, 'tour')}>Iniciar recorrido</button>
                 <button className="btn ghost" onClick={() => A.startScenario(sc.id, 'free')}>Explorar libre</button>

@@ -327,6 +327,22 @@ test('RIVECT Studio: la demo de restaurantes vive en /studio/restaurantes/ solo 
   }finally{await f.close();}
 });
 
+test('RIVECT Studio: la demo de clínicas odontológicas vive en /studio/odontologia/ solo con sesión de administrador',async()=>{
+  const f=await portalFixture();try{
+    assert.equal((await f.request('/studio/odontologia/')).headers.get('location'),'/login');
+    const admin=await f.login('admin'),pulso=await f.login('pulso');
+    assert.equal((await f.request('/studio/odontologia/',pulso)).status,403);
+    assert.equal((await f.request('/studio/odontologia',admin)).headers.get('location'),'/studio/odontologia/');
+    const html=await(await f.request('/studio/odontologia/',admin)).text();assert.match(html,/<title>Bahía Odontología/);
+    for(const kind of ['js','css']){
+      const file=html.match(new RegExp(`"/studio/odontologia/(assets/[^"]+\\.${kind})"`))[1];
+      const res=await f.request('/studio/odontologia/'+file,admin);assert.equal(res.status,200,file);
+    }
+    assert.equal((await f.request('/studio/odontologia/favicon.svg',admin)).headers.get('content-type'),'image/svg+xml');
+    for(const route of ['/studio/odontologia/../../server/main.mjs','/studio/odontologia/src/main.tsx','/studio/odontologia/.env'])assert.equal((await f.request(route,admin)).status,404,route);
+  }finally{await f.close();}
+});
+
 test('Rivect Retail Intelligence: solo administradores, con fallback de SPA',async()=>{
   const f=await portalFixture();try{
     assert.equal((await f.request('/retail/')).headers.get('location'),'/login');

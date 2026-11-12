@@ -83,3 +83,7 @@ La tarjeta de Restaurante del Studio tiene el botón **Abrir demo de gestión**,
 Las vistas del cliente (`#/m/unirse`, `#/m/carta`, `#/m/tarjeta/<código>`) también están detrás de la sesión: para probarlas en un celular hay que iniciar sesión como administrador en ese celular.
 
 El código fuente está en el proyecto `demo-restaurantes` (fuera de este repositorio). Para actualizar: en ese proyecto, `npm run publish:studio` compila con `--mode portal` y copia el resultado a `projects/studio/public/restaurantes/`; después `npm test` y publicar a `main`. **`npm run build:portal` del Studio vacía `projects/studio/public/`**: si se recompila el Studio hay que volver a ejecutar `publish:studio` para no perder la carpeta `restaurantes/`.
+
+### Demo de gestión para clínicas odontológicas (`/studio/odontologia/`)
+
+La tarjeta de Clínica odontológica tiene el mismo botón **Abrir demo de gestión**, que abre el sistema de Bahía Odontología (agenda, pacientes, odontograma, presupuestos, finanzas, mensajes, automatizaciones, inventario, laboratorio, equipo e informes). Funciona igual que la de restaurantes: build estático en `projects/studio/public/odontologia/`, solo administradores, rutas por hash, datos en localStorage (clave `rivect-bahia`) y "Restaurar" en *Recorridos* o *Ajustes → Datos*. El código está en el proyecto `Demo-dentistas`; para actualizar, ahí `npm run publish:studio`, después `npm test` y publicar a `main`. Recompilar el Studio también vacía esta carpeta.
