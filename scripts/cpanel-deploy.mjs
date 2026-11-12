@@ -5,9 +5,28 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 // Only these code paths are managed. Portal content, data and environment stay on the host.
-export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js','server/projects.mjs','server/landur.mjs','public/projects.css','public/projects.mjs','public/projects-brand.svg','public/landur-brand.png','projects/landur/server','projects/landur/public','server/studio.mjs','projects/studio/public'];
+export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js','server/projects.mjs','server/landur.mjs','public/projects.css','public/projects.mjs','public/projects-brand.svg','public/landur-brand.png','projects/landur/server','projects/landur/public','server/studio.mjs','projects/studio/public','projects/rivect-retail/public'];
+// Proyectos que el portal sirve como SPA (`createProjectSite`/`createStudio` en server/main.mjs).
+// La lista sale del propio servidor para que un montaje nuevo no dependa de acordarse de otra lista.
+export function mountedProjectDirs(repository){
+ const source=fs.readFileSync(path.join(repository,'namecheap/server/main.mjs'),'utf8');
+ const dirs=[...source.matchAll(/path\.join\(root,\s*'(projects\/[^']+\/public)'\)/g)].map(match=>match[1]);
+ if(!dirs.length)throw Error('No mounted project found in server/main.mjs');
+ return [...new Set(dirs)];
+}
+// Un montaje que no viaja en managedPaths, o cuyo build no está, responde 404 «Ruta no encontrada.»
+// en producción sin que nadie lo note: el despliegue se detiene antes de copiar nada.
+export function verifyMountedProjects({repository,paths=managedPaths}){
+ for(const dir of mountedProjectDirs(repository)){
+  if(!paths.includes(dir))throw Error(`Mounted project missing from managedPaths: ${dir}`);
+  const index=path.join(repository,dir,'index.html');
+  if(!fs.existsSync(index))throw Error(`Mounted project has no static build: ${dir}/index.html`);
+  for(const match of fs.readFileSync(index,'utf8').matchAll(/(?:src|href)="[^"]*?(assets\/[^"]+)"/g))if(!fs.existsSync(path.join(repository,dir,match[1])))throw Error(`Mounted project references a missing asset: ${dir}/${match[1]}`);
+ }
+}
 export function installRelease({repository,target,state,revision}){
  if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid deployment revision');
+ verifyMountedProjects({repository});
  for(const p of ['server/site.mjs','public/index.html','data'])if(!fs.existsSync(path.join(target,p)))throw Error('Existing portal required: '+p);
  const sources=p=>path.join(repository,p.startsWith('server/')||p.startsWith('public/')?'namecheap/'+p:p);
  for(const p of managedPaths)if(!fs.existsSync(sources(p)))throw Error('Missing release file: '+p);
