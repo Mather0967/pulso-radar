@@ -9,6 +9,7 @@ import {publicAPI,adminSiteAPI} from './site.mjs';
 import {projectMethodAllowed} from './access.mjs';
 import {projectAccess,availableProjects,mergeProjectGrants,renderProjectsPage} from './projects.mjs';
 import {createLandurPortal} from './landur.mjs';
+import {createStudio} from './studio.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dataDir=path.resolve(root,process.env.DATA_DIR||'data');
 const store=new AuthStore(dataDir),env={NVIDIA_API_KEY:process.env.NVIDIA_API_KEY||'',NVIDIA_MODEL:process.env.NVIDIA_MODEL||'deepseek-ai/deepseek-v4.1-flash',TAVILY_API_KEY:process.env.TAVILY_API_KEY||'',GROQ_API_KEY:process.env.GROQ_API_KEY||'',GROQ_MODEL:process.env.GROQ_MODEL||'openai/gpt-oss-120b',BUCKET:diskBucket(path.join(dataDir,'pulso')),GEMINI_API_KEY:process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||'',GEMINI_MODEL:process.env.GEMINI_MODEL||'gemini-3.8-flash'};
@@ -27,6 +28,7 @@ const landur=createLandurPortal({dataDir:path.join(dataDir,'landur'),session:{
  reauth:(id,password)=>store.reauth(id,password),
  logout:csrf=>store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==csrf)})
 }});
+const studio=createStudio({dir:path.join(root,'projects/studio/public'),access:u=>projectAccess(u,'studio')});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
@@ -42,6 +44,7 @@ async function route(req,ip){
  if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u,ip);
  if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
  if(!['GET','HEAD'].includes(method)&&req.headers.get('x-csrf-token')!==u.csrf)return json({error:'Sesión no válida. Volvé a iniciar sesión.'},403);
+ if(p==='/studio'||p.startsWith('/studio/'))return studio(req,u);
  if(p==='/auth/me'&&method==='GET')return json({user:publicUser(u),csrf:u.csrf});
  if(p==='/auth/logout'&&method==='POST'){await store.transact(db=>{db.sessions=db.sessions.filter(s=>s.csrf!==u.csrf)});return new Response('{}',{headers:{'Content-Type':'application/json','Set-Cookie':sessionCookie('',{secure:!local,maxAge:0})}})}
  if(p==='/portal'&&method==='GET'){

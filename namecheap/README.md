@@ -69,3 +69,9 @@ Se mantiene la landing, el módulo `site.mjs`, la administración y las páginas
 El despliegue controlado incluye los módulos de catálogo/adaptador, los recursos del selector y las carpetas runtime de LANDUR; no copia su base ni una demo. Se ejecutan también las pruebas de LANDUR antes de publicar. El cron continúa siguiendo `main`, sin cambios ni activaciones desde esta rama.
 
 Ver [integración y publicación de LANDUR](../projects/landur/docs/PORTAL-RIVECT.md). La guía anterior de subdominio/Node independiente aplica solo a instalaciones aisladas, no a este acceso compartido.
+
+## RIVECT Studio en el selector de proyectos
+
+Demo comercial interna (`projects/studio/`, React + Vite). Se compila con `npm run build:portal` dentro de esa carpeta, que deja el resultado estático en `projects/studio/public/` (versionado: el servidor no instala dependencias). `server/studio.mjs` lo monta en `/studio/` **detrás de la sesión**: sin sesión redirige a `/login`, y solo los administradores lo ven y lo abren (no se asigna por usuario). Los archivos quedan fuera de `public/` porque LiteSpeed entrega sin sesión todo lo que esté ahí; Node sirve únicamente los archivos listados al arrancar. Cumple la CSP del portal: sin scripts en línea, sin CDN, fuentes propias, sin WebAssembly. Las visitas guardadas quedan en el navegador de cada administrador (localStorage), no en el servidor.
+
+Para actualizar el Studio: cambiar el código en `projects/studio/`, `npm test` y `npm run build:portal` ahí, y publicar a `main` con el resto del repositorio.

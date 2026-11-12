@@ -9,7 +9,7 @@ test('deployment replaces only code, preserves portal and data, and records a re
  const put=(p,s)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,s)};
  try{
   for(const p of ['server/site.mjs','public/index.html','data/users.json','data/pulso/private.json','data/landur/landur.sqlite','public/portal.html','.env'])put(path.join(target,p),'preserve');
-  for(const p of managedPaths){const directory=['src','dist/server','projects/landur/server','projects/landur/public'].includes(p);put(path.join(target,p,directory?'old.mjs':''),'old');const source=path.join(repository,p.startsWith('server/')||p.startsWith('public/')?'namecheap/'+p:p);put(path.join(source,directory?'new.mjs':''),'new')}
+  for(const p of managedPaths){const directory=['src','dist/server','projects/landur/server','projects/landur/public','projects/studio/public'].includes(p);put(path.join(target,p,directory?'old.mjs':''),'old');const source=path.join(repository,p.startsWith('server/')||p.startsWith('public/')?'namecheap/'+p:p);put(path.join(source,directory?'new.mjs':''),'new')}
   const result=installRelease({repository,target,state,revision:'a'.repeat(40)});
   assert.equal(result.status,'deployed');assert.ok(fs.existsSync(path.join(target,'tmp/restart.txt')));
   for(const p of ['server/site.mjs','public/index.html','data/users.json','data/pulso/private.json','data/landur/landur.sqlite','public/portal.html','.env'])assert.equal(fs.readFileSync(path.join(target,p),'utf8'),'preserve');

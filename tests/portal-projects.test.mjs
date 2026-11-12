@@ -10,7 +10,10 @@ import {createLandurPortal,storageDiagnosis} from '../namecheap/server/landur.mj
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
 test('catálogo: permisos independientes y administradores ven ambos proyectos',()=>{
-  assert.deepEqual(availableProjects({active:true,role:'admin'}).map(p=>p.id),['pulso','landur']);
+  assert.deepEqual(availableProjects({active:true,role:'admin'}).map(p=>p.id),['pulso','landur','studio']);
+  // Studio es solo para administradores: ni una asignación explícita lo habilita para un miembro.
+  assert.equal(projectAccess({active:true,role:'member',projects:{studio:'editor'}},'studio'),null);
+  assert.throws(()=>mergeProjectGrants({},{projects:{studio:'viewer'}}));
   assert.deepEqual(availableProjects({active:true,role:'member',projects:{pulso:'editor'}}).map(p=>p.id),['pulso']);
   assert.equal(projectAccess({active:false,role:'admin'},'landur'),null);
   assert.equal(projectAccess({active:true,projects:{landur:'admin'}},'landur'),null);
@@ -284,4 +287,20 @@ test('el micrófono solo se habilita dentro de LANDUR: el portal sigue bloqueán
     const login = await f.request('/login');
     assert.match(login.headers.get('permissions-policy') || '', /microphone=\(\)/);
   } finally { await f.close(); }
+});
+
+test('RIVECT Studio: solo administradores con sesión, sin rutas fuera de la lista',async()=>{
+  const f=await portalFixture();try{
+    assert.equal((await f.request('/studio/')).headers.get('location'),'/login');
+    const admin=await f.login('admin'),pulso=await f.login('pulso');
+    assert.equal((await f.request('/studio/',pulso)).status,403);
+    assert.equal((await f.request('/studio',admin)).headers.get('location'),'/studio/');
+    const page=await f.request('/studio/',admin);assert.equal(page.status,200);
+    const html=await page.text();assert.match(html,/RIVECT Studio/);
+    const asset=html.match(/src="\/studio\/(assets\/[^"]+\.js)"/)[1];
+    const js=await f.request('/studio/'+asset,admin);assert.equal(js.status,200);assert.match(js.headers.get('content-type'),/javascript/);
+    for(const route of ['/studio/../server/main.mjs','/studio/%2e%2e/server/main.mjs','/studio/package.json','/studio/src/main.tsx'])assert.equal((await f.request(route,admin)).status,404,route);
+    assert.equal((await f.request('/studio/',{...admin,method:'POST',body:{}})).status,405);
+    assert.match(await(await f.request('/portal',admin)).text(),/Abrir RIVECT Studio/);
+  }finally{await f.close();}
 });

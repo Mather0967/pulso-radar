@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@xyflow/react/dist/style.css";
+@import "./components.css";
+
+@theme {
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  /* graphite base, never pure black */
+  --color-ink-0: #101318;
+  --color-ink-1: #151920;
+  --color-ink-2: #1b2029;
+  --color-ink-3: #242a35;
+  --color-line: #2b323e;
+  --color-line-soft: #20262f;
+  --color-fg: #eceef2;
+  --color-fg-2: #a0a8b6;
+  --color-fg-3: #677081;
+
+  /* RIVECT orange: activity, decision, path. Never constant fill. */
+  --color-brand: #ff6b1a;
+  --color-brand-2: #ff8a4a;
+  --color-brand-ghost: rgb(255 107 26 / 0.14);
+
+  /* waits (blue-grey, slow pulse), human-in-the-loop (sand), verified-real (green) */
+  --color-wait: #7088a8;
+  --color-human: #d8b98a;
+  --color-real: #4cc38a;
+  --color-fail: #e5675a;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--color-ink-0);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+  overflow: hidden;
+}
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+::selection { background: var(--color-brand-ghost); }
+
+/* React Flow overrides */
+.react-flow { --xy-background-color: var(--color-ink-0); }
+.react-flow__attribution { display: none; }
+.react-flow__node { cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
