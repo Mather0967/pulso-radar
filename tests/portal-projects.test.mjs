@@ -308,6 +308,25 @@ test('RIVECT Studio: solo administradores con sesión, sin rutas fuera de la lis
   }finally{await f.close();}
 });
 
+test('RIVECT Studio: la demo de restaurantes vive en /studio/restaurantes/ solo con sesión de administrador',async()=>{
+  const f=await portalFixture();try{
+    assert.equal((await f.request('/studio/restaurantes/')).headers.get('location'),'/login');
+    const admin=await f.login('admin'),pulso=await f.login('pulso');
+    assert.equal((await f.request('/studio/restaurantes/',pulso)).status,403);
+    assert.equal((await f.request('/studio/restaurantes',admin)).headers.get('location'),'/studio/restaurantes/');
+    const page=await f.request('/studio/restaurantes/',admin);assert.equal(page.status,200);
+    const html=await page.text();assert.match(html,/<title>Brasero/);
+    const js=html.match(/src="\/studio\/restaurantes\/(assets\/[^"]+\.js)"/)[1];
+    const script=await f.request('/studio/restaurantes/'+js,admin);
+    assert.match(script.headers.get('content-type'),/javascript/);assert.match(script.headers.get('cache-control')||'',/immutable/);
+    const photo=await f.request('/studio/restaurantes/photos/ojo-bife.jpg',admin);
+    assert.equal(photo.status,200);assert.equal(photo.headers.get('content-type'),'image/jpeg');assert.match(photo.headers.get('cache-control')||'',/private/);
+    // El Studio sigue siendo el Studio: su raíz no se confunde con la subcarpeta.
+    assert.match(await(await f.request('/studio/',admin)).text(),/RIVECT Studio/);
+    for(const route of ['/studio/restaurantes/../../server/main.mjs','/studio/restaurantes/src/main.tsx','/studio/restaurantes/inexistente.jpg','/studio/restaurantes/.env'])assert.equal((await f.request(route,admin)).status,404,route);
+  }finally{await f.close();}
+});
+
 test('Rivect Retail Intelligence: solo administradores, con fallback de SPA',async()=>{
   const f=await portalFixture();try{
     assert.equal((await f.request('/retail/')).headers.get('location'),'/login');

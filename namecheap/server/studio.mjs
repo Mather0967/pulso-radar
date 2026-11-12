@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.woff2': 'font/woff2', '.woff': 'font/woff', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
@@ -34,16 +34,22 @@ export function createProjectSite({ dir, access, mount }) {
     if (!access(user)) return Response.json({ error: 'No tenés permiso para este proyecto.' }, { status: 403 });
     if (p === mount) return new Response(null, { status: 303, headers: { Location: prefix } });
     if (!p.startsWith(prefix)) return Response.json({ error: 'Ruta no encontrada.' }, { status: 404 });
-    const name = p === prefix ? 'index.html' : p.slice(prefix.length);
+    let name = p === prefix ? 'index.html' : p.slice(prefix.length);
     // Sin traversal ni archivos ocultos (.gitignore, .env): nunca entran al fallback de SPA.
     if (!name || name.includes('..') || name.includes('\\') || name.split('/').some(segment => segment.startsWith('.'))) return Response.json({ error: 'Ruta no encontrada.' }, { status: 404 });
+    // Una subcarpeta con su propio index.html (p. ej. /studio/restaurantes/) se abre como página;
+    // sin la barra final se redirige. Una carpeta sin index.html sigue el fallback de SPA de abajo.
+    if (name.endsWith('/') && files.has(name + 'index.html')) name += 'index.html';
+    else if (!path.extname(name) && files.has(name + '/index.html')) return new Response(null, { status: 303, headers: { Location: p + '/' } });
     // Fallback de SPA: una ruta del cliente (sin extensión) devuelve index.html.
     // Los archivos reales y las rutas con extensión que no están en la lista blanca siguen dando 404.
     const file = files.get(name) ?? (path.extname(name) ? null : files.get('index.html'));
     if (!file) return Response.json({ error: 'Ruta no encontrada.' }, { status: 404 });
     const headers = { 'Content-Type': TYPES[path.extname(file)] };
     // Los recursos de Vite llevan hash en el nombre: se pueden cachear en el navegador (nunca en un proxy).
-    if (name.startsWith('assets/')) headers['Cache-Control'] = 'private, max-age=31536000, immutable';
+    if (/(^|\/)assets\//.test(name)) headers['Cache-Control'] = 'private, max-age=31536000, immutable';
+    // Las fotos no llevan hash: un día de caché privada evita volver a bajarlas en cada pantalla.
+    else if (path.extname(name) === '.jpg') headers['Cache-Control'] = 'private, max-age=86400';
     return new Response(await fs.promises.readFile(file), { headers });
   };
 }

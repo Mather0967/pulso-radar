@@ -43,6 +43,9 @@ export function Picker() {
                 <span className="mt-5 text-[22px] font-semibold tracking-[-0.02em]">{sc.business.label}</span>
                 <span className="mt-1 text-[14.5px] text-fg-2">{sc.business.tagline}</span>
               </button>
+              {sc.id === 'restaurante' && import.meta.env.MODE === 'portal' && (
+                <a className="btn mt-5 w-full justify-center" href="/studio/restaurantes/">Abrir demo de gestión</a>
+              )}
               <div className="mt-6 flex items-center gap-2">
                 <button className="btn primary" onClick={() => A.startScenario(sc.id, 'tour')}>Iniciar recorrido</button>
                 <button className="btn ghost" onClick={() => A.startScenario(sc.id, 'free')}>Explorar libre</button>

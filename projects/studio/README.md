@@ -20,6 +20,10 @@ Rubros incluidos: **Ferretería**, **Clínica odontológica**, **Restaurante** (
 | Pregunta interactiva | En el capítulo 3 el recorrido se detiene en "¿Qué pasa si no responde?". El cliente elige; o play para seguir. |
 | Guardar la visita | "Lo que vimos" → nombre, contacto, problemas, módulos ("Le interesa" en cada nodo), notas → Guardar / Exportar (JSON) / Imprimir. Se guarda en esta computadora (localStorage). |
 
+## Demo de restaurantes
+
+En modo portal, la tarjeta de Restaurante suma el botón "Abrir demo de gestión" hacia `/studio/restaurantes/` (ver `namecheap/README.md`). Esa carpeta es un build externo copiado dentro de `public/`: recompilar el Studio con `npm run build:portal` la borra y hay que volver a copiarla.
+
 ## Credibilidad
 
 Todo lo que se ve es simulación con datos de ejemplo y así se rotula. La única forma de marcar una
