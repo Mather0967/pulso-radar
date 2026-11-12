@@ -24,6 +24,13 @@ export function verifyMountedProjects({repository,paths=managedPaths}){
   for(const match of fs.readFileSync(index,'utf8').matchAll(/(?:src|href)="[^"]*?(assets\/[^"]+)"/g))if(!fs.existsSync(path.join(repository,dir,match[1])))throw Error(`Mounted project references a missing asset: ${dir}/${match[1]}`);
  }
 }
+// LiteSpeed sirve `public/` directamente, sin pasar por Node, y necesita poder leer cada archivo (644; carpetas 755).
+// El cron corre con `umask 077` y `cpSync` conserva el modo del origen: sin este paso, cada estático que Git reescribía
+// quedaba en 600 y el navegador recibía 403 (portal sin estilos, logos rotos). Lo servido por Node no lo necesita.
+export function makeWebReadable(target){
+ if(fs.statSync(target).isDirectory()){fs.chmodSync(target,0o755);for(const entry of fs.readdirSync(target))makeWebReadable(path.join(target,entry))}
+ else fs.chmodSync(target,0o644);
+}
 export function installRelease({repository,target,state,revision}){
  if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid deployment revision');
  verifyMountedProjects({repository});
@@ -46,6 +53,7 @@ export function installRelease({repository,target,state,revision}){
    fs.cpSync(sources(p),staged,{recursive:true});
    if(had)fs.renameSync(destination,destination+'.deploy-old');
    fs.renameSync(staged,destination);
+   if(p.startsWith('public/'))makeWebReadable(destination);
    fs.rmSync(destination+'.deploy-old',{recursive:true,force:true});
   }
   fs.mkdirSync(path.join(target,'tmp'),{recursive:true});

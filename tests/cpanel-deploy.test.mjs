@@ -33,6 +33,18 @@ test('deployment replaces only code, preserves portal and data, and records a re
   assert.equal(JSON.parse(fs.readFileSync(path.join(state,'status.json'))).revision,'a'.repeat(40));
  }finally{fs.rmSync(temp,{recursive:true,force:true})}
 });
+test('los estáticos que sirve el servidor web quedan legibles aunque el cron corra con umask 077',t=>{
+ // Regresión: el portal perdía los estilos y los logos (403) cada vez que se desplegaba un estático modificado.
+ const {temp,repository,target,state}=prepare();
+ const real=fs.chmodSync,calls=[];
+ t.mock.method(fs,'chmodSync',(p,mode)=>{calls.push([p,mode]);return real(p,mode)});
+ try{
+  installRelease({repository,target,state,revision:'c'.repeat(40)});
+  for(const f of managedPaths.filter(p=>p.startsWith('public/')))assert.ok(calls.some(([p,mode])=>p===path.join(target,f)&&mode===0o644),'sin 644: '+f);
+  assert.ok(calls.length>0&&calls.every(([p])=>p.startsWith(path.join(target,'public'))),'solo se toca lo que sirve el servidor web');
+  if(process.platform!=='win32')for(const f of managedPaths.filter(p=>p.startsWith('public/')))assert.equal(fs.statSync(path.join(target,f)).mode&0o777,0o644,f);
+ }finally{fs.rmSync(temp,{recursive:true,force:true})}
+});
 test('cada proyecto montado en el portal viaja en el despliegue',()=>{
  // Regresión: /retail quedó montado sin sus estáticos y la web respondía 404 sin que el
  // despliegue lo detectara.

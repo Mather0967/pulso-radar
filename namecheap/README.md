@@ -44,6 +44,10 @@ Antes de publicar se compila y se ejecuta toda la suite con el Node 22 de Passen
 
 Registro: `~/pulso-deploy/deploy.log`; commit publicado y respaldo: `~/pulso-deploy/status.json`. Para pausar la actualización, desactivar el cron. Para revertir una versión, hacer `git revert` del commit en GitHub y publicar a `main`; la automatización desplegará ese nuevo commit. Una rama de trabajo o PR sin integrar no modifica producción. Si el repositorio se vuelve privado habrá que configurar acceso de sólo lectura antes de reactivar el cron.
 
+### Permisos de los estáticos (403 en `/portal` sin estilos)
+
+LiteSpeed sirve `public/` sin pasar por Node y necesita poder leer cada archivo. El cron corre con `umask 077` y `cpSync` conserva el modo del origen, de modo que un estático que Git reescribía (`projects.css`, `landur-brand.png`…) quedaba en 600 y respondía **403**: el portal perdía estilos y logos. `scripts/cpanel-deploy.mjs` ahora deja cada archivo de `public/` en 644 (carpetas 755) al instalarlo; lo que sirve Node no cambia. Hay una prueba de regresión en `tests/cpanel-deploy.test.mjs`.
+
 ## NVIDIA para el prototipo
 
 El proveedor preferido pasa a NVIDIA cuando existe `NVIDIA_API_KEY` en el entorno de Passenger. Modelo predeterminado: `deepseek-ai/deepseek-v4.1-flash`; `NVIDIA_MODEL` permite cambiarlo. Sin esa clave se conserva Groq. Las claves se configuran únicamente en el servidor y quedan fuera de Git, respaldos de cartera y respuestas de estado.
@@ -82,7 +86,7 @@ La tarjeta de Restaurante del Studio tiene el botón **Abrir demo de gestión**,
 
 Las vistas del cliente (`#/m/unirse`, `#/m/carta`, `#/m/tarjeta/<código>`) también están detrás de la sesión: para probarlas en un celular hay que iniciar sesión como administrador en ese celular.
 
-El código fuente está en el proyecto `demo-restaurantes` (fuera de este repositorio). Para actualizar: en ese proyecto, `npm run publish:studio` compila con `--mode portal` y copia el resultado a `projects/studio/public/restaurantes/`; después `npm test` y publicar a `main`. **`npm run build:portal` del Studio vacía `projects/studio/public/`**: si se recompila el Studio hay que volver a ejecutar `publish:studio` para no perder la carpeta `restaurantes/`.
+El código fuente está en el proyecto `demo-restaurantes` (fuera de este repositorio). Para actualizar: en ese proyecto, `npm run publish:studio` compila con `--mode portal` y copia el resultado a `projects/studio/public/restaurantes/`; después `npm test` y publicar a `main`. Recompilar el Studio (`npm run build:portal`) ya no toca esa carpeta: solo reemplaza su propio `index.html` y `assets/`, así que las demos copiadas en `public/` (restaurantes, odontología) se conservan.
 
 ### Demo de gestión para clínicas odontológicas (`/studio/odontologia/`)
 

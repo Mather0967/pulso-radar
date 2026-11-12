@@ -22,7 +22,7 @@ Rubros incluidos: **Ferretería**, **Clínica odontológica**, **Restaurante** (
 
 ## Demo de restaurantes
 
-En modo portal, la tarjeta de Restaurante suma el botón "Abrir demo de gestión" hacia `/studio/restaurantes/` (ver `namecheap/README.md`). Esa carpeta es un build externo copiado dentro de `public/`: recompilar el Studio con `npm run build:portal` la borra y hay que volver a copiarla.
+En modo portal, la tarjeta de Restaurante suma el botón "Abrir demo de gestión" hacia `/studio/restaurantes/` (ver `namecheap/README.md`). Esa carpeta es un build externo copiado dentro de `public/`; `npm run build:portal` no la toca (solo reemplaza `index.html` y `assets/`).
 
 ## Credibilidad
 
