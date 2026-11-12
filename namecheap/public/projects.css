@@ -5,3 +5,9 @@
 /* Logo de LANDUR (brand/landur): ficha cuadrada morada con el logotipo */
 .project-symbol.landur-logo{background:transparent;padding:0;border:0}
 .landur-logo img{display:block;width:54px;height:54px;border-radius:13px}
+
+/* Rivect Retail Intelligence (proyecto interno, solo administradores) */
+.retail .project-symbol{background:#e8efff;color:#1a56e8}
+.retail .badge{background:#eef3ff;color:#3b62b6}
+.retail .open{background:#0b1120}
+.retail .open span{color:#8ab5ff}

@@ -19,6 +19,7 @@ export async function portalFixture({port=0}={}) {
   fs.mkdirSync(path.join(root,'scripts'),{recursive:true});fs.copyFileSync(path.join(repository,'scripts/storage.mjs'),path.join(root,'scripts/storage.mjs'));
   for(const dir of ['server','public'])fs.cpSync(path.join(repository,'projects/landur',dir),path.join(root,'projects/landur',dir),{recursive:true});
   fs.cpSync(path.join(repository,'projects/studio/public'),path.join(root,'projects/studio/public'),{recursive:true});
+  fs.cpSync(path.join(repository,'projects/rivect-retail/public'),path.join(root,'projects/rivect-retail/public'),{recursive:true});
   put(path.join(root,'server/site.mjs'),"export const publicAPI=async()=>Response.json({fixture:true}); export const adminSiteAPI=async()=>Response.json({fixture:true});");
   for(const file of ['index.html','account.html','portal.html','admin.html'])put(path.join(root,'public',file),`<!doctype html><html><body>Fixture: ${file}</body></html>`);
   fs.mkdirSync(path.join(root,'src'),{recursive:true});fs.copyFileSync(path.join(repository,'src/index.html'),path.join(root,'src/index.html'));

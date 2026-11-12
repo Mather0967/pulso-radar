@@ -10,10 +10,12 @@ import {createLandurPortal,storageDiagnosis} from '../namecheap/server/landur.mj
 import {portalFixture} from './helpers/portal-fixture.mjs';
 
 test('catálogo: permisos independientes y administradores ven ambos proyectos',()=>{
-  assert.deepEqual(availableProjects({active:true,role:'admin'}).map(p=>p.id),['pulso','landur','studio']);
-  // Studio es solo para administradores: ni una asignación explícita lo habilita para un miembro.
+  assert.deepEqual(availableProjects({active:true,role:'admin'}).map(p=>p.id),['pulso','landur','studio','retail']);
+  // Studio y Retail son solo para administradores: ni una asignación explícita los habilita para un miembro.
   assert.equal(projectAccess({active:true,role:'member',projects:{studio:'editor'}},'studio'),null);
+  assert.equal(projectAccess({active:true,role:'member',projects:{retail:'editor'}},'retail'),null);
   assert.throws(()=>mergeProjectGrants({},{projects:{studio:'viewer'}}));
+  assert.throws(()=>mergeProjectGrants({},{projects:{retail:'viewer'}}));
   assert.deepEqual(availableProjects({active:true,role:'member',projects:{pulso:'editor'}}).map(p=>p.id),['pulso']);
   assert.equal(projectAccess({active:false,role:'admin'},'landur'),null);
   assert.equal(projectAccess({active:true,projects:{landur:'admin'}},'landur'),null);
@@ -302,5 +304,24 @@ test('RIVECT Studio: solo administradores con sesión, sin rutas fuera de la lis
     for(const route of ['/studio/../server/main.mjs','/studio/%2e%2e/server/main.mjs','/studio/package.json','/studio/src/main.tsx'])assert.equal((await f.request(route,admin)).status,404,route);
     assert.equal((await f.request('/studio/',{...admin,method:'POST',body:{}})).status,405);
     assert.match(await(await f.request('/portal',admin)).text(),/Abrir RIVECT Studio/);
+    assert.match(await(await f.request('/portal',admin)).text(),/Abrir Rivect Retail Intelligence/);
+  }finally{await f.close();}
+});
+
+test('Rivect Retail Intelligence: solo administradores, con fallback de SPA',async()=>{
+  const f=await portalFixture();try{
+    assert.equal((await f.request('/retail/')).headers.get('location'),'/login');
+    const admin=await f.login('admin'),pulso=await f.login('pulso');
+    assert.equal((await f.request('/retail/',pulso)).status,403);
+    assert.equal((await f.request('/retail',admin)).headers.get('location'),'/retail/');
+    const page=await f.request('/retail/',admin);assert.equal(page.status,200);
+    const html=await page.text();assert.match(html,/Rivect Retail Intelligence/);
+    const asset=html.match(/src="\/retail\/(assets\/[^"]+\.js)"/)[1];
+    const js=await f.request('/retail/'+asset,admin);assert.equal(js.status,200);assert.match(js.headers.get('content-type'),/javascript/);
+    assert.match(js.headers.get('cache-control')||'',/private/);
+    // Deep link del router: devuelve el shell y el cliente resuelve la ruta.
+    assert.equal((await f.request('/retail/stock',admin)).status,200);
+    for(const route of ['/retail/../server/main.mjs','/retail/%2e%2e/server/main.mjs','/retail/package.json','/retail/src/main.tsx','/retail/.gitignore'])assert.equal((await f.request(route,admin)).status,404,route);
+    assert.equal((await f.request('/retail/',{...admin,method:'POST',body:{}})).status,405);
   }finally{await f.close();}
 });

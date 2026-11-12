@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 font-sans text-slate-300 antialiased;
+    background-image: radial-gradient(
+        120% 90% at 15% -10%,
+        rgba(47, 116, 255, 0.16) 0%,
+        rgba(4, 6, 12, 0) 55%
+      ),
+      radial-gradient(80% 60% at 95% 0%, rgba(74, 222, 159, 0.06) 0%, rgba(4, 6, 12, 0) 50%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(47, 116, 255, 0.35);
+    color: #fff;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1f2b42 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: #1f2b42;
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply relative rounded-2xl border border-line/90 bg-ink-850/70 shadow-card backdrop-blur-sm;
+  }
+
+  .panel-plain {
+    @apply rounded-2xl border border-line/90 bg-ink-900/60;
+  }
+
+  .panel-pad {
+    @apply p-5 sm:p-6;
+  }
+
+  .kpi-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium text-slate-400;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-line bg-ink-900/70 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-brand-500/70 focus:ring-2 focus:ring-brand-500/15;
+  }
+
+  .input-error {
+    @apply border-coral-400/70 focus:border-coral-400 focus:ring-coral-400/20;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-ink-800/80 px-2.5 py-1 text-[11px] font-medium text-slate-400;
+  }
+
+  .hairline {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-line to-transparent;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 32px rgba(47, 116, 255, 0.55);
+  }
+
+  .scroll-fade {
+    mask-image: linear-gradient(to bottom, transparent, black 8px, black calc(100% - 8px), transparent);
+  }
+
+  .grid-bg {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+}
+
+.recharts-default-tooltip {
+  border-radius: 12px !important;
+}
+
+.recharts-surface:focus {
+  outline: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0b1120 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area {
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #0b1120 !important;
+    padding: 0 !important;
+  }
+
+  .print-area * {
+    color: #0b1120 !important;
+    border-color: #d8dee9 !important;
+    background-color: transparent !important;
+  }
+
+  .print-area .print-panel {
+    border: 1px solid #d8dee9 !important;
+    break-inside: avoid;
+  }
+}
