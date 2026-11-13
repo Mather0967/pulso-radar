@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Info, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Info, Sparkles, X } from 'lucide-react'
 import { NAV_ITEMS } from './nav'
 import { useSimulationStore } from '@/store/useSimulationStore'
 import { cn } from '@/utils/format'
@@ -15,7 +15,7 @@ export function Sidebar({
 
   const content = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-5 pb-6 pt-5">
+      <div className="flex items-center justify-between px-5 pb-5 pt-5">
         <div className="flex items-center gap-3">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-brand-500/40 bg-gradient-to-br from-brand-500/25 to-ink-900 shadow-glow">
             <span className="font-display text-lg font-bold text-brand-200">R</span>
@@ -35,9 +35,23 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="mx-5 mb-5 rounded-xl border border-line/80 bg-ink-900/60 p-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-600">Comercio en demo</p>
-        <p className="mt-1 truncate font-display text-sm font-medium text-slate-200">{storeName}</p>
+      <div className="mx-4 mb-4 space-y-2">
+        <a
+          href="/portal"
+          className="group flex items-center justify-between rounded-xl border border-line/70 bg-ink-900/60 px-3 py-2 text-xs font-medium text-slate-400 transition-all hover:border-brand-500/40 hover:bg-ink-850 hover:text-white"
+          title="Regresar al portal principal de proyectos"
+        >
+          <span className="flex items-center gap-2">
+            <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5 text-brand-400" />
+            <span>Mis proyectos</span>
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-600 group-hover:text-slate-400">Portal</span>
+        </a>
+
+        <div className="rounded-xl border border-line/80 bg-ink-900/60 p-3">
+          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-600">Comercio en demo</p>
+          <p className="mt-1 truncate font-display text-sm font-medium text-slate-200">{storeName}</p>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3">
@@ -50,7 +64,7 @@ export function Sidebar({
               cn(
                 'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
                 isActive
-                  ? 'bg-brand-500/12 text-white'
+                  ? 'border border-brand-500/25 bg-gradient-to-r from-brand-500/15 to-brand-500/5 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
                   : 'text-slate-400 hover:bg-ink-800/70 hover:text-slate-200',
               )
             }
@@ -58,7 +72,7 @@ export function Sidebar({
             {({ isActive }) => (
               <>
                 {isActive ? (
-                  <span className="absolute left-0 top-1/2 h-6 w-[2px] -translate-y-1/2 rounded-r bg-brand-400" />
+                  <span className="absolute left-0 top-1/2 h-6 w-[2px] -translate-y-1/2 rounded-r bg-gradient-to-b from-brand-300 to-brand-500 shadow-[0_0_8px_rgba(47,116,255,0.8)]" />
                 ) : null}
                 <item.icon
                   className={cn(
@@ -70,7 +84,7 @@ export function Sidebar({
                 <span
                   className={cn(
                     'text-[9px] uppercase tracking-wider',
-                    isActive ? 'text-brand-300/70' : 'text-slate-700',
+                    isActive ? 'text-brand-300/80 font-semibold' : 'text-slate-700',
                   )}
                 >
                   {item.description.split(' ')[0]}

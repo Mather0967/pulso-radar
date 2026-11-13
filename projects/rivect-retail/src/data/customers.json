@@ -1,0 +1,20 @@
+[
+  {"id":"c01","name":"Lucía Fernández","channel":"WhatsApp","interests":["Zapatillas"],"purchasedProductIds":["p03"],"totalOrders":2,"lastActivityDaysAgo":12,"lifetimeValue":164800},
+  {"id":"c02","name":"Martín Ríos","channel":"Instagram","interests":["Botines","Zapatos"],"purchasedProductIds":["p09"],"totalOrders":1,"lastActivityDaysAgo":21,"lifetimeValue":118000},
+  {"id":"c03","name":"Carla Gómez","channel":"WhatsApp","interests":["Zapatillas"],"purchasedProductIds":[],"totalOrders":0,"lastActivityDaysAgo":4,"lifetimeValue":0},
+  {"id":"c04","name":"Diego Sosa","channel":"Web","interests":["Zapatillas","Indumentaria"],"purchasedProductIds":["p17","p27"],"totalOrders":3,"lastActivityDaysAgo":9,"lifetimeValue":146700},
+  {"id":"c05","name":"Valentina Paz","channel":"WhatsApp","interests":["Sandalias"],"purchasedProductIds":[],"totalOrders":0,"lastActivityDaysAgo":64,"lifetimeValue":0},
+  {"id":"c06","name":"Nicolás Herrera","channel":"WhatsApp","interests":["Zapatos"],"purchasedProductIds":["p14","p21"],"totalOrders":4,"lastActivityDaysAgo":7,"lifetimeValue":279600},
+  {"id":"c07","name":"Sofía Méndez","channel":"Instagram","interests":["Zapatillas","Accesorios"],"purchasedProductIds":["p25"],"totalOrders":2,"lastActivityDaysAgo":16,"lifetimeValue":137800},
+  {"id":"c08","name":"Bruno Costa","channel":"Presencial","interests":["Accesorios"],"purchasedProductIds":["p21","p22"],"totalOrders":5,"lastActivityDaysAgo":3,"lifetimeValue":88200},
+  {"id":"c09","name":"Agustina López","channel":"WhatsApp","interests":["Zapatillas"],"purchasedProductIds":[],"totalOrders":0,"lastActivityDaysAgo":2,"lifetimeValue":0},
+  {"id":"c10","name":"Facundo Álvarez","channel":"Web","interests":["Zapatillas","Botines"],"purchasedProductIds":["p06"],"totalOrders":1,"lastActivityDaysAgo":48,"lifetimeValue":105000},
+  {"id":"c11","name":"Micaela Torres","channel":"Instagram","interests":["Sandalias","Accesorios"],"purchasedProductIds":[],"totalOrders":0,"lastActivityDaysAgo":5,"lifetimeValue":0},
+  {"id":"c12","name":"Tomás Vidal","channel":"WhatsApp","interests":["Botines","Zapatos"],"purchasedProductIds":["p15"],"totalOrders":2,"lastActivityDaysAgo":33,"lifetimeValue":201000},
+  {"id":"c13","name":"Julieta Ríos","channel":"WhatsApp","interests":["Indumentaria"],"purchasedProductIds":["p27","p28"],"totalOrders":3,"lastActivityDaysAgo":11,"lifetimeValue":146700},
+  {"id":"c14","name":"Ezequiel Navarro","channel":"Instagram","interests":["Zapatillas"],"purchasedProductIds":["p18"],"totalOrders":2,"lastActivityDaysAgo":26,"lifetimeValue":91800},
+  {"id":"c15","name":"Camila Duarte","channel":"WhatsApp","interests":["Accesorios","Indumentaria"],"purchasedProductIds":[],"totalOrders":0,"lastActivityDaysAgo":71,"lifetimeValue":0},
+  {"id":"c16","name":"Gonzalo Peralta","channel":"Web","interests":["Zapatos"],"purchasedProductIds":["p14"],"totalOrders":1,"lastActivityDaysAgo":52,"lifetimeValue":98000},
+  {"id":"c17","name":"Renata Silva","channel":"WhatsApp","interests":["Zapatillas","Sandalias"],"purchasedProductIds":["p08","p12"],"totalOrders":2,"lastActivityDaysAgo":18,"lifetimeValue":89800},
+  {"id":"c18","name":"Iván Castro","channel":"Presencial","interests":["Zapatillas","Accesorios"],"purchasedProductIds":["p20","p26"],"totalOrders":1,"lastActivityDaysAgo":6,"lifetimeValue":131900}
+]

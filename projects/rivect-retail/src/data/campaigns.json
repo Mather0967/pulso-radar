@@ -1,0 +1,4 @@
+[
+  {"id":"cp01","name":"Vuelta al running","segment":"interesados-categoria","segmentLabel":"Interesados en una categoría","category":"Zapatillas","productIds":["p01","p02","p05"],"message":"Hola {{nombre}} 👟 Llegó nueva reposición del modelo que estabas mirando. Con {{descuento}}% off esta semana, ¿te lo reservamos?","discountPct":10,"recipients":9,"status":"borrador","createdAt":"2026-11-10T09:00:00.000Z"},
+  {"id":"cp02","name":"Sandalias de temporada","segment":"recuperacion","segmentLabel":"Clientes inactivos","category":"Sandalias","productIds":["p12","p13"],"message":"Hola {{nombre}} ☀️ Arranca la temporada y guardamos tu talle. Aprovechá {{descuento}}% off en sandalias hasta el domingo.","discountPct":20,"recipients":4,"status":"borrador","createdAt":"2026-11-08T15:30:00.000Z"}
+]

@@ -1,0 +1,20 @@
+{
+  "id": "store-norte-calzado",
+  "name": "Norte Calzado",
+  "businessType": "Calzado y deportes",
+  "dailyQueries": 65,
+  "averageMinutesPerQuery": 7,
+  "workingDays": 26,
+  "automationPercentage": 62,
+  "averageTicket": 48000,
+  "contributionMargin": 38,
+  "recoveredSales": 22,
+  "monthlySales": 12400000,
+  "employeesInService": 3,
+  "totalProducts": 30,
+  "operatingHours": "Lun a Sáb · 10:00 a 20:00",
+  "channels": ["WhatsApp", "Instagram", "Web", "Presencial"],
+  "unresolvedQueries": 32,
+  "customersWithoutFollowUp": 48,
+  "updatedAt": "2026-11-12T09:00:00.000Z"
+}
