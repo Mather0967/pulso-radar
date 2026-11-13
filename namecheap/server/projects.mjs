@@ -33,7 +33,7 @@ export function mergeProjectGrants(current={}, body={}) {
 }
 const escape = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SYMBOLS = {
-  pulso: '<span class="project-symbol">P</span>',
+  pulso: '<span class="project-symbol pulso-symbol"><img src="/symbol.svg" alt="Pulso" width="32" height="32"></span>',
   studio: '<span class="project-symbol">S</span>',
   retail: '<span class="project-symbol">R</span>',
   landur: '<span class="project-symbol landur-logo"><img src="/landur-brand.png" alt="landur®" width="54" height="54"></span>'

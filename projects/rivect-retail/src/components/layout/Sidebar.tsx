@@ -17,13 +17,20 @@ export function Sidebar({
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-5 pb-5 pt-5">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-brand-500/40 bg-gradient-to-br from-brand-500/25 to-ink-900 shadow-glow">
-            <span className="font-display text-lg font-bold text-brand-200">R</span>
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-line/90 bg-[#11222c] p-1.5 shadow-[0_0_20px_rgba(255,118,46,0.15)]">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 680" className="h-full w-full" role="img" aria-label="RIVECT Symbol">
+              <g transform="translate(21 50)">
+                <path fill="#F7F5EF" d="M23 109H240L642 577H451Z" />
+                <path fill="#F7F5EF" d="M256 109H564L411 283L369 236L436 165H305Z" />
+                <path fill="#F7F5EF" d="M208 327L282 409L184 518L9 522Z" />
+                <path fill="#FF762E" d="M730 6L531 402L635 528Z" />
+              </g>
+            </svg>
             <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-mint-400 ring-2 ring-ink-900" />
           </div>
           <div>
-            <p className="font-display text-sm font-semibold tracking-tight text-white">Rivect</p>
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Retail Intelligence</p>
+            <p className="font-display text-sm font-bold tracking-wider text-white">RIVECT</p>
+            <p className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Retail Intelligence</p>
           </div>
         </div>
         <button
