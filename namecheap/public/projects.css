@@ -1,101 +1,965 @@
 /*
-  Mis proyectos — espacio de trabajo del portal.
-  Dos zonas con lógica distinta: "Para trabajar" (claro, filas amplias, herramientas reales)
-  y "Para mostrar" (banda oscura, como el escenario de Studio: demos comerciales).
-  Tokens: tinta #11222c, superficie #fff, fondo #f3f4f2, acento RIVECT #ff762e (solo foco y flecha).
+  Mis proyectos · RIVECT Portal
+  Diseño editorial de alta fidelidad inspirado en React Bits & Motion UI.
+  - Cero IA slop: tipografía precisa, proporciones equilibradas, paleta editorial deliberada.
+  - Micro-interacciones: SpotlightCard dinámico con cursor, brillo GlareHover, pulso de estado y cinemática elástica.
+  - Zonas diferenciadas: "Para trabajar" (superficie blanca, iluminación cálida) y "Para mostrar" (escenario oscuro cinematográfico).
 */
-:root{--ink:#11222c;--ink-2:#4b5a62;--ink-3:#7a878e;--line:#e2e6e7;--bg:#f3f4f2;--surface:#fff;--accent:#ff762e;--stage:#121c22;--stage-2:#1b2830;--stage-ink:#d7e0e4;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);font-synthesis:none;color-scheme:only light}
-*{box-sizing:border-box}body{margin:0;background:var(--bg)}button,select{font:inherit}button,a{touch-action:manipulation}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
-a{color:inherit;text-decoration:none}a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
-h1,h2,h3,p{margin:0}
 
-.top{height:72px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100% - 1120px)/2));gap:20px}
-.brand img{display:block;width:150px;height:auto}
-.top-actions{display:flex;align-items:center;gap:18px;font-size:13px}
-.top-actions .who{color:var(--ink-3)}
-.top-actions a{color:var(--ink-2)}.top-actions a:hover{color:var(--ink)}
-.top-actions button{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-height:36px;padding:6px 12px;color:var(--ink-2)}
-.top-actions button:hover{border-color:#c9d0d3;color:var(--ink)}
+:root {
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-main{max-width:1120px;margin:auto;padding:48px 24px 24px}
-.intro h1{font-size:34px;font-weight:650;letter-spacing:-.03em}
-.intro p{font-size:15px;color:var(--ink-3);margin-top:6px}
+  /* Colores de marca y superficie clara */
+  --ink: #0c151c;
+  --ink-2: #3e4f5a;
+  --ink-3: #6b7e8a;
+  --ink-4: #9baab3;
+  --line: rgba(12, 21, 28, 0.08);
+  --line-strong: rgba(12, 21, 28, 0.14);
+  --bg: #f8faf9;
+  --surface: #ffffff;
+  --accent: #ff762e;
+  --accent-hover: #e6621b;
+  --accent-light: #fff3eb;
+  --accent-glow: rgba(255, 118, 46, 0.22);
 
-.group{margin-top:36px}
-.group>header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:12px}
-.group>header h2{font-size:15px;font-weight:650}
-.group>header p{font-size:13px;color:var(--ink-3)}
-.rows{border-radius:14px;overflow:hidden}
+  /* Escenario para demos ("Para mostrar") */
+  --stage: #0c1419;
+  --stage-2: #14222b;
+  --stage-card: #101c24;
+  --stage-border: rgba(255, 255, 255, 0.09);
+  --stage-border-hover: rgba(255, 118, 46, 0.4);
+  --stage-ink: #e6eef2;
+  --stage-muted: #82949f;
 
-/* Fila de proyecto: identidad | descripción | estado | abrir */
-.project{display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr) 130px 250px;align-items:center;gap:8px 28px;padding:22px 24px;background:var(--surface);position:relative;transition:background-color .15s}
-.project+.project{border-top:1px solid var(--line)}
-.operacion .rows{border:1px solid var(--line)}
-.operacion .project{padding:28px 24px}
-.operacion .project:hover{background:#fbfbfa}
-.project-id{display:flex;align-items:center;gap:14px;min-width:0}
-.project h3{font-size:19px;font-weight:650;letter-spacing:-.015em}
-.operacion .project h3{font-size:22px}
-.kind{font-size:12.5px;color:var(--ink-3);margin-top:2px}
-.project-symbol{width:44px;height:44px;flex:none;border-radius:11px;display:grid;place-items:center;background:#fff0e7;color:#c9581c;font-size:21px;font-weight:700}
-.operacion .project-symbol{width:52px;height:52px;border-radius:13px;font-size:25px}
-.project-symbol.landur-logo{background:transparent;padding:0}
-.landur-logo img{display:block;width:52px;height:52px;border-radius:13px}
-.description{font-size:14px;line-height:1.55;color:var(--ink-2);max-width:52ch}
-.project-meta{display:flex;flex-direction:column;gap:4px;font-size:12.5px}
-.access{color:var(--ink);font-weight:550;display:inline-flex;align-items:center;gap:6px}
-.access::before{content:"";width:7px;height:7px;border-radius:50%;background:#3f8a5f}
-.access.viewer::before{background:#9aa6ab}
-.status{color:var(--ink-3)}
-.open{justify-self:end;display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:9px;padding:11px 16px;font-size:13.5px;font-weight:550;white-space:nowrap;transition:background-color .15s}
-.open span{color:var(--accent);transition:transform .2s cubic-bezier(.22,1,.36,1)}
-.open:hover{background:#1d3542}.open:hover span{transform:translate(2px,-2px)}
-.shortcuts{grid-column:2;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
-.shortcuts a{color:var(--stage-ink);border-bottom:1px solid #ffffff2e;padding-bottom:1px}
-.shortcuts a:hover{color:#fff;border-color:var(--accent)}
+  /* Sombras y elevaciones físicas */
+  --shadow-sm: 0 1px 3px rgba(12, 21, 28, 0.04), 0 1px 2px rgba(12, 21, 28, 0.02);
+  --shadow-card: 0 4px 16px -2px rgba(12, 21, 28, 0.04), 0 1px 4px rgba(12, 21, 28, 0.02);
+  --shadow-hover: 0 20px 40px -10px rgba(12, 21, 28, 0.1), 0 8px 18px -4px rgba(12, 21, 28, 0.04);
+  --shadow-stage: 0 12px 36px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
-/* Para mostrar: escenario oscuro, como el propio Studio */
-.ventas .rows{background:var(--stage)}
-.ventas .project{background:var(--stage);color:#fff}
-.ventas .project+.project{border-top-color:#ffffff14}
-.ventas .project:hover{background:var(--stage-2)}
-.ventas .kind,.ventas .status{color:#8d9ca4}
-.ventas .description{color:var(--stage-ink)}
-.ventas .access{color:#fff}
-.ventas .project-symbol{background:#ff762e1f;color:#ff8f4f}
-.retail .project-symbol{background:#8ab5ff1f;color:#9cc1ff}
-.ventas .open{background:#fff;color:var(--ink)}
-.ventas .open:hover{background:#e9eef0}
-.ventas .open span{color:#d4561a}
-
-.permissions{margin-top:44px;border-top:1px solid var(--line);padding-top:28px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:32px}
-.permissions h2{font-size:15px;font-weight:650}
-.permissions p{font-size:13px;line-height:1.6;color:var(--ink-3);margin-top:6px}
-form{display:grid;grid-template-columns:2fr 1fr 1fr auto;align-items:end;gap:12px}
-label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-2)}
-select{width:100%;min-width:0;padding:9px 8px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-height:40px}
-form button{background:var(--ink);color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:13px;min-height:40px}
-#grants-status{grid-column:1/-1;margin:0}
-.empty{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:30px;margin-top:32px}
-.empty h2{font-size:18px}.empty p{font-size:14px;line-height:1.7;margin-top:10px;color:var(--ink-2)}
-.error{color:#ad3b2c;font-size:13px;margin-top:20px}
-footer{display:flex;justify-content:space-between;gap:15px;border-top:1px solid var(--line);padding:20px 0;margin-top:44px;color:var(--ink-3);font-size:12px}
-
-@media(max-width:900px){
-  .project{grid-template-columns:minmax(0,1fr) auto;gap:12px 16px}
-  .description,.shortcuts{grid-column:1/-1;grid-row:2}
-  .shortcuts{grid-row:3}
-  .project-meta{grid-row:1;grid-column:2;text-align:right;align-items:flex-end}
-  .open{grid-column:1/-1;justify-self:stretch;justify-content:space-between}
-  .permissions{grid-template-columns:1fr}
+  /* Curvas cinemáticas */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-@media(max-width:600px){
-  .top{height:auto;min-height:64px;padding:12px 16px}.top-actions{gap:10px}.top-actions .who{display:none}.brand img{width:118px}
-  main{padding:28px 16px 16px}.intro h1{font-size:28px}
-  .group>header{flex-direction:column;gap:2px}
-  .project,.operacion .project{padding:20px 16px}
-  form{grid-template-columns:1fr 1fr}form label:first-child,form button{grid-column:1/-1}
-  footer{flex-direction:column}
+
+/* Reset y base */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+body {
+  margin: 0;
+  font-family: var(--font-main);
+  color: var(--ink);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  color-scheme: only light;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, p {
+  margin: 0;
+}
+
+button, select, a {
+  font: inherit;
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible, button:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+/* ==========================================================================
+   Fondo ambiental con malla viva (React Bits Aurora + Pattern Grid)
+   ========================================================================== */
+.ambient-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.5;
+  animation: orbFloat 22s ease-in-out infinite alternate;
+}
+
+.orb-1 {
+  width: 580px;
+  height: 580px;
+  background: radial-gradient(circle, rgba(255, 118, 46, 0.11), transparent 70%);
+  top: -140px;
+  right: -80px;
+}
+
+.orb-2 {
+  width: 660px;
+  height: 660px;
+  background: radial-gradient(circle, rgba(47, 116, 255, 0.08), transparent 70%);
+  bottom: -180px;
+  left: -120px;
+  animation-duration: 28s;
+  animation-direction: alternate-reverse;
+}
+
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(12, 21, 28, 0.065) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 50% 25%, black 45%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 25%, black 45%, transparent 85%);
+}
+
+@keyframes orbFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 45px) scale(1.06); }
+  100% { transform: translate(25px, -35px) scale(0.96); }
+}
+
+/* ==========================================================================
+   Header de navegación
+   ========================================================================== */
+.top {
+  height: 74px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(24px, calc((100% - 1140px) / 2));
+  gap: 20px;
+  transition: border-color 0.25s ease;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.25s var(--ease-spring), opacity 0.2s ease;
+}
+
+.brand:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+.brand img {
+  display: block;
+  width: 154px;
+  height: auto;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.top-actions .who {
+  color: var(--ink-2);
+  font-weight: 550;
+  background: rgba(12, 21, 28, 0.04);
+  border: 1px solid rgba(12, 21, 28, 0.06);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+.top-actions .who::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.top-actions a {
+  color: var(--ink-2);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.top-actions a:hover {
+  color: var(--ink);
+  background: rgba(12, 21, 28, 0.05);
+}
+
+.top-actions button {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 9px;
+  min-height: 36px;
+  padding: 6px 14px;
+  color: var(--ink-2);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s var(--ease-spring);
+}
+
+.top-actions button:hover:not(:disabled) {
+  border-color: rgba(12, 21, 28, 0.25);
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(12, 21, 28, 0.08);
+}
+
+.top-actions button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ==========================================================================
+   Contenedor Principal & Introducción
+   ========================================================================== */
+main {
+  max-width: 1140px;
+  margin: auto;
+  padding: 52px 24px 36px;
+}
+
+.intro {
+  animation: introEnter 0.6s var(--ease-spring) both;
+}
+
+.intro h1 {
+  font-size: 40px;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1.12;
+}
+
+.intro p {
+  font-size: 16px;
+  color: var(--ink-3);
+  margin-top: 8px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+}
+
+@keyframes introEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Grupos de Proyectos
+   ========================================================================== */
+.group {
+  margin-top: 48px;
+  animation: groupEnter 0.7s var(--ease-spring) both;
+}
+
+.group.operacion {
+  animation-delay: 0.08s;
+}
+
+.group.ventas {
+  animation-delay: 0.18s;
+}
+
+@keyframes groupEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.group > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.group > header h2 {
+  font-size: 13.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+}
+
+.group > header h2::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.ventas > header h2::before {
+  background: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.4);
+}
+
+.group > header p {
+  font-size: 13px;
+  color: var(--ink-3);
+  letter-spacing: -0.01em;
+}
+
+.rows {
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Tarjetas de Proyecto (React Bits · SpotlightCard + GlareHover)
+   ========================================================================== */
+.project {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) 140px 240px;
+  align-items: center;
+  gap: 12px 28px;
+  padding: 26px 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.25s ease, box-shadow 0.35s var(--ease-spring), transform 0.35s var(--ease-spring), background-color 0.2s ease;
+  contain: paint;
+}
+
+.project:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 118, 46, 0.35);
+  box-shadow: var(--shadow-hover);
+}
+
+/* React Bits: Foco interactivo que sigue el mouse */
+.spotlight-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(400px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 118, 46, 0.08), transparent 65%);
+  z-index: 1;
+}
+
+.project:hover .spotlight-glow {
+  opacity: 1;
+}
+
+/* React Bits: Reflejo de luz en barrido diagonal */
+.card-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%) rotate(25deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transition: transform 0.85s var(--ease-spring);
+  z-index: 2;
+}
+
+.project:hover .card-glare {
+  transform: translateX(130%) rotate(25deg);
+}
+
+/* Identidad del proyecto (símbolo + título + eyebrow) */
+.project-id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  position: relative;
+  z-index: 3;
+}
+
+.project h3 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.kind {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+/* Símbolo / Escudo visual del proyecto */
+.project-symbol {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #fff6f0 0%, #ffebd9 100%);
+  color: #d45618;
+  font-size: 24px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 118, 46, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 12px rgba(255, 118, 46, 0.1);
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s ease;
+  position: relative;
+}
+
+.project:hover .project-symbol {
+  transform: scale(1.06) rotate(-2deg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 20px rgba(255, 118, 46, 0.2);
+}
+
+.project-symbol.landur-logo {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.landur-logo img {
+  display: block;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(12, 21, 28, 0.08);
+  transition: transform 0.3s var(--ease-spring);
+}
+
+.project:hover .landur-logo img {
+  transform: scale(1.06) rotate(1deg);
+}
+
+/* Descripción */
+.description {
+  font-size: 14.5px;
+  line-height: 1.58;
+  color: var(--ink-2);
+  max-width: 52ch;
+  position: relative;
+  z-index: 3;
+}
+
+/* Metadatos: Permiso y Estado */
+.project-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+  z-index: 3;
+}
+
+.access {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+/* Pulso vivo animado en el estado de acceso */
+.access::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  animation: livePulse 2.4s infinite;
+}
+
+.access.viewer::before {
+  background: #94a3b8;
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.status {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+/* Botón de acción Abrir */
+.open {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--ink);
+  color: #ffffff;
+  border-radius: 11px;
+  padding: 12px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16), var(--shadow-sm);
+  transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  z-index: 3;
+}
+
+.open span {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+  transition: transform 0.25s var(--ease-spring);
+  display: inline-block;
+}
+
+.open:hover {
+  background: #1c2e39;
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.24), 0 8px 20px rgba(12, 21, 28, 0.16);
+  border-color: rgba(255, 118, 46, 0.35);
+}
+
+.open:hover span {
+  transform: translate(3px, -3px) rotate(4deg);
+}
+
+.open:active {
+  transform: scale(0.97);
+}
+
+/* Atajos directos */
+.shortcuts {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12.5px;
+  position: relative;
+  z-index: 3;
+}
+
+.shortcuts a {
+  color: var(--stage-ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 5px 12px;
+  transition: all 0.2s var(--ease-spring);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shortcuts a::after {
+  content: "→";
+  font-size: 11px;
+  opacity: 0.6;
+  transition: transform 0.2s var(--ease-spring), opacity 0.2s ease;
+}
+
+.shortcuts a:hover {
+  color: #ffffff;
+  background: rgba(255, 118, 46, 0.15);
+  border-color: rgba(255, 118, 46, 0.4);
+  transform: translateY(-1px);
+}
+
+.shortcuts a:hover::after {
+  transform: translateX(3px);
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* ==========================================================================
+   Zona "Para mostrar" (Escenario Oscuro de Demos Comerciales)
+   ========================================================================== */
+.ventas .project {
+  background: linear-gradient(180deg, rgba(20, 33, 41, 0.88) 0%, rgba(13, 22, 28, 0.96) 100%);
+  border: 1px solid var(--stage-border);
+  box-shadow: var(--shadow-stage);
+  color: #ffffff;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.ventas .project:hover {
+  background: linear-gradient(180deg, rgba(24, 39, 49, 0.95) 0%, rgba(15, 26, 33, 0.98) 100%);
+  border-color: var(--stage-border-hover);
+  box-shadow: 0 16px 44px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.ventas .project h3 {
+  color: #ffffff;
+}
+
+.ventas .kind {
+  color: var(--stage-muted);
+}
+
+.ventas .description {
+  color: var(--stage-ink);
+}
+
+.ventas .access {
+  color: #ffffff;
+}
+
+.ventas .status {
+  color: var(--stage-muted);
+}
+
+.ventas .project-symbol {
+  background: linear-gradient(135deg, rgba(255, 118, 46, 0.22) 0%, rgba(255, 118, 46, 0.08) 100%);
+  color: #ff9a62;
+  border-color: rgba(255, 118, 46, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 16px rgba(255, 118, 46, 0.15);
+}
+
+.retail .project-symbol {
+  background: linear-gradient(135deg, rgba(47, 116, 255, 0.24) 0%, rgba(138, 181, 255, 0.08) 100%);
+  color: #9cc1ff;
+  border-color: rgba(138, 181, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(47, 116, 255, 0.2);
+}
+
+.ventas .retail:hover {
+  border-color: rgba(138, 181, 255, 0.5);
+}
+
+.ventas .spotlight-glow {
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 118, 46, 0.16), transparent 70%);
+}
+
+.ventas .retail .spotlight-glow {
+  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(138, 181, 255, 0.16), transparent 70%);
+}
+
+.ventas .open {
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 0 0 #ffffff, 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.ventas .open span {
+  color: #e05e19;
+}
+
+.ventas .open:hover {
+  background: #f4f6f8;
+  border-color: #ffffff;
+  box-shadow: inset 0 1px 0 0 #ffffff, 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   Panel de Administración y Permisos
+   ========================================================================== */
+.permissions {
+  margin-top: 54px;
+  padding: 34px 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.permissions::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, #2f74ff 100%);
+}
+
+.permissions h2 {
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.permissions p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  margin-top: 8px;
+}
+
+form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  align-items: end;
+  gap: 14px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  font-family: var(--font-main);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 42px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+select:focus {
+  background: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  outline: none;
+}
+
+form button {
+  background: var(--ink);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 650;
+  min-height: 42px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--shadow-sm);
+  transition: all 0.2s var(--ease-spring);
+}
+
+form button:hover:not(:disabled) {
+  background: #1c2e39;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+form button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+#grants-status {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+/* ==========================================================================
+   Estados Vacíos y Errores
+   ========================================================================== */
+.empty {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 36px 32px;
+  margin-top: 36px;
+  box-shadow: var(--shadow-card);
+}
+
+.empty h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.empty p {
+  font-size: 14.5px;
+  line-height: 1.65;
+  margin-top: 8px;
+  color: var(--ink-2);
+}
+
+.error {
+  color: #dc2626;
+  font-size: 13.5px;
+  font-weight: 550;
+  margin-top: 20px;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding: 32px 0;
+  margin-top: 60px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   Diseño Adaptativo (Responsive)
+   ========================================================================== */
+@media (max-width: 960px) {
+  .project {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px 18px;
+    padding: 22px 20px;
+  }
+  .description, .shortcuts {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .shortcuts {
+    grid-row: 3;
+  }
+  .project-meta {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: right;
+    align-items: flex-end;
+  }
+  .open {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+  .permissions {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .top {
+    height: auto;
+    min-height: 64px;
+    padding: 12px 18px;
+  }
+  .top-actions {
+    gap: 10px;
+  }
+  .top-actions .who {
+    display: none;
+  }
+  .brand img {
+    width: 124px;
+  }
+  main {
+    padding: 32px 16px 20px;
+  }
+  .intro h1 {
+    font-size: 30px;
+  }
+  .group > header {
+    flex-direction: column;
+    gap: 4px;
+  }
+  form {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 24px 0;
+  }
+}
+
+/* Reducción de movimiento para accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .card-glare, .spotlight-glow {
+    display: none !important;
+  }
+}
