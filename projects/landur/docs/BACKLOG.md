@@ -421,66 +421,67 @@ Pasada completa sobre la conexión nueva. Corregido y cubierto con pruebas:
   entrando.
 - Un 429 de Google ya no se informa como «clave inválida».
 
-### Diagnóstico de la planilla (11/11/2026)
+### Desvío de cifras en la demo con el cliente (14/11/2026)
 
-Ante un desfasaje entre la planilla y LANDUR, `node scripts/diagnostico-planilla.mjs <base.sqlite>`
-abre la base **en solo lectura** y muestra: operaciones con origen `sheets` por tipo y moneda
-(venta = no mueve caja, cobro = entra, gasto = sale, comisión), el detalle por mes, posibles
-duplicados (mismo importe y concepto aunque la fecha haya cambiado), referencias de pedido
-repetidas y cobros sin venta. Con `--json` vuelca el detalle para adjuntar a un reporte.
+**Causa:** el importador y su fixture se armaron con una planilla *supuesta* (fechas 8, 9 en todas las
+filas, incluida la mayorista; un «Cancelado» inventado). Las planillas reales del cliente (Drive:
+«Hoja de cálculo sin título» 24/10 y «Fragmento contabilidad Landur» 10/11) son distintas:
 
-### La marca de pago es «Transf.» (11/11/2026)
+- La fecha lleva el mes escrito en la primera fila del tramo («Setiembre 16», «Octubre») y después solo
+  el día. Esa fila se descartaba y las demás caían en el mes configurado. **Corregido:** el mes escrito rige
+  para las filas siguientes (el año sale del mes de la conexión).
+- Serial de fecha con hora: `Math.round` fechaba en el día siguiente. **Corregido** (`Math.floor`).
+- Dos filas idénticas sin Nro. Pedido se fundían en una sin avisar (pérdida silenciosa de venta). **Corregido:**
+  se numeran por orden de aparición. Un Nro. Pedido repetido ahora se avisa siempre.
+- El resultado no permitía conciliar. **Agregado:** `totals` (planilla vs LANDUR) y una línea en la tarjeta
+  de sincronía: «La planilla suma X (n filas) y en LANDUR quedó Y (m filas)».
 
-El cliente confirmó que en su planilla el pago del pedido se marca en la columna **`Transf.`**
-(TRUE/FALSE); `Estado` es logística («Enviado»), no cobro. La importación usaba `Estado` para
-decidir y por eso creaba cobros en pedidos todavía no transferidos: el saldo de la cuenta
-aparecía por encima de la realidad.
+**Decisiones tomadas (14/11/2026) y ya implementadas:**
+- **Mayorista sin día → se fecha el 1 del mes** (el que dice la planilla, «Octubre», o el de la conexión). Sin ningún mes
+  no se inventa nada. El resultado dice cuántas filas quedaron así («N filas sin día, fechadas el 1 del mes»).
+- **Minorista: Material y Envío entran como gasto** de la misma cuenta (categorías «Materiales» y «Envíos»). En la planilla,
+  *Ganancia Bruta = Bruto − MP Fee − Material − Envío*, y con esto el saldo de LANDUR suma lo mismo que esa columna.
+  «No registrar gasto» apaga los dos. «Cuenta Landur» y «Ganancia Neta» NO se corresponden con un saldo: ya descuentan el reparto
+  entre Rafa, Luis y la reinversión, que LANDUR no modela como gasto.
+- **Fila editada, borrada o cancelada después de sincronizar → se revierte y se rehace.** Cambia importe/fecha/comisión/estado:
+  se revierte lo asentado (cobro, material, envío, venta) y se vuelve a registrar. Las operaciones no se borran: la reversión
+  deja la original marcada, y la versión nueva lleva otra referencia externa (`row-X`, `row-X-r2`…, la misma convención que ya usaba el cobro).
+  - Las filas «que faltan» se detectan contra la lectura anterior de la misma planilla y pestaña (`connections.config.imported`,
+    interno: no viaja al navegador). La primera sincronización tras actualizar solo registra la lista; desde la segunda ya detecta borrados.
+  - Salvaguardas: no se revierte nada si alguna fila no se pudo leer en esa pasada; ni si la pestaña perdió más de la mitad de
+    sus filas (y más de 5): se avisa «La planilla perdió N de M filas…» (pestaña equivocada o vaciada por error); ni si la venta
+    tiene un cobro cargado a mano (se avisa y se deja como está).
 
-- Con columna `Transf.`: la fila siempre deja su **venta**; el **cobro** solo si la celda es TRUE.
-  Una celda vacía no es TRUE. Un valor que no se entiende (texto raro) se informa y no cobra.
-- Sin columna `Transf.`: manda `paidStates` y, sin `paidStates`, toda fila con comisión.
-- El material de mayorista no depende de la marca: si el gasto está configurado, se registra.
-- Los cobros ya asentados con la regla anterior **no se borran solos**: se revierten desde la app,
-  con su auditoría, para que el saldo vuelva a coincidir con la planilla.
-  `node scripts/diagnostico-planilla.mjs <base.sqlite> --collections` los lista.
+**Sigue pendiente:**
+- El **saldo inicial (corte) de la cuenta** tiene que ser anterior a la fecha más vieja de la planilla; si no, la venta entra pero
+  el cobro y los gastos se rechazan («anterior al saldo inicial») y el saldo no coincide. Es configuración, no código.
+- Una sola pestaña por conexión: minorista y mayorista necesitan dos pasadas cambiando la pestaña, y al cambiarla no se revierte
+  nada de la otra (la lista de filas es por planilla + pestaña).
+- El año de «Setiembre 16» sale del mes de la conexión: una pestaña que cruza de diciembre a enero fecharía mal el tramo de enero.
 
-### La sincronía reconcilia el cobro con la planilla (11/11/2026)
+**Pruebas:** `tests/integrations.test.mjs` 32/32 (los casos nuevos de fechas, repetidas y conciliación fallan con el código anterior).
+Suite completa 135/138: las 3 que fallan son las de Windows ya documentadas. Con las dos planillas reales del Drive reproducidas
+a mano: minorista 4.380 = 4.380, saldo 2.355 = suma de Ganancia Bruta; mayorista 8.880 = 8.880 y 52.500 = 52.500.
+**No probado:** sincronía real contra Google, la tarjeta de resultado en navegador (`qa-conexiones` no corre: falta playwright-core).
 
-Las cifras de la planilla y de LANDUR no coincidían porque había cobros asentados de pedidos
-que la planilla no marca como transferidos (la regla anterior miraba `Estado`). No alcanza con
-dejar de crearlos: los ya asentados seguían inflando el saldo.
+### Sincronización automática y plantilla nueva (14/11/2026)
 
-- Al sincronizar, si una fila deja de estar transferida (`Transf.` en FALSE o vacía), se
-  **cancela** o pierde la comisión, el cobro asentado se **revierte** con su contra-asiento
-  auditado (la comisión se revierte junto). El resumen lo informa como «cobro revertido».
-- Si la fila vuelve a marcar `Transf.` en TRUE, se registra un cobro nuevo con referencia
-  `…-cobro-r2` (la original queda ocupada por el registro revertido, que no se borra).
-- Revertir no borra nada: el cobro original queda marcado, con su contra-asiento y su entrada
-  en la auditoría. El saldo vuelve a reflejar la planilla.
+Pedido: que la planilla y LANDUR queden sincronizadas solas y en tiempo casi real. Detalle y puesta en marcha en
+[SINCRONIZACION-AUTOMATICA.md](SINCRONIZACION-AUTOMATICA.md).
 
-### Sincronía automática y decisiones de dinero (11/11/2026)
+- **Aviso de la planilla → sincronía.** `POST /landur/api/hooks/sync` (solo portal), con token (`LANDUR_SYNC_TOKEN`, 32+ caracteres;
+  sin él la ruta no existe). No lleva sesión ni `Origin`: es la única excepción al chequeo de origen de `main.mjs`, y se autentica con
+  el token (comparación en tiempo constante, 20 intentos fallidos por minuto). Responde 202 enseguida; `?wait=1` devuelve el resultado.
+- **Motor** `server/auto-sync.mjs`: junta avisos seguidos, mínimo 15 s entre corridas, nunca dos a la vez (también entre botón, aviso y reloj:
+  `createIntegrations` comparte la corrida en curso), una falla no tumba nada y se asienta una vez por mensaje distinto.
+- **Reloj interno** de respaldo (`LANDUR_SYNC_MINUTES`, 5 por defecto, 0 lo apaga). Passenger puede apagar el proceso: el disparo confiable
+  es el Apps Script de la planilla (al editar, al agregar/borrar filas y un latido cada 5 min), que además lo despierta.
+- **Plantilla** `docs/plantilla/` (también en Drive: «LANDUR · Ventas (plantilla sincronizable)»): superconjunto del formato del dueño. Fecha real
+  obligatoria, Nro. Pedido único, listas cerradas, una sola pestaña para minorista y mayorista, MP Neto y Ganancia Bruta como fórmulas.
+  `Transf.` TRUE = el dinero llegó (decide el cobro); `MP Fee` 0 = sin comisión. Una prueba lee los encabezados del generador y los pasa por el importador.
+- Una fila totalmente vacía (fórmulas pre-armadas) ya no cuenta como «sin importe».
 
-- **Las conexiones se sincronizan solas** cada 15 minutos en el portal (`LANDUR_SYNC_MINUTES`,
-  `0` apaga): el motor arranca el temporizador al inicializarse y hace una primera pasada.
-  Sólo sincroniza lo configurado y lo vencido (`lastSync`), así dos procesos no repiten la
-  misma consulta; un error en una conexión no frena las demás y queda en el registro.
-- **Shopify dejó de descontar comisión**: el cobro se registra por el total de la orden. El
-  ajuste real se hace después; inventar un descuento dejaría el saldo por debajo de la realidad.
-- **Ventas eliminadas**: si una venta se revirtió y la planilla todavía tiene la fila, la
-  sincronía la cuenta como `eliminadas` y **no la rehace sola**. La app pregunta «¿Querés
-  agregarlas también?» y sólo con la respuesta se vuelve a registrar, con referencia
-  `…-r2` y, si corresponde, su cobro y su material.
-
-### Borrado en bloque de los cobros de la planilla (11/11/2026)
-
-Los cobros que trajo la planilla se podían revertir de a uno; corregir un lote entero obligaba
-a repetir el gesto decenas de veces. En la ficha de la conexión de la planilla hay un
-desplegable «Borrar cobros de la planilla (N)»:
-
-- Muestra cuántos son y por cuánto antes de hacer nada.
-- Pide confirmación nominal (`confirm` + escribir **BORRAR**) y el servidor vuelve a exigir la
-  palabra en el comando: no se borra dinero por un clic repetido ni por una llamada suelta.
-- Borra los cobros **vigentes** de origen `sheets` con su comisión, deja las ventas pendientes
-  de cobro y registra en la auditoría el detalle completo (operaciones, asientos, aplicaciones,
-  comprobantes) antes de eliminar las filas.
-- No toca cobros manuales ni de otras conexiones.
+**Pruebas:** `auto-sync.test.mjs` (7, sin esperas fijas), `tests/landur-hook.test.mjs` (4, portal con token) y la de la plantilla.
+Raíz 104/104; Landur 143/146 (las 3 de Windows de siempre).
+**Falta (necesita el servidor real):** definir `LANDUR_SYNC_TOKEN` en cPanel y reiniciar; pegar el Apps Script en la planilla y ejecutar
+`configurar()` + `instalar()`; compartir la planilla con la cuenta de servicio; una sincronía real contra Google (nada se probó contra Google real).

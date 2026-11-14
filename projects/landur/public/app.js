@@ -329,7 +329,7 @@ function connectionForm(kind){
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto'], revertidas:['cobro revertido (la planilla no lo marca transferido)','cobros revertidos (la planilla no los marca transferidos)'], eliminadas:['venta eliminada (sigue en la planilla)','ventas eliminadas (siguen en la planilla)']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], sinEnvio:['sin gasto de envío','sin gasto de envío'], eliminadas:['venta eliminada (sigue en la planilla)','ventas eliminadas (siguen en la planilla)'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
@@ -352,15 +352,32 @@ function connectionStatus(kind){
     const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${(SKIP_LABELS[name] || [name, name])[value === 1 ? 0 : 1]}`);
     const when = ui.at.toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit', hour12:false});
     const period = summary.since && summary.until ? `${dateFmt(String(summary.since).slice(0,10))} al ${dateFmt(String(summary.until).slice(0,10))} · ` : '';
+    // Planilla contra LANDUR: lo que la hoja suma en «Bruto» y lo que quedó asentado como venta.
+    // Si difieren, se dice acá con las dos cifras; el motivo está en los avisos y en lo omitido.
+    const t = kind === 'sheets' ? summary.totals : null, cur = current.currency;
+    const rows = n => `${n} ${n === 1 ? 'fila' : 'filas'}`;
+    const mismatch = Boolean(t) && !(t.sheetCents === t.appCents && t.sheetRows === t.appRows);
+    const reverted = (summary.reverted || []).length, approx = summary.approxDates || 0;
+    // Lo que cambió en la planilla desde la última vez (editado, borrado, cancelado) se revierte: se dice cuánto.
+    const changes = [
+      reverted ? `${reverted} ${reverted === 1 ? 'registro revertido' : 'registros revertidos'} por cambios en la planilla` : '',
+      approx ? `${approx} ${approx === 1 ? 'fila sin día, fechada' : 'filas sin día, fechadas'} el 1 del mes` : ''
+    ].filter(Boolean);
+    const recon = !t ? '' : !mismatch
+      ? `Coincide con la planilla: ${fmt(t.sheetCents, cur)} en ${rows(t.sheetRows)}.`
+      : `La planilla suma ${fmt(t.sheetCents, cur)} (${rows(t.sheetRows)}) y en LANDUR quedó ${fmt(t.appCents, cur)} (${rows(t.appRows)}). Revisá los avisos.`;
+    const tone = mismatch ? 'warn' : 'ok';
     // Ventas que se eliminaron y la planilla todavía tiene: no se rehacen solas, se preguntan.
     const eliminated = (summary.skipped || {}).eliminadas || 0;
     const ask = eliminated && !ui.restore ? `<div class="cx-ask"><p>La planilla tiene ${eliminated} ${eliminated === 1 ? 'venta que eliminaste' : 'ventas que eliminaste'}. ¿Querés agregarlas también?</p><div class="cx-ask-actions"><button type="button" class="primary" data-connection-restore="${kind}">Sí, agregarlas</button><button type="button" class="secondary" data-connection-dismiss="${kind}">No, dejarlas</button></div></div>` : '';
-    if (!created.length) {
+    if (!created.length && !reverted) {
       const dup = (summary.skipped || {}).duplicadas;
       const note = kind === 'meta' ? ' El día en curso no está consolidado en Meta: se carga hasta ayer.' : '';
-      return card('ok', 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}`) + ask, syncBtn('Sincronizar de nuevo', 'secondary'));
+      return card(tone, 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}${approx ? ' ' + changes.join('. ') + '.' : ''}${recon ? ' ' + recon : ''}`) + ask, syncBtn('Sincronizar de nuevo', 'secondary'));
     }
-    return card('ok', 'check', `<div class="cx-result"><div class="big">${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div>${ask}</div>`, syncBtn('Sincronizar de nuevo'));
+    const big = created.length ? `${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}` : `${reverted} ${reverted === 1 ? 'registro revertido' : 'registros revertidos'}`;
+    const extra = created.length ? changes : changes.slice(1);
+    return card(tone, 'check', `<div class="cx-result"><div class="big">${big}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${extra.length ? `<div class="mut">${extra.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}${recon ? `<div class="mut">${recon}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div>${ask}</div>`, syncBtn('Sincronizar de nuevo'));
   }
   if (!current.lastSync) return card('ok', 'check', head('check', 'Conectado', `Todavía no sincronizaste. ${connectionKinds[kind].blurb}`), syncBtn('Sincronizar ahora'));
   if (connStale(current)) return card('warn', 'alert', head('alert', `Sin sincronizar ${ago(current.lastSync)}`, `Última sincronía el ${dateFmt(current.lastSync.slice(0,10))}.`), syncBtn('Sincronizar ahora'));

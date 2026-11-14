@@ -109,8 +109,8 @@ async function readPayload(req,{form,limit}){
   try{return {json:JSON.parse(text)};}
   catch{return {error:json({error:'JSON inválido.'},400)};}
 }
-export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('../projects/landur/',import.meta.url)),session}) {
-  let initialized,ledger;
+export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('../projects/landur/',import.meta.url)),session,env=process.env,fetchImpl}) {
+  let initialized,ledger,auto;
   const root=resolve(projectRoot);
   async function engine() {
     if(!initialized)initialized=(async()=>{
@@ -123,22 +123,22 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       const {exportOperations}=await import(pathToFileURL(resolve(root,'server/csv.mjs')));
       const {createRateLimiter}=await import(pathToFileURL(resolve(root,'server/limits.mjs')));
       const {createIntegrations}=await import(pathToFileURL(resolve(root,'server/integrations.mjs')));
+      const {createAutoSync,syncIntervalMs,tokenMatches}=await import(pathToFileURL(resolve(root,'server/auto-sync.mjs')));
       await mkdir(directory,{recursive:true,mode:0o700});
       const filename=resolve(directory,'landur.sqlite');
       ledger=new Ledger(filename);await chmod(filename,0o600);ledger.workspace('landur');
-      const connections=createIntegrations();
-      // Las conexiones se sincronizan solas: la planilla y la tienda no esperan a que alguien
-      // abra la app. `LANDUR_SYNC_MINUTES=0` apaga el temporizador.
-      const {createAutoSync}=await import(pathToFileURL(resolve(root,'server/auto-sync.mjs')));
-      const autoSync=createAutoSync({ledger,connections,workspace:'landur',minutes:Number(process.env.LANDUR_SYNC_MINUTES??15)});
-      autoSync.start();
-      autoSync.tick().catch(()=>{});
-      return {ledger,exportOperations,connections,autoSync,limiter:createRateLimiter({limit:30,windowMs:60*1000}),
+      // Sincronía automática de la planilla: el aviso de la propia planilla (ruta con token) y un reloj
+      // interno de respaldo. Passenger puede apagar el proceso, así que el aviso externo es el confiable.
+      const connections=createIntegrations(fetchImpl?{fetchImpl}:{});
+      auto=createAutoSync({ledger,workspace:'landur',connections,everyMs:syncIntervalMs(env.LANDUR_SYNC_MINUTES)});
+      auto.start();
+      auto.tick().catch(()=>{});
+      return {ledger,exportOperations,connections,auto,tokenMatches,hookLimiter:createRateLimiter({limit:20,windowMs:60*1000}),limiter:createRateLimiter({limit:30,windowMs:60*1000}),
         // Todo comando cuenta contra un tope por usuario: sin esto una sesión válida podía
         // escribir sin límite y hacer crecer la base y la tabla de idempotencia.
         commandLimiter:createRateLimiter({limit:120,windowMs:60*1000}),
         reauthLimiter:createRateLimiter({limit:5,windowMs:15*60*1000})};
-    })().catch(error=>{ledger?.close();ledger=undefined;initialized=undefined;throw error;});
+    })().catch(error=>{auto?.stop();auto=undefined;ledger?.close();ledger=undefined;initialized=undefined;throw error;});
     return initialized;
   }
   // Una sola salida de error para todo el portal. Antes solo el tramo de API la tenía: lo que
@@ -154,8 +154,30 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     // sin duplicar, y eso es lo que se le indica.
     return json({error:`LANDUR no pudo completar la solicitud (referencia ${reference}). No se confirmó el cambio: volvé a intentar y, si ya se había registrado, no se duplica.`},503);
   };
+  // Aviso de la planilla (Apps Script) y cron externo: no llevan sesión ni `Origin`, llevan un token
+  // compartido (LANDUR_SYNC_TOKEN, 32 caracteres o más). Sin token configurado la ruta no existe.
+  // Responde enseguida (202) y la sincronía corre aparte; con `?wait=1` espera el resultado (hasta 25 s).
+  async function hook(req) {
+    const token=String(env.LANDUR_SYNC_TOKEN??'');
+    if(token.length<32)return json({error:'Ruta no encontrada.'},404);
+    if(req.method!=='POST')return json({error:'Método no admitido.'},405);
+    const {auto,tokenMatches,hookLimiter}=await engine();
+    const bearer=/^Bearer\s+(.+)$/i.exec(req.headers.get('authorization')||'')?.[1];
+    if(!tokenMatches(token,String(bearer??req.headers.get('x-landur-token')??'').trim())){
+      // Un tope por minuto a los intentos fallidos: la ruta no sirve para adivinar el token.
+      hookLimiter.check('hook');
+      return json({error:'Token no válido.'},401);
+    }
+    const run=auto.trigger('webhook');
+    if(new URL(req.url).searchParams.get('wait')!=='1'){run.catch(()=>{});return json({accepted:true,...auto.status()},202);}
+    let timer;
+    const result=await Promise.race([run,new Promise(done=>{timer=setTimeout(()=>done({timeout:true}),25000);})]);
+    clearTimeout(timer);
+    return json({accepted:true,result,...auto.status()});
+  }
   async function route(req,user,ip) {
     const url=new URL(req.url),method=req.method;
+    if(url.pathname==='/landur/api/hooks/sync')return hook(req);
     // Ninguna escritura sin el origen correcto, ni siquiera el ingreso: un formulario de otro
     // sitio no debe poder iniciar sesión en nombre de un visitante.
     if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{base:url.origin}))return json(rejectOrigin(req,url.pathname,ip),403);
@@ -289,6 +311,6 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       return failure(error,{path:req?.url,actor:user?.id??null});
     }
   }
-  handler.close=()=>{ledger?.close();ledger=undefined;initialized=undefined;};
+  handler.close=()=>{auto?.stop();auto=undefined;ledger?.close();ledger=undefined;initialized=undefined;};
   return handler;
 }
