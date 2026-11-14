@@ -33,7 +33,8 @@ const studio=createStudio({dir:path.join(root,'projects/studio/public'),access:u
 const retail=createProjectSite({dir:path.join(root,'projects/rivect-retail/public'),access:u=>projectAccess(u,'retail'),mount:'/retail'});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
- if(!['GET','HEAD'].includes(method)&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
+ // El aviso de la planilla no es un navegador: no manda `Origin`. Se autentica con su token en landur.mjs.
+ if(!['GET','HEAD'].includes(method)&&p!=='/landur/api/hooks/sync'&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
  if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});

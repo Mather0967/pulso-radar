@@ -43,12 +43,15 @@ export const serviceAccountJson = JSON.stringify({
   private_key: serviceAccountKey,
 });
 
+// Una prueba puede reemplazar el contenido de una pestaña entre dos sincronías (la planilla del cliente cambia).
+export const sheetEdits = {};
+
 export const SHEET_ID = 'SHEET_QA_1234567890abcdefghij';
 
 // Encabezado exacto de la pestaña minorista del Excel del cliente, incluidas las dos
 // columnas «Transf.» repetidas. Solo se leen las columnas que la importación entiende.
 export const MINORISTA_HEADER = ['Fecha','Cliente','Canal','Nro. Pedido','Metodo de pago','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto','Material','Envío','Metodo de Envío','Pago del envio','Ganancia Bruta','Reinversion','Retention Ratio','Cuenta Landur','Transf.','Ganancia Neta','Rafa','Luis','Transf. reparto'];
-const MINORISTA_ROWS = [
+export const MINORISTA_ROWS = [
   MINORISTA_HEADER,
   [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80,190,'Ues','Cliente',599,360,0.6,630,false,239,239,'',false],
   [9,'Patricia Martinez','Web','#1276','MP','1 Set Decantador Mundo',1,'Enviado',1680,174,1506,730,190,'Ues','Cliente',586,352,0.6,1272,false,234,234,'',false],
@@ -81,7 +84,43 @@ const ESTADO_ROWS = [
   [10,'Beto Pendiente','#2002','1 lámpara',1,'Pendiente',500,50,450],
 ];
 
-async function fakeFetch(url, options = {}) {
+// Forma REAL de la planilla «Hoja de cálculo sin título» del cliente (Drive, 24/10): una fila de título
+// combinado arriba, el mes escrito en la primera fecha («Setiembre 16») y después solo el día.
+const SETIEMBRE_ROWS = [
+  ['Pedidos y entradas'],
+  MINORISTA_HEADER,
+  ['Setiembre 16','Milton Guevara','Instagram','IG0001','Efectivo','1 Ilumimate1 caja (Negro)',1,'Enviado',390,0,390,40,0,'Retiro','Nadie',350,175,0.5,215,false,175,175,0,false],
+  [16,'Adrian Pinazo Bermudez','Web','#1112','MP','1 Ilumimate1 caja (Negro)',1,'Enviado',650,68,582,40,260,'Ues','Cliente',282,141,0.5,441,false,141,141,0,false],
+  [17,'Francisco Ruiz','Web','#1115','MP','2 ilumimate1 caja (Verde)',2,'Enviado',970,101,869,80,190,'Ues','Cliente',599,300,0.5,570,false,299,299,0,false],
+  // Una venta cancelada que además abre el tramo de octubre: su mes rige para las filas de abajo.
+  ['Octubre 2','Ana Cancelada','Web','#1200','MP','1 lámpara',1,'Cancelado',500,50,450],
+  [3,'Beto Octubre','Web','#1201','MP','1 lámpara',1,'Enviado',700,70,630],
+];
+
+// Pestaña mayorista tal cual está en «Fragmento contabilidad Landur» (10/11): la columna Fecha está vacía.
+const SIN_FECHA_ROWS = [
+  MAYORISTA_HEADER,
+  ['','Mateico','Ilumimate placa',30,2940,750,825],
+  ['','Vale Vieira','Deadpool Joystick',1,840,555,611],
+];
+
+// Filas que no deben perderse ni fundirse sin aviso: dos ventas idénticas sin Nro. Pedido (son dos
+// ventas) y un Nro. Pedido repetido con el mismo importe (es un error de la planilla: se avisa).
+const REPETIDAS_ROWS = [
+  ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto'],
+  [9,'Mateico','','1 caja',30,'Enviado',5100,0,5100],
+  [9,'Mateico','','1 caja',30,'Enviado',5100,0,5100],
+  [9,'Ana','#3001','1 lámpara',1,'Enviado',800,80,720],
+  [9,'Ana','#3001','1 lámpara',1,'Enviado',800,80,720],
+];
+
+// Fecha como celda de fecha y hora (la parte decimal es la hora: 46000.75 = 18:00 del día 46000).
+const CON_HORA_ROWS = [
+  ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto'],
+  [46000.75,'Tarde','#4001','1 lámpara',1,'Enviado',100],
+];
+
+export async function fakeFetch(url, options = {}) {
   const href = String(url);
   const respond = (body, headers = {}) => new Response(JSON.stringify(body), {status: 200, headers});
   if (href.startsWith(accountUrl)) {
@@ -115,6 +154,12 @@ async function fakeFetch(url, options = {}) {
     // Pestaña que no se compartió con la cuenta de servicio.
     if (href.includes('privada'))
       return new Response(JSON.stringify({error: {message: 'The caller does not have permission'}}), {status: 403});
+    const tabName = decodeURIComponent(href).match(/'([^']+)'!A1/)?.[1];
+    if (sheetEdits[tabName]) return respond({values: sheetEdits[tabName]});
+    if (href.includes('setiembre')) return respond({values: SETIEMBRE_ROWS});
+    if (href.includes('conhora')) return respond({values: CON_HORA_ROWS});
+    if (href.includes('sinfecha'))return respond({values: SIN_FECHA_ROWS});
+    if (href.includes('repetidas')) return respond({values: REPETIDAS_ROWS});
     if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
     if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});

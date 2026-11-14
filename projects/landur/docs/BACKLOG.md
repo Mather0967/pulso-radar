@@ -420,3 +420,68 @@ Pasada completa sobre la conexión nueva. Corregido y cubierto con pruebas:
 - Si la cuenta elegida para la conexión fue eliminada, se avisa una vez y las ventas siguen
   entrando.
 - Un 429 de Google ya no se informa como «clave inválida».
+
+### Desvío de cifras en la demo con el cliente (14/11/2026)
+
+**Causa:** el importador y su fixture se armaron con una planilla *supuesta* (fechas 8, 9 en todas las
+filas, incluida la mayorista; un «Cancelado» inventado). Las planillas reales del cliente (Drive:
+«Hoja de cálculo sin título» 24/10 y «Fragmento contabilidad Landur» 10/11) son distintas:
+
+- La fecha lleva el mes escrito en la primera fila del tramo («Setiembre 16», «Octubre») y después solo
+  el día. Esa fila se descartaba y las demás caían en el mes configurado. **Corregido:** el mes escrito rige
+  para las filas siguientes (el año sale del mes de la conexión).
+- Serial de fecha con hora: `Math.round` fechaba en el día siguiente. **Corregido** (`Math.floor`).
+- Dos filas idénticas sin Nro. Pedido se fundían en una sin avisar (pérdida silenciosa de venta). **Corregido:**
+  se numeran por orden de aparición. Un Nro. Pedido repetido ahora se avisa siempre.
+- El resultado no permitía conciliar. **Agregado:** `totals` (planilla vs LANDUR) y una línea en la tarjeta
+  de sincronía: «La planilla suma X (n filas) y en LANDUR quedó Y (m filas)».
+
+**Decisiones tomadas (14/11/2026) y ya implementadas:**
+- **Mayorista sin día → se fecha el 1 del mes** (el que dice la planilla, «Octubre», o el de la conexión). Sin ningún mes
+  no se inventa nada. El resultado dice cuántas filas quedaron así («N filas sin día, fechadas el 1 del mes»).
+- **Minorista: Material y Envío entran como gasto** de la misma cuenta (categorías «Materiales» y «Envíos»). En la planilla,
+  *Ganancia Bruta = Bruto − MP Fee − Material − Envío*, y con esto el saldo de LANDUR suma lo mismo que esa columna.
+  «No registrar gasto» apaga los dos. «Cuenta Landur» y «Ganancia Neta» NO se corresponden con un saldo: ya descuentan el reparto
+  entre Rafa, Luis y la reinversión, que LANDUR no modela como gasto.
+- **Fila editada, borrada o cancelada después de sincronizar → se revierte y se rehace.** Cambia importe/fecha/comisión/estado:
+  se revierte lo asentado (cobro, material, envío, venta) y se vuelve a registrar. Las operaciones no se borran: la reversión
+  deja la original marcada, y la versión nueva lleva otra referencia externa (`row-X`, `row-X~2`…).
+  - Las filas «que faltan» se detectan contra la lectura anterior de la misma planilla y pestaña (`connections.config.imported`,
+    interno: no viaja al navegador). La primera sincronización tras actualizar solo registra la lista; desde la segunda ya detecta borrados.
+  - Salvaguardas: no se revierte nada si alguna fila no se pudo leer en esa pasada; ni si la pestaña perdió más de la mitad de
+    sus filas (y más de 5): se avisa «La planilla perdió N de M filas…» (pestaña equivocada o vaciada por error); ni si la venta
+    tiene un cobro cargado a mano (se avisa y se deja como está).
+
+**Sigue pendiente:**
+- El **saldo inicial (corte) de la cuenta** tiene que ser anterior a la fecha más vieja de la planilla; si no, la venta entra pero
+  el cobro y los gastos se rechazan («anterior al saldo inicial») y el saldo no coincide. Es configuración, no código.
+- Una sola pestaña por conexión: minorista y mayorista necesitan dos pasadas cambiando la pestaña, y al cambiarla no se revierte
+  nada de la otra (la lista de filas es por planilla + pestaña).
+- El año de «Setiembre 16» sale del mes de la conexión: una pestaña que cruza de diciembre a enero fecharía mal el tramo de enero.
+
+**Pruebas:** `tests/integrations.test.mjs` 32/32 (los casos nuevos de fechas, repetidas y conciliación fallan con el código anterior).
+Suite completa 135/138: las 3 que fallan son las de Windows ya documentadas. Con las dos planillas reales del Drive reproducidas
+a mano: minorista 4.380 = 4.380, saldo 2.355 = suma de Ganancia Bruta; mayorista 8.880 = 8.880 y 52.500 = 52.500.
+**No probado:** sincronía real contra Google, la tarjeta de resultado en navegador (`qa-conexiones` no corre: falta playwright-core).
+
+### Sincronización automática y plantilla nueva (14/11/2026)
+
+Pedido: que la planilla y LANDUR queden sincronizadas solas y en tiempo casi real. Detalle y puesta en marcha en
+[SINCRONIZACION-AUTOMATICA.md](SINCRONIZACION-AUTOMATICA.md).
+
+- **Aviso de la planilla → sincronía.** `POST /landur/api/hooks/sync` (solo portal), con token (`LANDUR_SYNC_TOKEN`, 32+ caracteres;
+  sin él la ruta no existe). No lleva sesión ni `Origin`: es la única excepción al chequeo de origen de `main.mjs`, y se autentica con
+  el token (comparación en tiempo constante, 20 intentos fallidos por minuto). Responde 202 enseguida; `?wait=1` devuelve el resultado.
+- **Motor** `server/auto-sync.mjs`: junta avisos seguidos, mínimo 15 s entre corridas, nunca dos a la vez (también entre botón, aviso y reloj:
+  `createIntegrations` comparte la corrida en curso), una falla no tumba nada y se asienta una vez por mensaje distinto.
+- **Reloj interno** de respaldo (`LANDUR_SYNC_MINUTES`, 5 por defecto, 0 lo apaga). Passenger puede apagar el proceso: el disparo confiable
+  es el Apps Script de la planilla (al editar, al agregar/borrar filas y un latido cada 5 min), que además lo despierta.
+- **Plantilla** `docs/plantilla/` (también en Drive: «LANDUR · Ventas (plantilla sincronizable)»): superconjunto del formato del dueño. Fecha real
+  obligatoria, Nro. Pedido único, listas cerradas, una sola pestaña para minorista y mayorista, MP Neto y Ganancia Bruta como fórmulas.
+  `MP Fee` vacío = vendida y sin cobrar; 0 = cobrada sin comisión. Una prueba lee los encabezados del generador y los pasa por el importador.
+- Una fila totalmente vacía (fórmulas pre-armadas) ya no cuenta como «sin importe».
+
+**Pruebas:** `auto-sync.test.mjs` (7, sin esperas fijas), `tests/landur-hook.test.mjs` (4, portal con token) y la de la plantilla.
+Raíz 104/104; Landur 143/146 (las 3 de Windows de siempre).
+**Falta (necesita el servidor real):** definir `LANDUR_SYNC_TOKEN` en cPanel y reiniciar; pegar el Apps Script en la planilla y ejecutar
+`configurar()` + `instalar()`; compartir la planilla con la cuenta de servicio; una sincronía real contra Google (nada se probó contra Google real).
