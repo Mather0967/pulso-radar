@@ -383,8 +383,12 @@ function connectionDetail(kind){
     + (kind === 'sheets' && connected ? kv('Cobra con', current.paidStates || 'toda fila con comisión') : '')
     + (kind === 'sheets' && connected ? kv('Material', current.materialColumn === 'none' ? 'No se registra' : current.materialColumn === 'plus10' ? 'Material + 10 %' : 'Material Real') : '')
     + kv(kind === 'sheets' ? 'Clave' : 'Token', kind === 'sheets' ? current.keyMask : current.tokenMask);
+  // Borrado en bloque de lo que trajo la planilla: explícito, con palabra de confirmación y
+  // constancia en la auditoría. Las ventas quedan pendientes de cobro.
+  const sheetCobros = kind === 'sheets' ? state.operations.filter(o => o.kind === 'collection' && o.source === 'sheets' && !o.reversed_by) : [];
+  const purge = sheetCobros.length ? `<details class="cx-danger"><summary class="cx-help">Borrar cobros de la planilla (${sheetCobros.length})</summary><p>Se borran de la base de datos y de la página los ${sheetCobros.length} cobros que trajo la planilla (${fmt(sheetCobros.reduce((sum, o) => sum + o.amount, 0), sheetCobros[0].currency)}), con sus comisiones. Las ventas quedan pendientes de cobro y el saldo se corrige. Queda constancia en la auditoría.</p><button type="button" class="secondary" data-collections-delete="sheets" ${state.access !== 'viewer' ? '' : 'disabled'}>Borrar los ${sheetCobros.length} cobros</button></details>` : '';
   return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button>${pill(tone[1], tone[0])}</div>
-    ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>
+    ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>${purge}
       <details class="cx-edit" data-connection-details ${ui.edit ? 'open' : ''}><summary class="cx-help">Editar conexión <span aria-hidden="true">⌄</span></summary>${connectionForm(kind)}</details>`
     : ''}`;
 }
@@ -504,6 +508,20 @@ function wireConnections(){
     const open = event.target.closest('[data-connection-open]');
     if (open) { showConnections(open.getAttribute('data-connection-open')); return; }
     if (event.target.closest('[data-connection-back]')) { showConnections(''); return; }
+    if (event.target.closest('[data-collections-delete]')) {
+      const list = state.operations.filter(o => o.kind === 'collection' && o.source === 'sheets' && !o.reversed_by);
+      if (!list.length) return;
+      const total = list.reduce((sum, o) => sum + o.amount, 0), currency = list[0].currency;
+      if (!confirm(`Se van a borrar ${list.length} ${list.length === 1 ? 'cobro' : 'cobros'} de la planilla por ${fmt(total, currency)}, con sus comisiones. El saldo se corrige y las ventas quedan pendientes de cobro. Desaparecen de la base y de la página; queda constancia en la auditoría. ¿Continuás?`)) return;
+      if (String(prompt('Escribí BORRAR para confirmar el borrado de los cobros de la planilla.') || '').trim().toUpperCase() !== 'BORRAR') { toast('No se borró nada.'); return; }
+      try {
+        const done = await api('/api/commands', {kind: 'collections.delete', source: 'sheets', confirm: 'BORRAR'});
+        await refresh();
+        await loadConnections('sheets');
+        toast(`Se borraron ${done.deleted} ${done.deleted === 1 ? 'cobro' : 'cobros'} de la planilla.`);
+      } catch (error) { toast(error.message); }
+      return;
+    }
     if (event.target.closest('[data-connection-prev]')) {
       const ui = connUiOf(connView), form = $('form[data-wizard]');
       if (form) ui.draft = {...ui.draft, ...Object.fromEntries(new FormData(form).entries())};

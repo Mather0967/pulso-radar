@@ -144,3 +144,12 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
 - **Shopify entra por el total.** La comisión no se estima: el ajuste es posterior y manual.
 - **Nada se rehace en silencio.** Lo recuperado queda como registro nuevo con referencia
   `…-r2`, y el original revertido sigue visible con su contra-asiento.
+
+### Borrar en bloque exige una decisión explícita (11/11/2026)
+
+- **La acción destructiva no vive al alcance del pulgar:** está detrás de un desplegable en la
+  ficha de la conexión, con el número y el importe a la vista.
+- **La confirmación viaja al servidor.** El comando `collections.delete` rechaza cualquier
+  llamada sin `confirm: "BORRAR"`, aunque salte la interfaz.
+- **Se borra, pero no en silencio:** la auditoría guarda el detalle de lo eliminado. Una venta
+  sin cobro queda pendiente, nunca desaparece.

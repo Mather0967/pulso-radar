@@ -470,3 +470,17 @@ dejar de crearlos: los ya asentados seguían inflando el saldo.
   sincronía la cuenta como `eliminadas` y **no la rehace sola**. La app pregunta «¿Querés
   agregarlas también?» y sólo con la respuesta se vuelve a registrar, con referencia
   `…-r2` y, si corresponde, su cobro y su material.
+
+### Borrado en bloque de los cobros de la planilla (11/11/2026)
+
+Los cobros que trajo la planilla se podían revertir de a uno; corregir un lote entero obligaba
+a repetir el gesto decenas de veces. En la ficha de la conexión de la planilla hay un
+desplegable «Borrar cobros de la planilla (N)»:
+
+- Muestra cuántos son y por cuánto antes de hacer nada.
+- Pide confirmación nominal (`confirm` + escribir **BORRAR**) y el servidor vuelve a exigir la
+  palabra en el comando: no se borra dinero por un clic repetido ni por una llamada suelta.
+- Borra los cobros **vigentes** de origen `sheets` con su comisión, deja las ventas pendientes
+  de cobro y registra en la auditoría el detalle completo (operaciones, asientos, aplicaciones,
+  comprobantes) antes de eliminar las filas.
+- No toca cobros manuales ni de otras conexiones.

@@ -510,6 +510,23 @@ export class Ledger {
       this.db.prepare('DELETE FROM accounts WHERE workspace=? AND id=?').run(workspace, account.id);
       return { id: account.id };
     }
+    // Borrar en bloque los cobros de un origen (hoy la planilla). No es una reversión: el
+    // asiento desaparece de la base y de la página, con su comisión, y el detalle completo
+    // queda en la auditoría. Se exige la palabra de confirmación en el propio comando para
+    // que no se borre dinero por accidente ni por un clic repetido.
+    if (kind === 'collections.delete') {
+      const source = input.source === undefined ? 'sheets' : text(input.source, 'Origen', 60);
+      if (String(input.confirm ?? '').trim().toUpperCase() !== 'BORRAR')
+        throw new DomainError('Para borrar cobros en bloque escribí BORRAR en la confirmación.', 400);
+      const rows = this.db.prepare("SELECT id, amount, currency FROM operations WHERE workspace=? AND kind='collection' AND reversed_by IS NULL AND source=?").all(workspace, source);
+      if (!rows.length) return { deleted: 0, total: 0, currency: null };
+      // La comisión nació de ese cobro: si se borra el cobro, la comisión no puede quedar suelta.
+      const ids = new Set(rows.map(row => row.id));
+      for (const row of rows)
+        for (const extra of this.db.prepare("SELECT id FROM operations WHERE workspace=? AND related_id=? AND kind='commission'").all(workspace, row.id)) ids.add(extra.id);
+      const removed = this.deleteOperations(workspace, actor, ids, 'collections.deleted');
+      return { deleted: rows.length, operations: removed.operations, total: rows.reduce((sum, row) => sum + row.amount, 0), currency: rows[0].currency };
+    }
     if (kind === 'evidence.remove') {
       const evidenceId = String(input.evidenceId ?? '');
       const entry = this.db.prepare('SELECT id,name,operation,sha256 FROM evidence WHERE workspace=? AND id=?').get(workspace, evidenceId);
