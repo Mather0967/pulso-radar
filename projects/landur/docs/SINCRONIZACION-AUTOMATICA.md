@@ -34,6 +34,26 @@ sincronizar un aviso.
    (también está en la pestaña «Instrucciones»). Poner la URL real y el token en `configurar()` y ejecutarla;
    después ejecutar `instalar()` y aceptar los permisos. Borrar el token del código.
 
+## La planilla definitiva y su traspaso a Rafa
+
+La planilla de Drive «LANDUR · Ventas (planilla sincronizable)» ya trae todos los datos disponibles (20 ventas: minorista de
+septiembre y noviembre y mayorista de octubre y noviembre). Pestañas: **Ventas** (lo que lee LANDUR), **Resumen** (qué tiene que
+mostrar LANDUR: ventas, gastos y saldo), **Importar con IA** (texto para pegarle a una IA y cargar los datos reales) e
+**Instrucciones**. En Ventas las columnas que se escriben van contiguas (A a P) y las fórmulas al final (`MP Neto`,
+`Ganancia Bruta`, `Control`), así pegar una tabla nunca pisa una fórmula; `Control` dice OK por fila.
+
+Las filas con Notas «Provisorio» (la mayorista, que no trae día ni número de pedido) son datos de muestra: Rafa las reemplaza
+por las reales. Borrar o corregir una fila no rompe nada: LANDUR revierte lo suyo.
+
+**Para entregarla** (quien administra LANDUR, una sola vez, antes de transferirla):
+1. Compartirla con la cuenta de servicio de Google (lector). El permiso **sobrevive** al cambio de dueño.
+2. En LANDUR: conexión de Sheets con pestaña `Ventas`, mes vacío, la cuenta y la cuenta de servicio.
+3. Transferir la propiedad a Rafa (Compartir → su correo → «Transferir propiedad»).
+
+Después del traspaso no hay que tocar nada en LANDUR ni recargar datos: la conexión apunta a la planilla, no a su dueño, y LANDUR la
+lee solo cada `LANDUR_SYNC_MINUTES`. Lo único que no se traspasa es el **Apps Script opcional** (tiempo real): sus disparadores
+quedan a nombre de quien los instaló, así que si se usa, Rafa ejecuta `instalar()` una vez.
+
 ## Con el formato actual de la planilla de Rafa (sin pedirle nada)
 
 LANDUR lee su planilla tal cual está; no hace falta que cambie ninguna columna ni que instale nada:
