@@ -16,14 +16,16 @@ const sales = ledger => ledger.snapshot('landur').operations.filter(o => o.kind 
 test('auto: dos avisos a la vez comparten la misma corrida y no duplican nada', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
-  const auto = createAutoSync({ledger, workspace: 'landur', connections, minGapMs: 40});
+  const auto = createAutoSync({ledger, workspace: 'landur', connections, minGapMs: 400});
   const [a, b] = await Promise.all([auto.trigger('webhook'), auto.trigger('reloj')]);
   assert.equal(a, b); // la misma corrida
   assert.equal(a.ok, true);
   assert.equal(a.created, 8); // 2 ventas + 2 cobros + 2 materiales + 2 envíos
   assert.equal(sales(ledger), 2);
-  // El segundo aviso quedó agendado para después del intervalo mínimo: corre y no encuentra nada nuevo.
-  await until(() => auto.status().last.reason === 'diferida');
+  // El segundo aviso quedó pendiente: corre después y no encuentra nada nuevo. Qué etiqueta lleve esa segunda
+  // corrida («diferida» si esperó el intervalo, «encolada» si la primera ya lo había agotado) depende de la
+  // velocidad del equipo: la prueba no lo supone, solo que haya una segunda corrida distinta de la primera.
+  await until(() => auto.status().last.reason !== 'webhook');
   assert.equal(auto.status().last.created, 0);
   assert.equal(sales(ledger), 2);
   auto.stop(); ledger.close();
@@ -32,12 +34,14 @@ test('auto: dos avisos a la vez comparten la misma corrida y no duplican nada', 
 test('auto: un aviso dentro del intervalo mínimo se agenda en vez de correr de nuevo', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
-  const auto = createAutoSync({ledger, workspace: 'landur', connections, minGapMs: 120});
+  // El intervalo es mucho mayor que lo que tarda una corrida, incluso en un hosting lento: así el segundo aviso
+  // siempre cae dentro del intervalo y la prueba no depende de la velocidad del equipo.
+  const auto = createAutoSync({ledger, workspace: 'landur', connections, minGapMs: 1500});
   await auto.trigger('webhook');
   const second = await auto.trigger('webhook');
   assert.deepEqual(second, {queued: true});
   assert.equal(auto.status().pending, true);
-  await until(() => auto.status().last.reason === 'diferida');
+  await until(() => auto.status().last.reason === 'diferida', 10000);
   assert.equal(auto.status().pending, false);
   auto.stop(); ledger.close();
 });
@@ -72,7 +76,7 @@ test('auto: el reloj interno sincroniza solo y se detiene', async () => {
   await until(() => auto.status().last?.reason === 'reloj');
   assert.equal(sales(ledger), 2);
   auto.stop();
-  await sleep(60); // por si había una corrida en vuelo al detener
+  await until(() => !auto.status().running); // una corrida en vuelo al detener termina antes de comparar
   const at = auto.status().last.at;
   await sleep(100);
   assert.equal(auto.status().last.at, at); // detenido: no hay más corridas
