@@ -485,3 +485,20 @@ Pedido: que la planilla y LANDUR queden sincronizadas solas y en tiempo casi rea
 Raíz 104/104; Landur 143/146 (las 3 de Windows de siempre).
 **Falta (necesita el servidor real):** definir `LANDUR_SYNC_TOKEN` en cPanel y reiniciar; pegar el Apps Script en la planilla y ejecutar
 `configurar()` + `instalar()`; compartir la planilla con la cuenta de servicio; una sincronía real contra Google (nada se probó contra Google real).
+
+### Varias pestañas y mayorista sin depender de la planilla (14/11/2026)
+
+Objetivo: que LANDUR lea la planilla de Rafa tal cual está (el fragmento y la general), sin pedirle cambios.
+
+- **Una conexión lee varias pestañas** (`minorista, mayorista`; hasta 4). Todas se leen **antes** de asentar nada: si una falla no se
+  asienta ni se revierte nada (una pestaña ausente parecería «filas borradas»). El mes vigente y las columnas de gasto son de cada
+  pestaña; las filas se rotulan con su pestaña en los avisos. La conciliación suma todas.
+- **Mayorista con «Transf.» en TRUE cobra completa**: la pestaña no tiene columna de comisión (ni `MP Fee` ni `MP Neto`), así que no hay
+  nada que descontar. Con la columna de comisión presente y vacía sigue sin cobro (dato que falta). Cambia el saldo: las ventas
+  mayoristas marcadas como transferidas ahora lo mueven.
+- La interfaz pide «Pestañas» (varias, separadas por coma) y el alta propone `minorista, mayorista`.
+- Casi tiempo real sin Apps Script: `LANDUR_SYNC_MINUTES=2` en cPanel. Detalle en SINCRONIZACION-AUTOMATICA.md.
+
+**Pruebas:** 5 casos nuevos de pestañas y la mayorista real del 24/10 (mes escrito en la primera fila, días vacíos, «Transf.» mixto, fila
+sin importe). Landur 157/160 (las 3 de Windows); raíz 104/104.
+**No resuelto por código:** la planilla que se lee tiene que estar viva y legible; un fragmento copiado una vez no se actualiza solo.
