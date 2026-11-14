@@ -54,6 +54,21 @@ Después del traspaso no hay que tocar nada en LANDUR ni recargar datos: la cone
 lee solo cada `LANDUR_SYNC_MINUTES`. Lo único que no se traspasa es el **Apps Script opcional** (tiempo real): sus disparadores
 quedan a nombre de quien los instaló, así que si se usa, Rafa ejecuta `instalar()` una vez.
 
+## Limpiar las ventas viejas antes de cambiar de planilla
+
+Al apuntar la conexión a otra planilla, LANDUR deja de comparar contra la anterior: las ventas que trajo la planilla vieja quedan
+en LANDUR y no se revierten solas. Para limpiarlas hay un botón en **Conexiones → Google Sheets → «Eliminar ventas de la planilla (N)»**:
+
+- **Revierte, no borra.** Cada venta se anula con su contra-asiento junto con su cobro, su comisión, el material y el envío; el saldo se
+  corrige y el historial se conserva. El detalle completo queda en la auditoría (`sales.reverted`).
+- **Fecha opcional** («solo las anteriores a»): limpia solo lo viejo.
+- **Confirmación escrita** (`ELIMINAR`) y un resumen con cantidad e importe antes de hacerlo. Es el mismo patrón que «Borrar cobros de la
+  planilla», que sí borra de la base.
+- **No toca** lo cargado a mano ni una venta con un cobro cargado a mano (la cuenta como «no tocada» y lo avisa).
+- Si las filas siguen en la planilla, la sincronización **no las rehace sola**: pregunta «¿Querés agregarlas también?».
+
+Orden recomendado: respaldo (`npm run backup`) → «Eliminar ventas de la planilla» → apuntar la conexión a la planilla nueva → sincronizar.
+
 ## Con el formato actual de la planilla de Rafa (sin pedirle nada)
 
 LANDUR lee su planilla tal cual está; no hace falta que cambie ninguna columna ni que instale nada:
