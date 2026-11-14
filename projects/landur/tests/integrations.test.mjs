@@ -4,7 +4,7 @@
 // source + external_id) y los errores de una fila no abortan el lote.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_UNPAID_ROWS, MINORISTA_HEADER} from './helpers/integrations-fixture.mjs';
+import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_UNPAID_ROWS, MAYORISTA_ROWS, MINORISTA_HEADER} from './helpers/integrations-fixture.mjs';
 
 test('conexiones: el token se guarda completo y se informa enmascarado', async () => {
   const {ledger, connections} = await integrationsAgainst();
@@ -231,16 +231,16 @@ test('sheets: la pestaña minorista real ubica cada columna en su lugar', async 
   ledger.close();
 });
 
-test('sheets: la pestaña mayorista del Excel entra como venta y no inventa cobro', async () => {
+test('sheets: la pestaña mayorista del Excel entra como venta y, con «Transf.» en TRUE, cobra completo', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista'}));
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual(summary.errors, []);
-  // Sin Nro. Pedido, sin Estado y sin comisión: 3 ventas, 3 gastos de material y ningún cobro.
-  assert.equal(summary.created.length, 6);
-  assert.equal(summary.skipped.sinCobro, 3);
+  // Sin Nro. Pedido ni comisión y con «Transf.» en TRUE: 3 ventas, 3 gastos de material y 3 cobros completos.
+  assert.equal(summary.created.length, 9);
+  assert.equal(summary.skipped.sinCobro, 0);
   const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
-  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 3);
   const placa = ops.find(o => o.kind === 'sale' && o.concept.includes('Ilumimate placa'));
   assert.equal(placa.amount, 294000);
   assert.equal(placa.date, '2026-11-08');
@@ -262,7 +262,7 @@ test('sheets: el gasto de material puede tomar el «Material + 10 %»', async ()
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista', materialColumn: 'plus10'}));
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual(summary.errors, []);
-  assert.equal(summary.created.length, 6);
+  assert.equal(summary.created.length, 9);
   const placa = ledger.snapshot('landur').operations.find(o => o.kind === 'expense' && o.concept.includes('Ilumimate placa'));
   assert.equal(placa.amount, 82500); // 825, no 750
   ledger.close();
@@ -272,7 +272,7 @@ test('sheets: con «no registrar gasto» el material no entra', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'mayorista', materialColumn: 'none'}));
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
-  assert.equal(summary.created.length, 3); // solo ventas
+  assert.equal(summary.created.length, 6); // ventas y sus cobros
   assert.equal(summary.skipped.sinMaterial, 0);
   assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'expense').length, 0);
   ledger.close();
@@ -596,5 +596,88 @@ test('corte: las ventas anteriores al saldo inicial entran y se avisa una sola v
   assert.match(summary.errors[0].message, /2 filas tienen fecha anterior al saldo inicial/);
   assert.match(summary.errors[0].message, /2026-11-13/);
   assert.match(summary.errors[0].message, /del 2026-11-08/);
+  ledger.close();
+});
+
+// --- Varias pestañas en una conexión (minorista + mayorista) ------------------------------------------
+test('pestañas: una conexión lee minorista y mayorista y concilia las dos', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  const saved = connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: ' minorista,mayorista , minorista '}));
+  assert.equal(saved.status.sheetName, 'minorista, mayorista'); // se normaliza y no repite
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(summary.errors, []);
+  // Minorista: 2 ventas + 2 cobros + 2 materiales + 2 envíos. Mayorista: 3 ventas + 3 cobros + 3 materiales.
+  assert.equal(summary.created.length, 17);
+  assert.deepEqual(summary.totals, {sheetRows: 6, sheetCents: 1326000, appRows: 5, appCents: 1153000});
+  const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual([again.created, again.reverted], [[], []]);
+  ledger.close();
+});
+
+test('pestañas: si una no se puede leer no se asienta ni se revierte nada', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'minorista, privada'}));
+  await assert.rejects(connections.sync(ledger, 'landur', 'tester', 'sheets', {}), /compartí la planilla/);
+  assert.equal(ledger.snapshot('landur').operations.length, 0);
+  ledger.close();
+});
+
+test('pestañas: una fila borrada de una pestaña se revierte sin tocar la otra', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'minorista, mayorista'}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  const live = () => ledger.snapshot('landur').operations.filter(o => o.kind === 'sale' && !o.reversed_by).length;
+  assert.equal(live(), 5);
+  const [header, first] = MAYORISTA_ROWS;
+  sheetEdits.mayorista = [header, first]; // de tres filas queda una
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(summary.reverted.filter(item => item.kind === 'sale').length, 2);
+    assert.equal(live(), 3); // 2 de minorista + 1 de mayorista
+  } finally { delete sheetEdits.mayorista; }
+  ledger.close();
+});
+
+test('pestañas: se aceptan hasta 4 y el nombre se valida pestaña por pestaña', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'a, b, c, d, e'})), /máximo 4/);
+  assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'minorista, ven/tas'})), /solo admite letras/);
+  ledger.close();
+});
+
+// --- La mayorista real de Rafa (planilla del 24/10) ------------------------------------------------------
+// «Octubre» solo en la primera fila, el resto de la columna Fecha vacía, «Transf.» marcado fila por fila,
+// sin columna de comisión, y una fila sin importe («Microfono»): nada de eso se le pide cambiar.
+test('mayorista real: mes escrito, días vacíos y Transf. mixto entran sin pedirle nada a la planilla', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista'}));
+  const header = ['Fecha','Cliente','Producto','Unidades','Bruto','Material Real','Material + 10%','Transf.','Ganancia Total','Reinversion','Transf.','Rafa','Parte Vendedor','Transf.','Vendedor','15% Ahorro Personal','15% Ahorro Personal'];
+  const row = (date, client, product, units, gross, material, paid) => [date, client, product, units, gross, material, material * 1.1, paid, 0, 0, paid, 0, 0, paid, 'Luis', 0, false];
+  sheetEdits.Mayorista = [[], header,
+    row('Octubre', 'Matesuru', 'Ilumimate caja', 50, 5000, 2500, true),
+    row('', 'ClienteB', 'Ilumimate caja', 100, 10000, 5000, true),
+    row('', 'ClienteC', 'Ilumimate placa', 200, 20000, 10000, true),
+    row('', 'ClienteD', 'Ilumimate caja', 35, 3500, 1750, true),
+    row('', 'ClienteE', 'Ilumimate caja', 120, 12000, 6000, true),
+    row('', 'ClienteF', 'Yerbera250', 10, 1000, 500, false),
+    row('', 'ClienteG', 'Yerbera500', 10, 1000, 500, false),
+    ['', '', 'Microfono', 1],
+  ];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    assert.equal(summary.approxDates, 7); // sin día: se fechan el 1 del mes que dice la planilla
+    assert.equal(summary.skipped.vacias, 1); // «Microfono» no tiene importe
+    const sales = ledger.snapshot('landur').operations.filter(o => o.kind === 'sale');
+    assert.equal(sales.length, 7);
+    assert.ok(sales.every(o => o.date === '2026-10-01'), sales.map(o => o.date).join());
+    // Cobran las cinco marcadas con TRUE, completas (esta pestaña no tiene comisión); las otras dos quedan por cobrar.
+    const collections = ledger.snapshot('landur').operations.filter(o => o.kind === 'collection');
+    assert.equal(collections.length, 5);
+    assert.equal(collections.reduce((sum, o) => sum + o.amount, 0), (5000 + 10000 + 20000 + 3500 + 12000) * 100);
+    assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'commission').length, 0);
+    assert.equal(summary.skipped.sinCobro, 2);
+    assert.deepEqual(summary.totals, {sheetRows: 7, sheetCents: 5250000, appRows: 7, appCents: 5250000});
+  } finally { delete sheetEdits.Mayorista; }
   ledger.close();
 });

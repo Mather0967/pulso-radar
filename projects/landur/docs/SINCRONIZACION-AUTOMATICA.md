@@ -34,6 +34,22 @@ sincronizar un aviso.
    (también está en la pestaña «Instrucciones»). Poner la URL real y el token en `configurar()` y ejecutarla;
    después ejecutar `instalar()` y aceptar los permisos. Borrar el token del código.
 
+## Con el formato actual de la planilla de Rafa (sin pedirle nada)
+
+LANDUR lee su planilla tal cual está; no hace falta que cambie ninguna columna ni que instale nada:
+
+- **Conexión:** pestañas `minorista, mayorista` (una sola conexión lee las dos; hasta 4), mes de la planilla = el año y mes
+  actuales (por ejemplo `2026-11`: de ahí sale el año de «Setiembre 16»), la cuenta y la cuenta de servicio.
+- **Fechas:** entiende el día suelto (8, 9), el mes escrito en la primera fila de un tramo («Setiembre 16», «Octubre») y lo
+  aplica a las filas siguientes. La mayorista no trae día: se fecha el 1 del mes y la tarjeta dice cuántas filas fueron así.
+- **Cobro:** lo decide la columna «Transf.». En la minorista, con TRUE y comisión (`MP Fee`/`MP Neto`). En la mayorista, que
+  no tiene comisión, con TRUE el cobro entra completo.
+- **Casi tiempo real sin Apps Script:** el reloj interno lee las pestañas cada `LANDUR_SYNC_MINUTES`. Con `2` o `3` los cambios
+  aparecen en pocos minutos y solo hace falta que la cuenta de servicio pueda leer la planilla.
+- **Lo único que ningún código resuelve:** que la planilla que se lee esté **viva y legible**. Un fragmento copiado una vez no se
+  actualiza solo; tiene que ser la planilla real (o una vista conectada con `IMPORTRANGE`) y legible con el enlace o compartida con la
+  cuenta de servicio.
+
 ## Probarlo
 
 ```bash

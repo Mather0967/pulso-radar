@@ -65,7 +65,7 @@ const DAY_ONLY_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1]];
 
 // Pestaña mayorista del mismo archivo: sin Nro. Pedido, sin Estado y sin comisión.
 export const MAYORISTA_HEADER = ['Fecha','Cliente','Producto','Unidades','Bruto','Material Real','Material + 10%','Transf.','Ganancia Bruta','Ganancia Neta','Reinversion','Transf.','Rafa','Parte Vendedor','Transf.','Vendedor','15% Ahorro Personal','15% Ahorro Personal'];
-const MAYORISTA_ROWS = [
+export const MAYORISTA_ROWS = [
   MAYORISTA_HEADER,
   [8,'Mateico','Ilumimate placa',30,2940,750,825,true,2115,1374,741,true,825,550,true,'Luis',123.75,false],
   [8,'Mateico','Ilumimate caja',30,5100,1200,1320,true,3780,2457,1323,true,1475,983,true,'Luis',221.25,false],
