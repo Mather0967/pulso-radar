@@ -503,6 +503,17 @@ Objetivo: que LANDUR lea la planilla de Rafa tal cual está (el fragmento y la g
 sin importe). Landur 157/160 (las 3 de Windows); raíz 104/104.
 **No resuelto por código:** la planilla que se lee tiene que estar viva y legible; un fragmento copiado una vez no se actualiza solo.
 
+### Botón para eliminar las ventas viejas (14/11/2026)
+
+Pedido: poder limpiar las ventas de la planilla vieja antes de pasar a la nueva (la conexión solo compara contra su propia lectura anterior).
+
+- Comando `sales.revert` en el ledger y botón «Eliminar ventas de la planilla (N)» en Conexiones. **Revierte** (no borra) cada venta con su
+  cobro, comisión, material y envío (se reconocen por la referencia `<venta>-cobro|-material|-envio`, con `-rN` si se rehicieron).
+- Fecha opcional (`before`), confirmación escrita `ELIMINAR`, auditoría `sales.reverted` con el detalle. Una venta con cobro cargado a mano no se
+  toca. Si las filas siguen en la planilla, la sincronía pregunta antes de rehacerlas (`eliminadas`).
+- 5 pruebas (revierte todo y el saldo vuelve a la apertura; exige la palabra; fecha; cobro a mano; la sincronía pregunta). **No probado en navegador**
+  (`qa-conexiones` no corre en este equipo).
+
 ### Planilla definitiva con datos y lista para importar con IA (14/11/2026)
 
 La plantilla se rehízo para que Rafa la reciba cargada y pueda volcar sus datos reales con una IA, y para que el traspaso de propiedad no

@@ -404,8 +404,12 @@ function connectionDetail(kind){
   // constancia en la auditoría. Las ventas quedan pendientes de cobro.
   const sheetCobros = kind === 'sheets' ? state.operations.filter(o => o.kind === 'collection' && o.source === 'sheets' && !o.reversed_by) : [];
   const purge = sheetCobros.length ? `<details class="cx-danger"><summary class="cx-help">Borrar cobros de la planilla (${sheetCobros.length})</summary><p>Se borran de la base de datos y de la página los ${sheetCobros.length} cobros que trajo la planilla (${fmt(sheetCobros.reduce((sum, o) => sum + o.amount, 0), sheetCobros[0].currency)}), con sus comisiones. Las ventas quedan pendientes de cobro y el saldo se corrige. Queda constancia en la auditoría.</p><button type="button" class="secondary" data-collections-delete="sheets" ${state.access !== 'viewer' ? '' : 'disabled'}>Borrar los ${sheetCobros.length} cobros</button></details>` : '';
+  // Limpieza de ventas viejas: revierte (no borra) las ventas que trajo la planilla con sus cobros, comisiones,
+  // material y envío. Fecha opcional («solo las anteriores a») y palabra de confirmación.
+  const sheetSales = kind === 'sheets' ? state.operations.filter(o => o.kind === 'sale' && o.source === 'sheets' && !o.reversed_by) : [];
+  const salesPurge = sheetSales.length ? `<details class="cx-danger"><summary class="cx-help">Eliminar ventas de la planilla (${sheetSales.length})</summary><p>Se anulan las ${sheetSales.length} ventas que trajo la planilla (${fmt(sheetSales.reduce((sum, o) => sum + o.amount, 0), sheetSales[0].currency)}), con sus cobros, comisiones, material y envío. No se borra nada: queda el historial con sus reversiones y el saldo se corrige. Si siguen en la planilla, la sincronización pregunta si querés agregarlas de nuevo.</p><label class="field">Solo las anteriores a (opcional)<input type="date" data-sales-before></label><button type="button" class="secondary" data-sales-revert="sheets" ${state.access !== 'viewer' ? '' : 'disabled'}>Eliminar ventas</button></details>` : '';
   return `<div class="cx-head"><button type="button" class="cx-back" data-connection-back>‹ Conexiones</button>${pill(tone[1], tone[0])}</div>
-    ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>${purge}
+    ${connected ? `${connectionStatus(kind)}${connectionWarnings(kind)}<div class="kv-list">${rows}</div>${purge}${salesPurge}
       <details class="cx-edit" data-connection-details ${ui.edit ? 'open' : ''}><summary class="cx-help">Editar conexión <span aria-hidden="true">⌄</span></summary>${connectionForm(kind)}</details>`
     : ''}`;
 }
@@ -525,6 +529,21 @@ function wireConnections(){
     const open = event.target.closest('[data-connection-open]');
     if (open) { showConnections(open.getAttribute('data-connection-open')); return; }
     if (event.target.closest('[data-connection-back]')) { showConnections(''); return; }
+    if (event.target.closest('[data-sales-revert]')) {
+      const before = ($('[data-sales-before]') || {}).value || '';
+      const list = state.operations.filter(o => o.kind === 'sale' && o.source === 'sheets' && !o.reversed_by && (!before || o.date < before));
+      if (!list.length) { toast('No hay ventas de la planilla para eliminar con ese filtro.'); return; }
+      const total = list.reduce((sum, o) => sum + o.amount, 0), currency = list[0].currency;
+      if (!confirm(`Se van a eliminar ${list.length} ${list.length === 1 ? 'venta' : 'ventas'} de la planilla por ${fmt(total, currency)}${before ? ` anteriores al ${dateFmt(before)}` : ''}, con sus cobros, comisiones, material y envío. No se borra nada: queda el historial con sus reversiones y el saldo se corrige. Si siguen en la planilla, la sincronización va a preguntar si querés agregarlas de nuevo. ¿Continuás?`)) return;
+      if (String(prompt('Escribí ELIMINAR para confirmar la eliminación de las ventas de la planilla.') || '').trim().toUpperCase() !== 'ELIMINAR') { toast('No se eliminó nada.'); return; }
+      try {
+        const done = await api('/api/commands', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR', ...(before ? {before} : {})});
+        await refresh();
+        await loadConnections('sheets');
+        toast(`Se eliminaron ${done.reverted} ${done.reverted === 1 ? 'venta' : 'ventas'} de la planilla${done.skipped ? ` (${done.skipped} con cobros cargados a mano no se tocaron)` : ''}.`);
+      } catch (error) { toast(error.message); }
+      return;
+    }
     if (event.target.closest('[data-collections-delete]')) {
       const list = state.operations.filter(o => o.kind === 'collection' && o.source === 'sheets' && !o.reversed_by);
       if (!list.length) return;

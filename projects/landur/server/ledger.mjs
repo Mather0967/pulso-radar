@@ -527,6 +527,39 @@ export class Ledger {
       const removed = this.deleteOperations(workspace, actor, ids, 'collections.deleted');
       return { deleted: rows.length, operations: removed.operations, total: rows.reduce((sum, row) => sum + row.amount, 0), currency: rows[0].currency };
     }
+    // Eliminar en bloque las ventas de un origen (hoy la planilla), con lo que nació de cada una: su cobro y
+    // la comisión, el material y el envío. A diferencia de «collections.delete» NO borra nada: cada operación
+    // queda marcada con su contra-asiento y el detalle completo en la auditoría. Una venta con un cobro
+    // cargado a mano no se toca (lo asentado a mano no lo deshace una limpieza). `before` limita a las
+    // anteriores a esa fecha. La palabra de confirmación va en el propio comando.
+    if (kind === 'sales.revert') {
+      const source = input.source === undefined ? 'sheets' : text(input.source, 'Origen', 60);
+      if (String(input.confirm ?? '').trim().toUpperCase() !== 'ELIMINAR')
+        throw new DomainError('Para eliminar las ventas en bloque escribí ELIMINAR en la confirmación.', 400);
+      const before = input.before === undefined || input.before === null || input.before === '' ? null : date(input.before);
+      const sales = this.db.prepare(`SELECT id, amount, currency, external_id FROM operations WHERE workspace=? AND kind='sale' AND reversed_by IS NULL AND source=?${before ? ' AND date < ?' : ''} ORDER BY date, rowid`).all(workspace, source, ...(before ? [before] : []));
+      const day = new Date().toISOString().slice(0, 10);
+      const result = { reverted: 0, skipped: 0, operations: 0, total: 0, currency: sales[0]?.currency ?? null };
+      const reversedSales = [];
+      for (const sale of sales) {
+        // Lo que nació de la venta: cobros aplicados y gastos con su referencia («<venta>-cobro», «-material», «-envio»,
+        // con sufijo «-rN» si se rehicieron).
+        const children = new Map();
+        for (const op of this.db.prepare("SELECT * FROM operations WHERE workspace=? AND related_id=? AND reversed_by IS NULL AND kind NOT IN ('reversal','commission')").all(workspace, sale.id)) children.set(op.id, op);
+        if ([...children.values()].some(op => op.source !== source)) { result.skipped++; continue; }
+        const prefix = `${sale.external_id}-`;
+        for (const op of this.db.prepare("SELECT * FROM operations WHERE workspace=? AND source=? AND reversed_by IS NULL AND kind IN ('collection','expense') AND substr(external_id,1,?)=?").all(workspace, source, prefix.length, prefix))
+          if (/^-(cobro|material|envio)(-r\d+)?$/.test(op.external_id.slice(sale.external_id.length))) children.set(op.id, op);
+        for (const child of children.values()) {
+          for (const commission of this.db.prepare("SELECT * FROM operations WHERE workspace=? AND related_id=? AND reversed_by IS NULL AND kind='commission'").all(workspace, child.id)) { this.insertReversal(workspace, commission, day); result.operations++; }
+          this.insertReversal(workspace, child, day); result.operations++;
+        }
+        this.insertReversal(workspace, this.db.prepare('SELECT * FROM operations WHERE id=?').get(sale.id), day); result.operations++;
+        result.reverted++; result.total += sale.amount; reversedSales.push(sale.id);
+      }
+      this.audit(workspace, actor, 'sales.reverted', JSON.stringify({ source, before, reverted: result.reverted, skipped: result.skipped, operations: result.operations, sales: reversedSales }));
+      return result;
+    }
     if (kind === 'evidence.remove') {
       const evidenceId = String(input.evidenceId ?? '');
       const entry = this.db.prepare('SELECT id,name,operation,sha256 FROM evidence WHERE workspace=? AND id=?').get(workspace, evidenceId);

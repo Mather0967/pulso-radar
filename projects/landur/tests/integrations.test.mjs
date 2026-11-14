@@ -681,3 +681,87 @@ test('mayorista real: mes escrito, días vacíos y Transf. mixto entran sin pedi
   } finally { delete sheetEdits.Mayorista; }
   ledger.close();
 });
+
+// --- Eliminar en bloque las ventas de la planilla (se revierten, no se borran) --------------------------
+const liveOf = (ledger, kind) => ledger.snapshot('landur').operations.filter(o => o.kind === kind && !o.reversed_by);
+
+test('limpieza: eliminar las ventas de la planilla revierte cobros, comisiones y gastos y deja el saldo en la apertura', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  const before = ledger.snapshot('landur');
+  assert.equal(liveOf(ledger, 'sale').length, 2);
+  assert.ok(before.accounts[0].balance !== 10000); // hubo movimiento
+  const result = ledger.command('landur', 'tester', 'limpiar-ventas-0001', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR'});
+  assert.equal(result.reverted, 2);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.total, 97000 + 168000);
+  // Nada vigente: ni ventas, ni cobros, ni comisiones, ni gastos; el saldo vuelve a la apertura (100).
+  for (const kind of ['sale', 'collection', 'commission', 'expense']) assert.equal(liveOf(ledger, kind).length, 0, kind);
+  const after = ledger.snapshot('landur');
+  assert.equal(after.accounts[0].balance, 10000);
+  assert.deepEqual([after.totals[0].sales, after.totals[0].expenses, after.totals[0].receivable], [0, 0, 0]);
+  // No se borró nada: todo sigue en el historial, marcado, y queda la auditoría con el detalle.
+  assert.equal(after.operations.filter(o => o.source === 'sheets' && o.kind !== 'reversal').length, before.operations.filter(o => o.source === 'sheets').length);
+  const audit = after.audit.find(entry => entry.action === 'sales.reverted');
+  assert.ok(audit);
+  assert.equal(JSON.parse(audit.entity).reverted, 2);
+  ledger.close();
+});
+
+test('limpieza: exige la palabra de confirmación y no toca nada sin ella', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  for (const confirm of [undefined, '', 'BORRAR', 'si']) {
+    assert.throws(() => ledger.command('landur', 'tester', `limpiar-sin-palabra-${String(confirm)}`.padEnd(24, 'x'), {kind: 'sales.revert', source: 'sheets', confirm}), /ELIMINAR/);
+  }
+  assert.equal(liveOf(ledger, 'sale').length, 2);
+  ledger.close();
+});
+
+test('limpieza: con fecha solo se eliminan las anteriores', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {}); // #1275 del 08/11 y #1276 del 09/11
+  const result = ledger.command('landur', 'tester', 'limpiar-con-fecha-001', {kind: 'sales.revert', source: 'sheets', before: '2026-11-09', confirm: 'eliminar'});
+  assert.equal(result.reverted, 1);
+  const remaining = liveOf(ledger, 'sale');
+  assert.equal(remaining.length, 1);
+  assert.match(remaining[0].concept, /#1276/);
+  // La de #1276 conserva su cobro y sus gastos.
+  assert.equal(liveOf(ledger, 'collection').length, 1);
+  assert.equal(liveOf(ledger, 'expense').length, 2);
+  ledger.close();
+});
+
+test('limpieza: una venta con un cobro cargado a mano no se toca y se informa', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {}); // sin cuenta: solo ventas
+  const sale = ledger.snapshot('landur').operations.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
+  ledger.command('landur', 'tester', 'manual-000000003', {kind: 'collection', concept: 'Cobro a mano', accountId, targetId: sale.id, amount: '970.00', currency: 'USD', commission: '1.00', date: '2026-11-09'});
+  const result = ledger.command('landur', 'tester', 'limpiar-con-manual-01', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR'});
+  assert.deepEqual([result.reverted, result.skipped], [1, 1]);
+  assert.equal(liveOf(ledger, 'sale').length, 1);
+  assert.match(liveOf(ledger, 'sale')[0].concept, /#1275/);
+  assert.equal(liveOf(ledger, 'collection').length, 1); // el cobro a mano sigue
+  ledger.close();
+});
+
+test('limpieza: no afecta lo cargado a mano ni deja a la sincronía rehacer lo eliminado sin preguntar', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  ledger.command('landur', 'tester', 'venta-manual-000001', {kind: 'sale', concept: 'Venta a mano', amount: '10.00', currency: 'USD', date: '2026-11-01'});
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  ledger.command('landur', 'tester', 'limpiar-todo-0000001', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR'});
+  assert.deepEqual(liveOf(ledger, 'sale').map(o => o.concept), ['Venta a mano']);
+  // La planilla todavía tiene las filas: la sincronía no las rehace sola, pregunta (eliminadas).
+  const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(again.skipped.eliminadas, 2);
+  assert.deepEqual(again.created, []);
+  // Con la respuesta afirmativa vuelven, completas.
+  const restored = await connections.sync(ledger, 'landur', 'tester', 'sheets', {restoreDeleted: true});
+  assert.equal(restored.created.filter(item => item.kind === 'sale').length, 2);
+  ledger.close();
+});
