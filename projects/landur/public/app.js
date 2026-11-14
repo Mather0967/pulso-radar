@@ -93,11 +93,11 @@ function render() {
     const opBtn=event.target.closest('[data-operation]');
     if(opBtn){detail(opBtn.getAttribute('data-operation'));return;}
     const paymentBtn=event.target.closest('[data-delete-payment]');
-    if(paymentBtn){const id=paymentBtn.getAttribute('data-delete-payment');if(!confirm('Eliminar este pago del saldo. La operación original queda registrada pero el dinero vuelve a la cuenta. ¿Continuás?'))return;try{await api('/api/commands',{kind:'payment.delete',paymentId:id});await refresh();toast('Pago eliminado del saldo.');}catch(error){toast(error.message);}}
+    if(paymentBtn){const id=paymentBtn.getAttribute('data-delete-payment');if(!confirm('Eliminar este pago del saldo. La operación original queda registrada pero el dinero vuelve a la cuenta. ¿Continuás?'))return;try{await api('/api/commands',{kind:'payment.delete',paymentId:id},crypto.randomUUID());await refresh();toast('Pago eliminado del saldo.');}catch(error){toast(error.message);}}
     const revertBtn=event.target.closest('[data-revert]');
-    if(revertBtn){const id=revertBtn.getAttribute('data-revert');if(!confirm('Eliminar este registro, sus comisiones y sus contra-asientos del saldo, con la cuenta de auditoría correspondiente. ¿Continuás?'))return;try{await api('/api/commands',{kind:'reversal',operationId:id});await refresh();toast('Registro revertido.');}catch(error){toast(error.message);}}
+    if(revertBtn){const id=revertBtn.getAttribute('data-revert');if(!confirm('Eliminar este registro, sus comisiones y sus contra-asientos del saldo, con la cuenta de auditoría correspondiente. ¿Continuás?'))return;try{await api('/api/commands',{kind:'reversal',operationId:id,date:today()},crypto.randomUUID());await refresh();toast('Registro revertido.');}catch(error){toast(error.message);}}
     const evidenceBtn=event.target.closest('[data-remove-evidence]');
-    if(evidenceBtn){const id=evidenceBtn.getAttribute('data-remove-evidence');if(!confirm('Quitar este comprobante del registro. No se borra del todo, queda constancia en el registro. ¿Continuás?'))return;try{await api('/api/commands',{kind:'evidence.remove',evidenceId:id});await refresh();toast('Comprobante quitado.');}catch(error){toast(error.message);}}
+    if(evidenceBtn){const id=evidenceBtn.getAttribute('data-remove-evidence');if(!confirm('Quitar este comprobante del registro. No se borra del todo, queda constancia en el registro. ¿Continuás?'))return;try{await api('/api/commands',{kind:'evidence.remove',evidenceId:id},crypto.randomUUID());await refresh();toast('Comprobante quitado.');}catch(error){toast(error.message);}}
     const payBtn=event.target.closest('[data-pay]');
     if(payBtn){const id=payBtn.getAttribute('data-pay');const type=payBtn.getAttribute('data-type')||'payment';quickCapture(type,id);return;}
     const attachBtn=event.target.closest('[data-attach]');
@@ -537,7 +537,7 @@ function wireConnections(){
       if (!confirm(`Se van a eliminar ${list.length} ${list.length === 1 ? 'venta' : 'ventas'} de la planilla por ${fmt(total, currency)}${before ? ` anteriores al ${dateFmt(before)}` : ''}, con sus cobros, comisiones, material y envío. No se borra nada: queda el historial con sus reversiones y el saldo se corrige. Si siguen en la planilla, la sincronización va a preguntar si querés agregarlas de nuevo. ¿Continuás?`)) return;
       if (String(prompt('Escribí ELIMINAR para confirmar la eliminación de las ventas de la planilla.') || '').trim().toUpperCase() !== 'ELIMINAR') { toast('No se eliminó nada.'); return; }
       try {
-        const done = await api('/api/commands', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR', ...(before ? {before} : {})});
+        const done = await api('/api/commands', {kind: 'sales.revert', source: 'sheets', confirm: 'ELIMINAR', ...(before ? {before} : {})}, crypto.randomUUID());
         await refresh();
         await loadConnections('sheets');
         toast(`Se eliminaron ${done.reverted} ${done.reverted === 1 ? 'venta' : 'ventas'} de la planilla${done.skipped ? ` (${done.skipped} con cobros cargados a mano no se tocaron)` : ''}.`);
@@ -551,7 +551,7 @@ function wireConnections(){
       if (!confirm(`Se van a borrar ${list.length} ${list.length === 1 ? 'cobro' : 'cobros'} de la planilla por ${fmt(total, currency)}, con sus comisiones. El saldo se corrige y las ventas quedan pendientes de cobro. Desaparecen de la base y de la página; queda constancia en la auditoría. ¿Continuás?`)) return;
       if (String(prompt('Escribí BORRAR para confirmar el borrado de los cobros de la planilla.') || '').trim().toUpperCase() !== 'BORRAR') { toast('No se borró nada.'); return; }
       try {
-        const done = await api('/api/commands', {kind: 'collections.delete', source: 'sheets', confirm: 'BORRAR'});
+        const done = await api('/api/commands', {kind: 'collections.delete', source: 'sheets', confirm: 'BORRAR'}, crypto.randomUUID());
         await refresh();
         await loadConnections('sheets');
         toast(`Se borraron ${done.deleted} ${done.deleted === 1 ? 'cobro' : 'cobros'} de la planilla.`);
