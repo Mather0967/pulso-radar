@@ -4,13 +4,15 @@
 //      en el servidor) y ejecutala UNA vez. Después borrá el token de acá: queda guardado en las
 //      propiedades del script, no a la vista de quien edite la planilla.
 //   2. Ejecutá instalar() UNA vez y aceptá los permisos.
+//   Si la planilla cambia de dueño, el nuevo dueño vuelve a ejecutar instalar(): los disparadores
+//   quedan a nombre de quien los instala. Es opcional: LANDUR también lee la planilla solo.
 //
 // Desde ese momento: cada edición, cada fila agregada o borrada y, además, un latido cada 5 minutos
 // le avisan a LANDUR, que sincroniza (junta avisos seguidos y nunca corre dos a la vez).
 
 function configurar() {
   PropertiesService.getScriptProperties().setProperties({
-    LANDUR_URL: 'https://TU-DOMINIO/landur/api/hooks/sync',
+    LANDUR_URL: 'https://rivect.net/landur/api/hooks/sync',
     LANDUR_TOKEN: 'PEGAR_AQUI_EL_TOKEN'
   });
 }

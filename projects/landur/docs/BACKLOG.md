@@ -502,3 +502,20 @@ Objetivo: que LANDUR lea la planilla de Rafa tal cual está (el fragmento y la g
 **Pruebas:** 5 casos nuevos de pestañas y la mayorista real del 24/10 (mes escrito en la primera fila, días vacíos, «Transf.» mixto, fila
 sin importe). Landur 157/160 (las 3 de Windows); raíz 104/104.
 **No resuelto por código:** la planilla que se lee tiene que estar viva y legible; un fragmento copiado una vez no se actualiza solo.
+
+### Planilla definitiva con datos y lista para importar con IA (14/11/2026)
+
+La plantilla se rehízo para que Rafa la reciba cargada y pueda volcar sus datos reales con una IA, y para que el traspaso de propiedad no
+requiera tocar nada. `docs/plantilla/generar-plantilla.py` la genera y trae las 20 ventas disponibles (extracto del fragmento y de la
+planilla del 24/10).
+
+- Columnas que se escriben contiguas (A–P); `MP Neto`, `Ganancia Bruta` y `Control` al final como fórmulas: pegar una tabla no pisa fórmulas.
+- `Control` por fila (fecha, Nro. Pedido, repetidos, Bruto, «Transf. TRUE sin MP Fee») y pestaña `Resumen` con lo que tiene que mostrar
+  LANDUR (ventas, gastos, saldo). Se verificó que el importador produce exactamente esas cifras: 73.480 / 33.635 / 25.745, 20 ventas,
+  8 cobros, 0 avisos, y una segunda sincronía no cambia nada.
+- Pestaña `Importar con IA` con el texto para pegarle a la IA (16 columnas, reglas de fecha, Nro. Pedido, MP Fee 0, Transf.).
+- Mayorista sin día ni número: fecha el 1 del mes, `M-001…` asignados por LANDUR y Notas «Provisorio» (resaltadas en amarillo).
+- Traspaso: el permiso de lectura de la cuenta de servicio sobrevive al cambio de dueño y la sincronía no depende del dueño; solo el
+  Apps Script opcional hay que reinstalarlo (`instalar()`), porque sus disparadores son de quien los instaló.
+- Corregido: tres notas del Resumen empezaban con «=» y Google las leía como fórmulas (`#ERROR!`).
+
