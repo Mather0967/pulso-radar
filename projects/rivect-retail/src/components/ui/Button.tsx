@@ -6,12 +6,12 @@ type Size = 'sm' | 'md' | 'lg' | 'icon'
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-brand-500 text-white shadow-[0_14px_30px_-14px_rgba(47,116,255,0.9)] hover:bg-brand-400 active:bg-brand-600',
+    'bg-gradient-to-r from-brand-600 via-brand-500 to-brand-600 bg-[length:200%_auto] text-white shadow-[0_10px_28px_-10px_rgba(47,116,255,0.7),inset_0_1px_0_rgba(255,255,255,0.2)] hover:bg-right hover:shadow-[0_14px_36px_-10px_rgba(47,116,255,0.9)] active:scale-[0.98]',
   secondary:
-    'border border-line bg-ink-800/80 text-slate-200 hover:border-brand-500/50 hover:text-white',
-  ghost: 'text-slate-400 hover:bg-ink-800 hover:text-white',
+    'border border-line/90 bg-gradient-to-b from-ink-800/90 to-ink-850/95 text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.3)] hover:border-brand-500/50 hover:text-white active:scale-[0.98]',
+  ghost: 'text-slate-400 hover:bg-ink-800/80 hover:text-white active:scale-[0.98]',
   danger:
-    'border border-coral-400/30 bg-coral-500/10 text-coral-400 hover:border-coral-400/60 hover:bg-coral-500/20',
+    'border border-coral-400/30 bg-coral-500/10 text-coral-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-coral-400/60 hover:bg-coral-500/20 active:scale-[0.98]',
 }
 
 const sizes: Record<Size, string> = {

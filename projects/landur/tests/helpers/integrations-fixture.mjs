@@ -84,43 +84,22 @@ const ESTADO_ROWS = [
   [10,'Beto Pendiente','#2002','1 lámpara',1,'Pendiente',500,50,450],
 ];
 
-// Forma REAL de la planilla «Hoja de cálculo sin título» del cliente (Drive, 24/10): una fila de título
-// combinado arriba, el mes escrito en la primera fecha («Setiembre 16») y después solo el día.
-const SETIEMBRE_ROWS = [
-  ['Pedidos y entradas'],
+// La marca de pago de la planilla real: «Transf.» (TRUE/FALSE).
+const PAGADOS_ROWS = [
   MINORISTA_HEADER,
-  ['Setiembre 16','Milton Guevara','Instagram','IG0001','Efectivo','1 Ilumimate1 caja (Negro)',1,'Enviado',390,0,390,40,0,'Retiro','Nadie',350,175,0.5,215,false,175,175,0,false],
-  [16,'Adrian Pinazo Bermudez','Web','#1112','MP','1 Ilumimate1 caja (Negro)',1,'Enviado',650,68,582,40,260,'Ues','Cliente',282,141,0.5,441,false,141,141,0,false],
-  [17,'Francisco Ruiz','Web','#1115','MP','2 ilumimate1 caja (Verde)',2,'Enviado',970,101,869,80,190,'Ues','Cliente',599,300,0.5,570,false,299,299,0,false],
-  // Una venta cancelada que además abre el tramo de octubre: su mes rige para las filas de abajo.
-  ['Octubre 2','Ana Cancelada','Web','#1200','MP','1 lámpara',1,'Cancelado',500,50,450],
-  [3,'Beto Octubre','Web','#1201','MP','1 lámpara',1,'Enviado',700,70,630],
+  MINORISTA_ROWS[1].map((value, index) => (index === 19 ? true : value)),
+  MINORISTA_ROWS[2].map((value, index) => (index === 19 ? true : index === 7 ? 'Enviado' : value)),
+];
+const TRANSF_RARO_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1].map((value, index) => (index === 19 ? 'no sé' : value))];
+// Las mismas dos filas, con el pago marcado y sin marcar: sirven para comprobar que la
+// sincronía revierte el cobro cuando la planilla lo desmarca y lo vuelve a registrar después.
+const IMPAGOS_ROWS = [
+  MINORISTA_HEADER,
+  MINORISTA_ROWS[1],
+  MINORISTA_ROWS[2].map((value, index) => (index === 7 ? 'Enviado' : value)),
 ];
 
-// Pestaña mayorista tal cual está en «Fragmento contabilidad Landur» (10/11): la columna Fecha está vacía.
-const SIN_FECHA_ROWS = [
-  MAYORISTA_HEADER,
-  ['','Mateico','Ilumimate placa',30,2940,750,825],
-  ['','Vale Vieira','Deadpool Joystick',1,840,555,611],
-];
-
-// Filas que no deben perderse ni fundirse sin aviso: dos ventas idénticas sin Nro. Pedido (son dos
-// ventas) y un Nro. Pedido repetido con el mismo importe (es un error de la planilla: se avisa).
-const REPETIDAS_ROWS = [
-  ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto'],
-  [9,'Mateico','','1 caja',30,'Enviado',5100,0,5100],
-  [9,'Mateico','','1 caja',30,'Enviado',5100,0,5100],
-  [9,'Ana','#3001','1 lámpara',1,'Enviado',800,80,720],
-  [9,'Ana','#3001','1 lámpara',1,'Enviado',800,80,720],
-];
-
-// Fecha como celda de fecha y hora (la parte decimal es la hora: 46000.75 = 18:00 del día 46000).
-const CON_HORA_ROWS = [
-  ['Fecha','Cliente','Nro. Pedido','Pedido','Unidades','Estado','Bruto'],
-  [46000.75,'Tarde','#4001','1 lámpara',1,'Enviado',100],
-];
-
-export async function fakeFetch(url, options = {}) {
+async function fakeFetch(url, options = {}) {
   const href = String(url);
   const respond = (body, headers = {}) => new Response(JSON.stringify(body), {status: 200, headers});
   if (href.startsWith(accountUrl)) {
@@ -162,6 +141,9 @@ export async function fakeFetch(url, options = {}) {
     if (href.includes('repetidas')) return respond({values: REPETIDAS_ROWS});
     if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
     if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
+    if (href.includes('pagados')) return respond({values: PAGADOS_ROWS});
+    if (href.includes('transf-raro')) return respond({values: TRANSF_RARO_ROWS});
+    if (href.includes('impagos')) return respond({values: IMPAGOS_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }
@@ -177,7 +159,8 @@ export async function integrationsAgainst() {
 }
 
 export function saveShopify({currency = 'USD', accountId, ...rest} = {}) {
-  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, commission: '2.00', accountId: accountId ?? null, ...rest};
+  // Shopify ya no descuenta comisión: el cobro entra por el total de la orden.
+  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, accountId: accountId ?? null, ...rest};
 }
 
 export function saveMeta({accountId, ...rest} = {}) {

@@ -127,12 +127,14 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
       await mkdir(directory,{recursive:true,mode:0o700});
       const filename=resolve(directory,'landur.sqlite');
       ledger=new Ledger(filename);await chmod(filename,0o600);ledger.workspace('landur');
-      // Sincronía automática de la planilla: el aviso de la propia planilla (ruta con token) y un reloj
-      // interno de respaldo. Passenger puede apagar el proceso, así que el aviso externo es el confiable.
-      const connections=createIntegrations(fetchImpl?{fetchImpl}:{});
-      auto=createAutoSync({ledger,workspace:'landur',connections,everyMs:syncIntervalMs(env.LANDUR_SYNC_MINUTES)});
-      auto.start();
-      return {ledger,exportOperations,connections,auto,tokenMatches,hookLimiter:createRateLimiter({limit:20,windowMs:60*1000}),limiter:createRateLimiter({limit:30,windowMs:60*1000}),
+      const connections=createIntegrations();
+      // Las conexiones se sincronizan solas: la planilla y la tienda no esperan a que alguien
+      // abra la app. `LANDUR_SYNC_MINUTES=0` apaga el temporizador.
+      const {createAutoSync}=await import(pathToFileURL(resolve(root,'server/auto-sync.mjs')));
+      const autoSync=createAutoSync({ledger,connections,workspace:'landur',minutes:Number(process.env.LANDUR_SYNC_MINUTES??15)});
+      autoSync.start();
+      autoSync.tick().catch(()=>{});
+      return {ledger,exportOperations,connections,autoSync,limiter:createRateLimiter({limit:30,windowMs:60*1000}),
         // Todo comando cuenta contra un tope por usuario: sin esto una sesión válida podía
         // escribir sin límite y hacer crecer la base y la tabla de idempotencia.
         commandLimiter:createRateLimiter({limit:120,windowMs:60*1000}),
