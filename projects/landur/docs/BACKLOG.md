@@ -420,3 +420,11 @@ Pasada completa sobre la conexión nueva. Corregido y cubierto con pruebas:
 - Si la cuenta elegida para la conexión fue eliminada, se avisa una vez y las ventas siguen
   entrando.
 - Un 429 de Google ya no se informa como «clave inválida».
+
+### Diagnóstico de la planilla (11/11/2026)
+
+Ante un desfasaje entre la planilla y LANDUR, `node scripts/diagnostico-planilla.mjs <base.sqlite>`
+abre la base **en solo lectura** y muestra: operaciones con origen `sheets` por tipo y moneda
+(venta = no mueve caja, cobro = entra, gasto = sale, comisión), el detalle por mes, posibles
+duplicados (mismo importe y concepto aunque la fecha haya cambiado), referencias de pedido
+repetidas y cobros sin venta. Con `--json` vuelca el detalle para adjuntar a un reporte.
