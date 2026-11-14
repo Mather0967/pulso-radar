@@ -81,6 +81,14 @@ const ESTADO_ROWS = [
   [10,'Beto Pendiente','#2002','1 lámpara',1,'Pendiente',500,50,450],
 ];
 
+// La marca de pago de la planilla real: «Transf.» (TRUE/FALSE).
+const PAGADOS_ROWS = [
+  MINORISTA_HEADER,
+  MINORISTA_ROWS[1].map((value, index) => (index === 19 ? true : value)),
+  MINORISTA_ROWS[2].map((value, index) => (index === 19 ? true : index === 7 ? 'Enviado' : value)),
+];
+const TRANSF_RARO_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1].map((value, index) => (index === 19 ? 'no sé' : value))];
+
 async function fakeFetch(url, options = {}) {
   const href = String(url);
   const respond = (body, headers = {}) => new Response(JSON.stringify(body), {status: 200, headers});
@@ -117,6 +125,8 @@ async function fakeFetch(url, options = {}) {
       return new Response(JSON.stringify({error: {message: 'The caller does not have permission'}}), {status: 403});
     if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
     if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
+    if (href.includes('pagados')) return respond({values: PAGADOS_ROWS});
+    if (href.includes('transf-raro')) return respond({values: TRANSF_RARO_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }

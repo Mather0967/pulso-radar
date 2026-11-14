@@ -428,3 +428,18 @@ abre la base **en solo lectura** y muestra: operaciones con origen `sheets` por 
 (venta = no mueve caja, cobro = entra, gasto = sale, comisión), el detalle por mes, posibles
 duplicados (mismo importe y concepto aunque la fecha haya cambiado), referencias de pedido
 repetidas y cobros sin venta. Con `--json` vuelca el detalle para adjuntar a un reporte.
+
+### La marca de pago es «Transf.» (11/11/2026)
+
+El cliente confirmó que en su planilla el pago del pedido se marca en la columna **`Transf.`**
+(TRUE/FALSE); `Estado` es logística («Enviado»), no cobro. La importación usaba `Estado` para
+decidir y por eso creaba cobros en pedidos todavía no transferidos: el saldo de la cuenta
+aparecía por encima de la realidad.
+
+- Con columna `Transf.`: la fila siempre deja su **venta**; el **cobro** solo si la celda es TRUE.
+  Una celda vacía no es TRUE. Un valor que no se entiende (texto raro) se informa y no cobra.
+- Sin columna `Transf.`: manda `paidStates` y, sin `paidStates`, toda fila con comisión.
+- El material de mayorista no depende de la marca: si el gasto está configurado, se registra.
+- Los cobros ya asentados con la regla anterior **no se borran solos**: se revierten desde la app,
+  con su auditoría, para que el saldo vuelva a coincidir con la planilla.
+  `node scripts/diagnostico-planilla.mjs <base.sqlite> --collections` los lista.

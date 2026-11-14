@@ -117,3 +117,12 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
   no se asienta y se informa en el resumen de la sincronía.
 - **Minorista queda igual por ahora.** Su columna `Material` no se descuenta hasta que el cliente
   lo confirme.
+
+### Marca de pago: «Transf.» de la planilla (11/11/2026)
+
+- **El pago lo dice la planilla, no el estado de logística.** `Transf.` TRUE = el dinero llegó;
+  FALSE o vacío = el pedido sigue pendiente. Esa columna manda por sobre `paidStates`.
+- **`paidStates` queda como respaldo** para planillas sin esa columna; nunca se cobra por la sola
+  presencia de una comisión cuando la planilla dice que el pedido no está transferido.
+- **No se borra ni se reescribe dinero ya asentado.** Los cobros creados con la regla anterior se
+  revierten desde la app, con su registro de auditoría.

@@ -190,6 +190,16 @@ function sheetDate(value, month, label) {
   if (/^\d{1,2}$/.test(text)) return monthDay(Number(text), month, label);
   throw new DomainError(`${label}: la fecha «${truncate(text, 20)}» no se entiende. Usá una columna de fecha real o indicá el mes de la planilla.`);
 }
+// «Transf.» es la marca de pago de la planilla: TRUE cuando el dinero llegó. Una celda vacía
+// no es TRUE: no se registra un cobro que la planilla no confirma.
+function sheetFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1 ? true : value === 0 ? false : null;
+  const text = foldCell(value);
+  if (['true', 'verdadero', 'si', 'x', '1', 'yes'].includes(text)) return true;
+  if (['false', 'falso', 'no', '0'].includes(text)) return false;
+  return null;
+}
 const SHEET_COLUMNS = {
   date: ['fecha', 'dia', 'date'],
   customer: ['cliente', 'customer', 'nombre'],
@@ -200,6 +210,8 @@ const SHEET_COLUMNS = {
   gross: ['bruto', 'total', 'importe bruto'],
   fee: ['mp fee', 'fee', 'comision', 'comision mp', 'arancel'],
   net: ['mp neto', 'neto', 'importe neto'],
+  // El cliente marca el pago en «Transf.» (TRUE/FALSE), no en «Estado» (eso es logística).
+  paid: ['transf'],
   // La pestaña mayorista separa el costo real del material del valor con 10 % cargado.
   material: ['material real'],
   materialPlus: ['material 10', 'material + 10'],
@@ -546,6 +558,17 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       }
       // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
       if (!account) continue;
+      // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga
+      // «Estado» (que es logística) ni si hay comisión en la fila.
+      if (columns.paid >= 0) {
+        const flag = cell('paid');
+        const paid = sheetFlag(flag);
+        if (paid === null && String(flag ?? '').trim() !== '') {
+          fail(`La columna «Transf.» tiene un valor que no se entiende («${truncate(String(flag), 12)}»). Usá TRUE o FALSE.`);
+          continue;
+        }
+        if (paid !== true) { skipped.sinCobro++; continue; }
+      }
       // Si el cliente indicó qué estados significan «cobrado», una fila en otro estado deja
       // su venta y no genera cobro. Sin estados configurados se mantiene el comportamiento
       // anterior: el cobro se registra siempre que la fila traiga comisión.

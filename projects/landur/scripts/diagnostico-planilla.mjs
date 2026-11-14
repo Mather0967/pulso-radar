@@ -107,4 +107,15 @@ if (!report.repeatedRefs.length) console.log('  ninguna');
 for (const row of report.repeatedRefs) console.log(`  ${row.ref}  → ${row.count} ventas`);
 console.log(`\nCobros registrados: ${report.collectionsForSales} · ventas con cobro: ${report.salesWithCollection}/${sales.size} · cobros sin venta: ${report.orphanCollections}`);
 console.log('\nRecordá: el saldo de las cuentas suma cobros y resta gastos; las ventas quedan como pendientes de cobro.');
+
+// Listado opcional para revisar cobros que la planilla no confirma (p. ej. filas con
+// «Transf.» = FALSE asentadas con la regla anterior): se revierten desde la app, con auditoría.
+if (process.argv.includes('--collections')) {
+  console.log('\nCobros de planilla asentados:');
+  const collections = ops.filter(item => item.kind === 'collection');
+  if (!collections.length) console.log('  ninguno');
+  for (const op of collections) {
+    console.log(`  ${op.date}  ${op.concept}  ${money(op.amount, op.currency)}  [${op.external_id}]`);
+  }
+}
 db.close();
