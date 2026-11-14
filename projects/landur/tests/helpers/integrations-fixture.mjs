@@ -162,6 +162,9 @@ export async function fakeFetch(url, options = {}) {
     if (href.includes('repetidas')) return respond({values: REPETIDAS_ROWS});
     if (href.includes('mayorista')) return respond({values: MAYORISTA_ROWS});
     if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
+    if (href.includes('pagados')) return respond({values: PAGADOS_ROWS});
+    if (href.includes('transf-raro')) return respond({values: TRANSF_RARO_ROWS});
+    if (href.includes('impagos')) return respond({values: IMPAGOS_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }
@@ -177,7 +180,8 @@ export async function integrationsAgainst() {
 }
 
 export function saveShopify({currency = 'USD', accountId, ...rest} = {}) {
-  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, commission: '2.00', accountId: accountId ?? null, ...rest};
+  // Shopify ya no descuenta comisión: el cobro entra por el total de la orden.
+  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, accountId: accountId ?? null, ...rest};
 }
 
 export function saveMeta({accountId, ...rest} = {}) {

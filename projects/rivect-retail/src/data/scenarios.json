@@ -1,0 +1,50 @@
+[
+  {
+    "key": "conservador",
+    "label": "Conservador",
+    "summary": "Automatización parcial, solo consultas de catálogo y disponibilidad.",
+    "assumptions": {
+      "automationPercentage": 45,
+      "recoveredSales": 9,
+      "averageMinutesPerQuery": 8,
+      "contributionMargin": 34
+    },
+    "rationale": [
+      "Se automatiza menos de la mitad de las consultas.",
+      "Solo se recuperan conversaciones con intención explícita de compra.",
+      "Se mantiene una revisión humana de cada respuesta sugerida."
+    ]
+  },
+  {
+    "key": "equilibrado",
+    "label": "Equilibrado",
+    "summary": "Catálogo, stock, seguimiento y reservas con supervisión del equipo.",
+    "assumptions": {
+      "automationPercentage": 62,
+      "recoveredSales": 22,
+      "averageMinutesPerQuery": 7,
+      "contributionMargin": 38
+    },
+    "rationale": [
+      "Cobertura amplia de consultas repetitivas de atención.",
+      "Seguimiento automático de conversaciones sin respuesta.",
+      "El equipo interviene solo en casos de excepción."
+    ]
+  },
+  {
+    "key": "optimista",
+    "label": "Optimista",
+    "summary": "Automatización completa de atención, recuperación y campañas.",
+    "assumptions": {
+      "automationPercentage": 78,
+      "recoveredSales": 40,
+      "averageMinutesPerQuery": 6,
+      "contributionMargin": 42
+    },
+    "rationale": [
+      "Automatización de la mayoría de consultas entrantes.",
+      "Recuperación activa de oportunidades y campañas estacionales.",
+      "Requiere catálogo y stock actualizados de forma constante."
+    ]
+  }
+]

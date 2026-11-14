@@ -36,5 +36,25 @@ try {
     });
   }
 }catch(e){error.textContent=e.message;}
+// React Bits · SpotlightCard & Micro-interactions
+function setupSpotlights() {
+  const cards = document.querySelectorAll('[data-spotlight]');
+  cards.forEach((card, index) => {
+    card.style.setProperty('--card-index', index);
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty('--spot-x', `${x}px`);
+      card.style.setProperty('--spot-y', `${y}px`);
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.removeProperty('--spot-x');
+      card.style.removeProperty('--spot-y');
+    });
+  });
+}
+setupSpotlights();
+
 // Never restore personalized project/permission HTML from back-forward cache.
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});

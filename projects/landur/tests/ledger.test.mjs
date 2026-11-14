@@ -497,3 +497,29 @@ test('corregir una cuenta valida corte, moneda e importe antes de tocar nada', t
   assert.equal(run({kind:'account.update',accountId:empty,name:'Caja nueva',accountKind:'cash',currency:'USD',opening:'0',cutoff:'2026-10-01',verified:true,accessible:true}).changed,true);
   assert.equal(ledger.snapshot('a').accounts.find(a=>a.id===empty).currency,'USD');
 });
+
+test('cobros en bloque: borra los de la planilla con su comisión y deja el resto', t => {
+  const {ledger,run,account,op}=fixture(t);
+  const wallet=account({name:'Billetera',accountKind:'wallet',opening:'10000'});
+  const sheetSale=run(op('sale',{amount:'1000',source:'sheets',externalId:'row-A'})).id;
+  run(op('collection',{amount:'1000',accountId:wallet,targetId:sheetSale,commission:'100',source:'sheets',externalId:'row-A-cobro'}));
+  const manualSale=run(op('sale',{amount:'500',source:'manual',externalId:'manual-1'})).id;
+  run(op('collection',{amount:'500',accountId:wallet,targetId:manualSale,commission:'0',source:'manual',externalId:'manual-1-cobro'}));
+
+  // Sin la palabra de confirmación no se borra nada.
+  assert.throws(()=>run({kind:'collections.delete',source:'sheets'}), /BORRAR/);
+  assert.equal(ledger.snapshot('a').operations.filter(o=>o.kind==='collection').length,2);
+
+  const done=run({kind:'collections.delete',source:'sheets',confirm:'BORRAR'});
+  assert.equal(done.deleted,1);
+  assert.equal(done.total,100000);
+  const ops=ledger.snapshot('a').operations;
+  assert.equal(ops.filter(o=>o.kind==='collection').length,1);   // el cobro manual sigue
+  assert.equal(ops.filter(o=>o.kind==='commission').length,0);   // la comisión se fue con su cobro
+  assert.equal(ops.filter(o=>o.kind==='sale').length,2);         // las ventas no se tocan
+  // Saldo: apertura de la billetera más el cobro manual, que no tuvo comisión.
+  assert.equal(ledger.snapshot('a').accounts.find(a=>a.id===wallet).balance,1000000+50000);
+  // La venta de la planilla vuelve a estar pendiente de cobro.
+  assert.equal(ledger.snapshot('a').totals[0].receivable,100000);
+  assert.ok(ledger.snapshot('a').audit.some(entry=>entry.action==='collections.deleted'));
+});

@@ -33,7 +33,8 @@ test('shopify: ventas pagas se registran como venta + cobro; test y canceladas s
   const kinds = ledger.snapshot('landur').operations.map(o => o.kind);
   assert.equal(kinds.filter(k => k === 'sale').length, 2);
   assert.equal(kinds.filter(k => k === 'collection').length, 2);
-  assert.equal(kinds.filter(k => k === 'commission').length, 2); // la comisión queda explícita
+  // Shopify ya no descuenta comisión: el cobro entra por el total y el ajuste es manual.
+  assert.equal(kinds.filter(k => k === 'commission').length, 0);
 
   // Segunda sincronía: nada nuevo.
   const second = await connections.sync(ledger, 'landur', 'tester', 'shopify', {});
@@ -106,19 +107,22 @@ test('sheets: cada fila es una venta y, con cuenta, su cobro; repetir no duplica
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
-  // 3 filas con importe: 2 enviadas + 1 cancelada.
+  // 3 filas con importe: 2 activas + 1 cancelada. Las activas tienen «Transf.» = FALSE:
+  // dejan su venta y ningún cobro.
   assert.equal(summary.rows, 3);
   assert.equal(summary.created.length, 8); // 2 ventas + 2 cobros + 2 materiales + 2 envíos
   assert.equal(summary.skipped.canceladas, 1);
+  assert.equal(summary.skipped.sinCobro, 2);
   assert.deepEqual(summary.errors, []);
   assert.equal(summary.since, '2026-11-08');
   assert.equal(summary.until, '2026-11-09');
 
   const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
   assert.equal(ops.filter(o => o.kind === 'sale').length, 2);
-  assert.equal(ops.filter(o => o.kind === 'collection').length, 2);
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
   const sale = ops.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
   assert.equal(sale.amount, 97000);
+  assert.equal(sale.date, '2026-11-08');
   assert.match(sale.concept, /Esteban Fernandez/);
   // La comisión sale de la planilla (MP Fee = 101), no de una regla inventada.
   const collection = ops.find(o => o.kind === 'collection' && o.external_id === 'row-#1275-cobro');
@@ -222,10 +226,8 @@ test('sheets: la pestaña minorista real ubica cada columna en su lugar', async 
   assert.equal(sale.date, '2026-11-08');
   assert.match(sale.concept, /Esteban Fernandez/);
   assert.match(sale.concept, /2 ilumimate1/); // usa «Pedido», no «Material» ni «Cuenta Landur»
-  // El cobro sale del MP Fee de esa fila (101 sobre 970), no de una columna vecina.
-  const collection = ops.find(o => o.external_id === 'row-#1275-cobro');
-  assert.equal(collection.amount, 97000);
-  assert.equal(collection.applied ?? 0, 0);
+  // La fila tiene «Transf.» = FALSE: queda como venta pendiente y no se registra cobro.
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
   ledger.close();
 });
 

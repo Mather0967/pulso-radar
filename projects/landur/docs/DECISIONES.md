@@ -117,3 +117,39 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
   no se asienta y se informa en el resumen de la sincronía.
 - **Minorista queda igual por ahora.** Su columna `Material` no se descuenta hasta que el cliente
   lo confirme.
+
+### Marca de pago: «Transf.» de la planilla (11/11/2026)
+
+- **El pago lo dice la planilla, no el estado de logística.** `Transf.` TRUE = el dinero llegó;
+  FALSE o vacío = el pedido sigue pendiente. Esa columna manda por sobre `paidStates`.
+- **`paidStates` queda como respaldo** para planillas sin esa columna; nunca se cobra por la sola
+  presencia de una comisión cuando la planilla dice que el pedido no está transferido.
+- **No se borra ni se reescribe dinero ya asentado.** Los cobros creados con la regla anterior se
+  revierten desde la app, con su registro de auditoría.
+
+### La sincronía corrige el cobro, no lo deja pasar (11/11/2026)
+
+- **La planilla es la fuente del pago.** Si desmarca un pedido (o lo cancela), el cobro asentado
+  se revierte en la siguiente sincronía; no se edita ni se borra la operación original.
+- **Reactivable.** Volver a marcar `Transf.` en TRUE registra un cobro nuevo con otra referencia
+  externa, porque la anterior pertenece al registro revertido.
+- **La reversión es visible.** Aparece como «Reversión» en Movimientos y queda en la auditoría:
+  si la corrección fue un error de la planilla, se ve y se puede volver a marcar el pago.
+
+### Lo automático no decide por el cliente (11/11/2026)
+
+- **La sincronía corre sola, la decisión de recuperar es humana.** Sincronizar cada 15 minutos
+  mantiene los datos al día; volver a crear una venta eliminada necesita una respuesta explícita,
+  porque «eliminé esta venta» es una decisión, no un dato faltante.
+- **Shopify entra por el total.** La comisión no se estima: el ajuste es posterior y manual.
+- **Nada se rehace en silencio.** Lo recuperado queda como registro nuevo con referencia
+  `…-r2`, y el original revertido sigue visible con su contra-asiento.
+
+### Borrar en bloque exige una decisión explícita (11/11/2026)
+
+- **La acción destructiva no vive al alcance del pulgar:** está detrás de un desplegable en la
+  ficha de la conexión, con el número y el importe a la vista.
+- **La confirmación viaja al servidor.** El comando `collections.delete` rechaza cualquier
+  llamada sin `confirm: "BORRAR"`, aunque salte la interfaz.
+- **Se borra, pero no en silencio:** la auditoría guarda el detalle de lo eliminado. Una venta
+  sin cobro queda pendiente, nunca desaparece.

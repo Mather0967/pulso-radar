@@ -106,8 +106,8 @@ export function ChatPanel({
                 <div
                   className={
                     isCustomer
-                      ? 'rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2.5 text-[13px] leading-relaxed text-white shadow-[0_10px_30px_-16px_rgba(47,116,255,0.9)]'
-                      : 'rounded-2xl rounded-bl-md border border-line bg-ink-800/90 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-300'
+                      ? 'rounded-2xl rounded-br-sm bg-gradient-to-r from-brand-600 to-brand-500 px-4 py-2.5 text-[13px] leading-relaxed text-white shadow-[0_10px_26px_-10px_rgba(47,116,255,0.7),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      : 'rounded-2xl rounded-bl-sm border border-line/80 bg-gradient-to-b from-ink-800/95 to-ink-850/95 px-4 py-2.5 text-[13px] leading-relaxed text-slate-200 shadow-sm'
                   }
                 >
                   <p className="whitespace-pre-line">
@@ -115,7 +115,7 @@ export function ChatPanel({
                   </p>
                   <p
                     className={`mt-1 text-right text-[9px] ${
-                      isCustomer ? 'text-white/60' : 'text-slate-600'
+                      isCustomer ? 'text-white/70' : 'text-slate-500'
                     }`}
                   >
                     {formatTime(message.at)}
@@ -129,19 +129,19 @@ export function ChatPanel({
                       <button
                         key={`${message.id}-${product.id}`}
                         onClick={() => onSelectProduct(product)}
-                        className="flex w-full items-center gap-2.5 rounded-xl border border-line bg-ink-900/80 p-2 text-left transition hover:border-brand-500/40"
+                        className="group/prod flex w-full items-center gap-2.5 rounded-xl border border-line/80 bg-ink-900/85 p-2.5 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 hover:shadow-md"
                       >
                         <ProductThumb category={product.category} name={product.name} size="sm" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[11px] font-medium text-slate-200">
+                          <p className="truncate text-xs font-medium text-slate-100 group-hover/prod:text-brand-200">
                             {product.name}
                           </p>
-                          <p className="text-[10px] text-slate-500">
+                          <p className="text-[11px] text-slate-400">
                             {money(product.price)}
                             {ref.variant ? ` · ${ref.variant}` : ''}
                           </p>
                         </div>
-                        <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-500">
+                        <span className="rounded-full border border-line bg-ink-800/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 group-hover/prod:border-brand-500/30 group-hover/prod:text-brand-300">
                           {ref.reason}
                         </span>
                       </button>
@@ -150,7 +150,7 @@ export function ChatPanel({
                 ) : null}
 
                 {!isCustomer && message.meta?.detected?.length ? (
-                  <p className="mt-1 pl-1 text-[9px] text-slate-600">
+                  <p className="mt-1 pl-1 text-[9px] text-slate-500">
                     {message.meta.detected.join(' · ')}
                   </p>
                 ) : null}
@@ -161,12 +161,12 @@ export function ChatPanel({
 
         {typing ? (
           <div className="flex justify-start">
-            <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-line bg-ink-800/90 px-3.5 py-3">
+            <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-line/80 bg-ink-800/95 px-4 py-3 shadow-sm">
               {[0, 1, 2].map((dot) => (
                 <span
                   key={dot}
-                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-500"
-                  style={{ animationDelay: `${dot * 120}ms` }}
+                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-400"
+                  style={{ animationDelay: `${dot * 140}ms` }}
                 />
               ))}
             </div>
@@ -175,13 +175,13 @@ export function ChatPanel({
       </div>
 
       {quickReplies.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 border-t border-line/60 bg-ink-900/40 px-3 py-2">
+        <div className="flex flex-wrap gap-1.5 border-t border-line/60 bg-ink-900/60 px-3.5 py-2.5">
           {quickReplies.map((reply) => (
             <button
               key={reply}
               onClick={() => onSend(reply)}
               disabled={disabled}
-              className="rounded-full border border-brand-500/30 bg-brand-500/10 px-2.5 py-1 text-[11px] text-brand-200 transition hover:bg-brand-500/20 disabled:opacity-50"
+              className="rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200 shadow-sm transition-all hover:scale-105 hover:border-brand-500/60 hover:bg-brand-500/20 hover:text-white disabled:opacity-50"
             >
               {reply}
             </button>
@@ -189,7 +189,7 @@ export function ChatPanel({
         </div>
       ) : null}
 
-      <form onSubmit={submit} className="border-t border-line bg-ink-900/70 p-3">
+      <form onSubmit={submit} className="border-t border-line bg-ink-900/80 p-3">
         <div className="flex items-center gap-2">
           <input
             value={input}
@@ -202,7 +202,7 @@ export function ChatPanel({
           <button
             type="submit"
             disabled={disabled || input.trim().length === 0}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white transition hover:bg-brand-400 disabled:opacity-40"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_4px_16px_rgba(47,116,255,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:from-brand-500 hover:to-brand-400 active:scale-95 disabled:opacity-40"
             aria-label="Enviar mensaje"
           >
             <Send className="h-4 w-4" />

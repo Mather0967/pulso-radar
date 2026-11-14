@@ -210,6 +210,16 @@ function sheetDate(value, marker, label) {
   }
   throw new DomainError(`${label}: la fecha «${truncate(text, 20)}» no se entiende. Usá una columna de fecha real o indicá el mes de la planilla.`);
 }
+// «Transf.» es la marca de pago de la planilla: TRUE cuando el dinero llegó. Una celda vacía
+// no es TRUE: no se registra un cobro que la planilla no confirma.
+function sheetFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1 ? true : value === 0 ? false : null;
+  const text = foldCell(value);
+  if (['true', 'verdadero', 'si', 'x', '1', 'yes'].includes(text)) return true;
+  if (['false', 'falso', 'no', '0'].includes(text)) return false;
+  return null;
+}
 const SHEET_COLUMNS = {
   date: ['fecha', 'dia', 'date'],
   customer: ['cliente', 'customer', 'nombre'],
@@ -220,6 +230,8 @@ const SHEET_COLUMNS = {
   gross: ['bruto', 'total', 'importe bruto'],
   fee: ['mp fee', 'fee', 'comision', 'comision mp', 'arancel'],
   net: ['mp neto', 'neto', 'importe neto'],
+  // El cliente marca el pago en «Transf.» (TRUE/FALSE), no en «Estado» (eso es logística).
+  paid: ['transf'],
   // La pestaña mayorista separa el costo real del material del valor con 10 % cargado.
   material: ['material real'],
   materialPlus: ['material 10', 'material + 10'],
@@ -327,7 +339,6 @@ function validateSave(ledger, workspace, input) {
     config.domain = normalizeShopifyDomain(input.domain);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la tienda (UYU, USD o BRL).');
-    config.commission = parseMoney(input.commission ?? previous?.commission ?? '0');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
     config.accessToken = nextToken ?? previous?.accessToken ?? null;
     if (!config.accessToken)
@@ -376,7 +387,9 @@ async function syncShopify(ledger, workspace, actor, config, since, until, fetch
 
   let account = null;
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
-  const commission = parseMoney(config.commission ?? '0');
+  // La comisión de Shopify no se estima acá: el cobro entra por el total de la orden y el
+  // ajuste se hace después. Inventar un descuento dejaría el saldo por debajo de la realidad.
+  const commission = '0.00';
   const created = [], skipped = { duplicadas: 0, prueba: 0, canceladas: 0, vacias: 0, sinCobro: 0 }, errors = [];
   let missingAccountAccounted = false;
   for (const order of orders) {
@@ -409,7 +422,6 @@ async function syncShopify(ledger, workspace, actor, config, since, until, fetch
         continue;
       }
       if (account.currency !== currency) { fail(`La cuenta elegida maneja ${account.currency}; los cobros de esta orden son en ${currency}. Elegí una cuenta de esa moneda para la conexión.`); continue; }
-      if (Number(commission) >= Number(total)) { fail(`La comisión configurada (${commission}) no deja saldo por cobrar en ${label}. Revisá la comisión en Configuración.`); continue; }
       const collectionExternal = `order-${order.id}-cobro`;
       if (externalExists(ledger, workspace, 'shopify', collectionExternal)) { skipped.duplicadas++; continue; }
       const run = ledger.command(workspace, actor, truncate(`cobro-shopify-${order.id}`, 100),
@@ -481,7 +493,10 @@ async function syncMeta(ledger, workspace, actor, config, since, until, fetchImp
 // La planilla es la fuente de la venta: cada fila entra como venta y, si la conexión tiene
 // cuenta, también su cobro con la comisión que figura en la propia fila (MP Fee, o Bruto −
 // MP Neto). No se calcula nada que la planilla no diga: sin comisión no hay cobro.
-async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
+async function syncSheets(ledger, workspace, actor, config, fetchImpl, options = {}) {
+  // `restoreDeleted` viene de la pregunta de la app: la sincronía nunca rehace una venta
+  // eliminada por su cuenta, porque eso sería decidir por el cliente.
+  const restoreDeleted = options.restoreDeleted === true;
   const token = await googleAccessToken(config.serviceAccount, fetchImpl);
   // El nombre de la pestaña va entre comillas: con espacios o puntos, la anotación A1 sin
   // comillas no es válida y Google rechaza la lectura.
@@ -636,6 +651,17 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       if (shippingField) syncExpense({ saleExternal, suffix: '-envio', cell: cell(shippingField), concept: `Envío · ${order || customer || detail || 'planilla'}`, category: 'Envíos', date, label, skipKey: 'sinEnvio', what: 'El envío' });
       // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
       if (!account) continue;
+      // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga
+      // «Estado» (que es logística) ni si hay comisión en la fila.
+      if (columns.paid >= 0) {
+        const flag = cell('paid');
+        const paid = sheetFlag(flag);
+        if (paid === null && String(flag ?? '').trim() !== '') {
+          fail(`La columna «Transf.» tiene un valor que no se entiende («${truncate(String(flag), 12)}»). Usá TRUE o FALSE.`);
+          continue;
+        }
+        if (paid !== true) { if (dropCollection()) skipped.revertidas++; else skipped.sinCobro++; continue; }
+      }
       // Si el cliente indicó qué estados significan «cobrado», una fila en otro estado deja
       // su venta y no genera cobro. Sin estados configurados se mantiene el comportamiento
       // anterior: el cobro se registra siempre que la fila traiga comisión.
