@@ -330,7 +330,7 @@ function connectionForm(kind){
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto'], revertidas:['cobro revertido (la planilla no lo marca transferido)','cobros revertidos (la planilla no los marca transferidos)']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.

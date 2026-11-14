@@ -88,6 +88,13 @@ const PAGADOS_ROWS = [
   MINORISTA_ROWS[2].map((value, index) => (index === 19 ? true : index === 7 ? 'Enviado' : value)),
 ];
 const TRANSF_RARO_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1].map((value, index) => (index === 19 ? 'no sé' : value))];
+// Las mismas dos filas, con el pago marcado y sin marcar: sirven para comprobar que la
+// sincronía revierte el cobro cuando la planilla lo desmarca y lo vuelve a registrar después.
+const IMPAGOS_ROWS = [
+  MINORISTA_HEADER,
+  MINORISTA_ROWS[1],
+  MINORISTA_ROWS[2].map((value, index) => (index === 7 ? 'Enviado' : value)),
+];
 
 async function fakeFetch(url, options = {}) {
   const href = String(url);
@@ -127,6 +134,7 @@ async function fakeFetch(url, options = {}) {
     if (href.includes('referencias')) return respond({values: REFERENCIAS_ROWS});
     if (href.includes('pagados')) return respond({values: PAGADOS_ROWS});
     if (href.includes('transf-raro')) return respond({values: TRANSF_RARO_ROWS});
+    if (href.includes('impagos')) return respond({values: IMPAGOS_ROWS});
     if (href.includes('estados')) return respond({values: ESTADO_ROWS});
     return respond({values: href.includes('solodia') ? DAY_ONLY_ROWS : MINORISTA_ROWS});
   }

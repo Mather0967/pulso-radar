@@ -443,3 +443,17 @@ aparecía por encima de la realidad.
 - Los cobros ya asentados con la regla anterior **no se borran solos**: se revierten desde la app,
   con su auditoría, para que el saldo vuelva a coincidir con la planilla.
   `node scripts/diagnostico-planilla.mjs <base.sqlite> --collections` los lista.
+
+### La sincronía reconcilia el cobro con la planilla (11/11/2026)
+
+Las cifras de la planilla y de LANDUR no coincidían porque había cobros asentados de pedidos
+que la planilla no marca como transferidos (la regla anterior miraba `Estado`). No alcanza con
+dejar de crearlos: los ya asentados seguían inflando el saldo.
+
+- Al sincronizar, si una fila deja de estar transferida (`Transf.` en FALSE o vacía), se
+  **cancela** o pierde la comisión, el cobro asentado se **revierte** con su contra-asiento
+  auditado (la comisión se revierte junto). El resumen lo informa como «cobro revertido».
+- Si la fila vuelve a marcar `Transf.` en TRUE, se registra un cobro nuevo con referencia
+  `…-cobro-r2` (la original queda ocupada por el registro revertido, que no se borra).
+- Revertir no borra nada: el cobro original queda marcado, con su contra-asiento y su entrada
+  en la auditoría. El saldo vuelve a reflejar la planilla.

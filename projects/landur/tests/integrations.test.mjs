@@ -323,3 +323,36 @@ test('sheets: un valor que no se entiende en «Transf.» se informa y no cobra',
   assert.equal(summary.created.filter(item => item.kind === 'collection').length, 0);
   ledger.close();
 });
+
+test('sheets: si la planilla desmarca el pago, el cobro se revierte y el saldo vuelve', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  // El saldo es la apertura de la cuenta más lo que entren los cobros.
+  const opening = ledger.snapshot('landur').accounts.find(a => a.id === accountId).balance;
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'pagados'}));
+  const first = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(first.created.filter(item => item.kind === 'collection').length, 2);
+  assert.ok(ledger.snapshot('landur').accounts.find(a => a.id === accountId).balance > opening);
+
+  // La planilla deja de marcar «Transf.»: ese cobro no corresponde y se revierte.
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'impagos'}));
+  const second = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(second.created, []);
+  assert.equal(second.skipped.revertidas, 2);
+  assert.equal(ledger.snapshot('landur').accounts.find(a => a.id === accountId).balance, opening);
+  const ops = ledger.snapshot('landur').operations;
+  assert.equal(ops.filter(o => o.kind === 'reversal').length, 4); // 2 cobros + sus 2 comisiones
+  assert.equal(ops.filter(o => o.kind === 'collection' && !o.reversed_by).length, 0);
+
+  // Repetir la sincronía no revierte dos veces.
+  const third = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(third.skipped.revertidas ?? 0, 0);
+
+  // Vuelve a marcar el pago: el cobro se registra de nuevo, con otra referencia.
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'pagados'}));
+  const fourth = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(fourth.created.filter(item => item.kind === 'collection').length, 2);
+  const live = ledger.snapshot('landur').operations.filter(o => o.kind === 'collection' && !o.reversed_by);
+  assert.equal(live.length, 2);
+  assert.ok(live.every(o => /-r2$/.test(o.external_id)));
+  ledger.close();
+});
