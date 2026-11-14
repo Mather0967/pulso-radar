@@ -135,3 +135,12 @@ Para registrar otro cambio: fecha, solicitud, aprobador, decisión, motivo, efec
   externa, porque la anterior pertenece al registro revertido.
 - **La reversión es visible.** Aparece como «Reversión» en Movimientos y queda en la auditoría:
   si la corrección fue un error de la planilla, se ve y se puede volver a marcar el pago.
+
+### Lo automático no decide por el cliente (11/11/2026)
+
+- **La sincronía corre sola, la decisión de recuperar es humana.** Sincronizar cada 15 minutos
+  mantiene los datos al día; volver a crear una venta eliminada necesita una respuesta explícita,
+  porque «eliminé esta venta» es una decisión, no un dato faltante.
+- **Shopify entra por el total.** La comisión no se estima: el ajuste es posterior y manual.
+- **Nada se rehace en silencio.** Lo recuperado queda como registro nuevo con referencia
+  `…-r2`, y el original revertido sigue visible con su contra-asiento.

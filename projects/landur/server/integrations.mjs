@@ -305,7 +305,6 @@ function validateSave(ledger, workspace, input) {
     config.domain = normalizeShopifyDomain(input.domain);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la tienda (UYU, USD o BRL).');
-    config.commission = parseMoney(input.commission ?? previous?.commission ?? '0');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
     config.accessToken = nextToken ?? previous?.accessToken ?? null;
     if (!config.accessToken)
@@ -354,7 +353,9 @@ async function syncShopify(ledger, workspace, actor, config, since, until, fetch
 
   let account = null;
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
-  const commission = parseMoney(config.commission ?? '0');
+  // La comisión de Shopify no se estima acá: el cobro entra por el total de la orden y el
+  // ajuste se hace después. Inventar un descuento dejaría el saldo por debajo de la realidad.
+  const commission = '0.00';
   const created = [], skipped = { duplicadas: 0, prueba: 0, canceladas: 0, vacias: 0, sinCobro: 0 }, errors = [];
   let missingAccountAccounted = false;
   for (const order of orders) {
@@ -387,7 +388,6 @@ async function syncShopify(ledger, workspace, actor, config, since, until, fetch
         continue;
       }
       if (account.currency !== currency) { fail(`La cuenta elegida maneja ${account.currency}; los cobros de esta orden son en ${currency}. Elegí una cuenta de esa moneda para la conexión.`); continue; }
-      if (Number(commission) >= Number(total)) { fail(`La comisión configurada (${commission}) no deja saldo por cobrar en ${label}. Revisá la comisión en Configuración.`); continue; }
       const collectionExternal = `order-${order.id}-cobro`;
       if (externalExists(ledger, workspace, 'shopify', collectionExternal)) { skipped.duplicadas++; continue; }
       const run = ledger.command(workspace, actor, truncate(`cobro-shopify-${order.id}`, 100),
@@ -459,7 +459,10 @@ async function syncMeta(ledger, workspace, actor, config, since, until, fetchImp
 // La planilla es la fuente de la venta: cada fila entra como venta y, si la conexión tiene
 // cuenta, también su cobro con la comisión que figura en la propia fila (MP Fee, o Bruto −
 // MP Neto). No se calcula nada que la planilla no diga: sin comisión no hay cobro.
-async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
+async function syncSheets(ledger, workspace, actor, config, fetchImpl, options = {}) {
+  // `restoreDeleted` viene de la pregunta de la app: la sincronía nunca rehace una venta
+  // eliminada por su cuenta, porque eso sería decidir por el cliente.
+  const restoreDeleted = options.restoreDeleted === true;
   const token = await googleAccessToken(config.serviceAccount, fetchImpl);
   // El nombre de la pestaña va entre comillas: con espacios o puntos, la anotación A1 sin
   // comillas no es válida y Google rechaza la lectura.
@@ -482,7 +485,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
 
   let account = null;
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
-  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0, revertidas: 0 }, errors = [];
+  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0, revertidas: 0, eliminadas: 0 }, errors = [];
   let read = 0, first = null, last = null;
   // La cuenta guardada puede haberse eliminado después: se avisa una vez y se siguen
   // registrando las ventas, que no dependen de una cuenta.
@@ -517,6 +520,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       const collectionExternal = `${saleExternal}-cobro`;
       // Un cobro que la planilla ya no respalda se revierte con su contra-asiento (auditado):
       // el saldo vuelve a coincidir con la planilla y el registro original se conserva.
+      // Cantidad de registros que ya usaron esta referencia: el primero, más las reactivaciones
+      // (`-r2`, `-r3`…). La referencia externa de un registro revertido no se libera.
+      const sheetAttempts = base => ledger.db.prepare("SELECT external_id FROM operations WHERE workspace=? AND source='sheets'").all(workspace)
+        .filter(op => op.external_id === base || String(op.external_id ?? '').startsWith(`${base}-r`)).length;
       const dropCollection = () => {
         const live = ledger.db.prepare("SELECT id FROM operations WHERE workspace=? AND source='sheets' AND external_id=? AND kind='collection' AND reversed_by IS NULL").get(workspace, collectionExternal);
         if (!live) return false;
@@ -532,17 +539,22 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       // otro carácter de la referencia (#, puntos, dos puntos) se reemplaza. La referencia
       // externa, que sí puede llevarlos, queda intacta.
       const keyRef = reference.replace(/[^A-Za-z0-9_-]+/g, '-');
-      let saleRow = ledger.db.prepare('SELECT id, amount, date FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', saleExternal);
+      let saleRow = ledger.db.prepare('SELECT id, amount, date, reversed_by FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', saleExternal);
       if (saleRow && (saleRow.amount !== Math.round(Number(gross) * 100) || saleRow.date !== date)) {
         // Misma referencia con otro importe o fecha: puede ser un número de pedido repetido o
         // una fila editada. No se salta en silencio ni se duplica: se avisa por fila.
         fail(`La referencia ${reference} ya está registrada con otro importe o fecha (${saleRow.date}, ${(saleRow.amount / 100).toFixed(2)}). Revisá el número de pedido en la planilla.`);
         continue;
       }
-      if (!saleRow) {
+      // Una venta que se eliminó (reversión) y sigue en la planilla no se rehace sola: se
+      // cuenta y la app pregunta si querés agregar también las eliminadas.
+      const deleted = Boolean(saleRow?.reversed_by);
+      if (deleted && !restoreDeleted) { skipped.eliminadas++; continue; }
+      if (!saleRow || deleted) {
         const concept = truncate([order ? `Pedido ${order}` : '', customer, detail].filter(Boolean).join(' · ') || 'Venta de planilla', 115);
-        const run = ledger.command(workspace, actor, truncate(`venta-planilla-${keyRef}`, 100),
-          { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: saleExternal });
+        const suffix = deleted ? `-r${sheetAttempts(saleExternal) + 1}` : '';
+        const run = ledger.command(workspace, actor, truncate(`venta-planilla-${keyRef}${suffix}`, 100),
+          { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: `${saleExternal}${suffix}` });
         created.push({ kind: 'sale', id: run.id, ref: label });
         saleRow = { id: run.id };
       }
@@ -558,12 +570,14 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
           if (!account) skipped.sinMaterial++;
           else {
             const materialExternal = `${saleExternal}-material`;
-            const registered = ledger.db.prepare('SELECT amount, date FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', materialExternal);
+            const registered = ledger.db.prepare('SELECT amount, date, reversed_by FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, 'sheets', materialExternal);
             if (registered && (registered.amount !== Math.round(Number(material) * 100) || registered.date !== date))
               fail(`El material de ${reference} ya está registrado con otro importe o fecha (${registered.date}, ${(registered.amount / 100).toFixed(2)}). Revisá la planilla.`);
-            else if (!registered) {
-              const run = ledger.command(workspace, actor, truncate(`material-planilla-${keyRef}`, 100),
-                { kind: 'expense', concept: truncate(`Material · ${detail || customer || 'planilla'}`, 115), amount: material, currency: config.currency, date, category: 'Materiales', accountId: account.id, source: 'sheets', externalId: materialExternal });
+            else if (!registered || (registered.reversed_by && restoreDeleted)) {
+              // El gasto de material eliminado vuelve sólo junto con las ventas eliminadas.
+              const suffix = registered ? `-r${sheetAttempts(materialExternal) + 1}` : '';
+              const run = ledger.command(workspace, actor, truncate(`material-planilla-${keyRef}${suffix}`, 100),
+                { kind: 'expense', concept: truncate(`Material · ${detail || customer || 'planilla'}`, 115), amount: material, currency: config.currency, date, category: 'Materiales', accountId: account.id, source: 'sheets', externalId: `${materialExternal}${suffix}` });
               created.push({ kind: 'expense', id: run.id, ref: label });
             }
           }
@@ -603,8 +617,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl) {
       // Si un cobro anterior de la misma fila se revirtió, la referencia externa sigue
       // ocupada: el nuevo cobro lleva un sufijo para que volver a marcar «Transf.» no quede
       // trabado y la fila vuelva a tener su cobro.
-      const attempts = ledger.db.prepare("SELECT external_id FROM operations WHERE workspace=? AND source='sheets'").all(workspace)
-        .filter(op => op.external_id === collectionExternal || String(op.external_id ?? '').startsWith(`${collectionExternal}-r`)).length;
+      const attempts = sheetAttempts(collectionExternal);
       const suffix = attempts ? `-r${attempts + 1}` : '';
       const run = ledger.command(workspace, actor, truncate(`cobro-planilla-${keyRef}${suffix}`, 100),
         { kind: 'collection', concept: truncate(`Cobro · ${order || customer || 'planilla'}`, 115), accountId: account.id, targetId: saleRow.id, amount: gross, currency: config.currency, commission, date, source: 'sheets', externalId: `${collectionExternal}${suffix}` });
@@ -639,7 +652,7 @@ export function createIntegrations({ fetchImpl = fetch } = {}) {
       throw new DomainError('Primero guardá la configuración de la conexión en Configuración.', 400);
     // La planilla se lee entera (una pestaña por mes o por libro): no hay ventana que recortar.
     if (kind === 'sheets') {
-      const summary = await syncSheets(ledger, workspace, actor, config, fetchImpl);
+      const summary = await syncSheets(ledger, workspace, actor, config, fetchImpl, { restoreDeleted: input.restoreDeleted === true });
       return finish(ledger, workspace, kind, summary, summary.since, summary.until);
     }
     let since = input.since !== undefined ? formatDate(input.since)

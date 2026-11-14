@@ -33,7 +33,8 @@ test('shopify: ventas pagas se registran como venta + cobro; test y canceladas s
   const kinds = ledger.snapshot('landur').operations.map(o => o.kind);
   assert.equal(kinds.filter(k => k === 'sale').length, 2);
   assert.equal(kinds.filter(k => k === 'collection').length, 2);
-  assert.equal(kinds.filter(k => k === 'commission').length, 2); // la comisión queda explícita
+  // Shopify ya no descuenta comisión: el cobro entra por el total y el ajuste es manual.
+  assert.equal(kinds.filter(k => k === 'commission').length, 0);
 
   // Segunda sincronía: nada nuevo.
   const second = await connections.sync(ledger, 'landur', 'tester', 'shopify', {});
@@ -354,5 +355,35 @@ test('sheets: si la planilla desmarca el pago, el cobro se revierte y el saldo v
   const live = ledger.snapshot('landur').operations.filter(o => o.kind === 'collection' && !o.reversed_by);
   assert.equal(live.length, 2);
   assert.ok(live.every(o => /-r2$/.test(o.external_id)));
+  ledger.close();
+});
+
+test('sheets: una venta eliminada no vuelve sola, y se puede recuperar a pedido', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'pagados'}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+
+  const sale = ledger.snapshot('landur').operations.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
+  const collection = ledger.snapshot('landur').operations.find(o => o.kind === 'collection' && o.related_id === sale.id);
+  // Eliminar una venta es revertirla: primero su cobro, después la venta.
+  ledger.reverse('landur', 'tester', {operationId: collection.id, date: sale.date});
+  ledger.reverse('landur', 'tester', {operationId: sale.id, date: sale.date});
+
+  const second = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(second.skipped.eliminadas, 1);
+  assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'sale' && !o.reversed_by && o.concept.includes('#1275')).length, 0);
+
+  // Con la respuesta explícita, vuelve la venta (y su cobro, que estaba revertido).
+  const restored = await connections.sync(ledger, 'landur', 'tester', 'sheets', {restoreDeleted: true});
+  assert.equal(restored.created.filter(item => item.kind === 'sale').length, 1);
+  assert.equal(restored.created.filter(item => item.kind === 'collection').length, 1);
+  const live = ledger.snapshot('landur').operations.find(o => o.kind === 'sale' && !o.reversed_by && o.concept.includes('#1275'));
+  assert.ok(live, 'la venta eliminada se vuelve a registrar');
+  assert.match(live.external_id, /-r2$/);
+  assert.equal(ledger.snapshot('landur').operations.filter(o => o.kind === 'collection' && !o.reversed_by && o.related_id === live.id).length, 1);
+
+  // Sin la marca no se duplica: la venta viva ya está.
+  const third = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(third.created.filter(item => item.kind === 'sale').length, 0);
   ledger.close();
 });

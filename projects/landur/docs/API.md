@@ -19,9 +19,11 @@ Base: mismo origen que la PWA. En modo portal, anteponer `/landur` a las rutas s
 | `GET /api/evidence/<id>` | Devuelve el archivo; solo el espacio dueño puede leerlo |
 | `GET /api/connections` | Estado de Shopify, Meta Ads y Google Sheets: configuración, credencial enmascarada (token o cuenta de servicio) y última sincronía |
 | `POST /api/connections` | `{kind, ...}`; guarda la conexión del espacio; el token vacío conserva el guardado |
-| `POST /api/sync/shopify` | Órdenes pagas como venta + cobro, deduplicadas por orden; mismo tope por sesión que la importación |
+| `POST /api/sync/shopify` | Órdenes pagas como venta + cobro por el total de la orden (no descuenta comisión: el ajuste es manual), deduplicadas por orden; mismo tope por sesión que la importación |
 | `POST /api/sync/meta` | Gasto diario por campaña como egreso, deduplicado por campaña + fecha |
 | `POST /api/sync/sheets` | Lee la pestaña elegida de Google Sheets: cada fila es una venta (deduplicada por Nro. Pedido o huella de fila) y, si la conexión tiene cuenta, también su cobro con la comisión de la propia fila. La marca de pago es la columna `Transf.` (TRUE/FALSE): sin TRUE la fila deja su venta y no genera cobro. Sin esa columna, manda `paidStates` y, sin `paidStates`, se cobra toda fila con comisión. Si una fila deja de estar transferida o se cancela, el cobro ya asentado se revierte con contra-asiento auditado; si vuelve a TRUE, se registra uno nuevo |
+
+Las conexiones configuradas se sincronizan solas cada 15 minutos (`LANDUR_SYNC_MINUTES`, `0` lo apaga), además del botón. Un `POST /api/sync/sheets` con `{"restoreDeleted": true}` vuelve a registrar las ventas que se habían eliminado y siguen en la planilla; sin esa marca, la sincronía las cuenta como `eliminadas` y no las rehace.
 
 Mutaciones: `Content-Type: application/json`, `X-Landur-Request: 1` y origen permitido. La clave idempotente debe reutilizarse al reintentar **la misma operación**, no generar otra cuando se pierde una respuesta. El servidor devuelve conflicto si la clave existe con un contenido diferente.
 

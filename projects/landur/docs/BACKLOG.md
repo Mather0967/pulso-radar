@@ -457,3 +457,16 @@ dejar de crearlos: los ya asentados seguían inflando el saldo.
   `…-cobro-r2` (la original queda ocupada por el registro revertido, que no se borra).
 - Revertir no borra nada: el cobro original queda marcado, con su contra-asiento y su entrada
   en la auditoría. El saldo vuelve a reflejar la planilla.
+
+### Sincronía automática y decisiones de dinero (11/11/2026)
+
+- **Las conexiones se sincronizan solas** cada 15 minutos en el portal (`LANDUR_SYNC_MINUTES`,
+  `0` apaga): el motor arranca el temporizador al inicializarse y hace una primera pasada.
+  Sólo sincroniza lo configurado y lo vencido (`lastSync`), así dos procesos no repiten la
+  misma consulta; un error en una conexión no frena las demás y queda en el registro.
+- **Shopify dejó de descontar comisión**: el cobro se registra por el total de la orden. El
+  ajuste real se hace después; inventar un descuento dejaría el saldo por debajo de la realidad.
+- **Ventas eliminadas**: si una venta se revirtió y la planilla todavía tiene la fila, la
+  sincronía la cuenta como `eliminadas` y **no la rehace sola**. La app pregunta «¿Querés
+  agregarlas también?» y sólo con la respuesta se vuelve a registrar, con referencia
+  `…-r2` y, si corresponde, su cobro y su material.

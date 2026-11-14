@@ -308,8 +308,7 @@ function connectionForm(kind){
   const off = state.access !== 'viewer' ? '' : 'disabled';
   const fields = kind === 'shopify' ? `
       <label class="field wide">Tienda<small>El dominio que muestra el admin de Shopify.</small><input name="domain" value="${escape(current.domain || '')}" placeholder="negocio.myshopify.com" maxlength="120" autocapitalize="none" autocorrect="off" ${off}></label>
-      <label class="field">Moneda de la tienda<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
-      <label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(current.commission ?? '0')}" maxlength="12" ${off}></label>` : kind === 'sheets' ? `
+      <label class="field">Moneda de la tienda<select name="currency" ${off}>${CURRENCIES.map(c => `<option ${c === current.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label>` : kind === 'sheets' ? `
       <label class="field wide">Planilla<small>El enlace de la hoja de Google o su identificador.</small><input name="spreadsheetId" value="${escape(current.spreadsheetId || '')}" placeholder="https://docs.google.com/spreadsheets/d/…" maxlength="400" autocapitalize="none" autocorrect="off" ${off}></label>
       <label class="field">Pestaña<input name="sheetName" value="${escape(current.sheetName || '')}" placeholder="minorista" maxlength="80" ${off}></label>
       <label class="field">Mes de la planilla<small>Solo si la fecha es el día suelto (8, 9).</small><input name="month" value="${escape(current.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label>
@@ -330,7 +329,7 @@ function connectionForm(kind){
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto'], revertidas:['cobro revertido (la planilla no lo marca transferido)','cobros revertidos (la planilla no los marca transferidos)']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto'], revertidas:['cobro revertido (la planilla no lo marca transferido)','cobros revertidos (la planilla no los marca transferidos)'], eliminadas:['venta eliminada (sigue en la planilla)','ventas eliminadas (siguen en la planilla)']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
@@ -353,12 +352,15 @@ function connectionStatus(kind){
     const skipped = Object.entries(summary.skipped || {}).filter(([, value]) => value).map(([name, value]) => `${value} ${(SKIP_LABELS[name] || [name, name])[value === 1 ? 0 : 1]}`);
     const when = ui.at.toLocaleTimeString('es-UY', {hour:'2-digit', minute:'2-digit', hour12:false});
     const period = summary.since && summary.until ? `${dateFmt(String(summary.since).slice(0,10))} al ${dateFmt(String(summary.until).slice(0,10))} · ` : '';
+    // Ventas que se eliminaron y la planilla todavía tiene: no se rehacen solas, se preguntan.
+    const eliminated = (summary.skipped || {}).eliminadas || 0;
+    const ask = eliminated && !ui.restore ? `<div class="cx-ask"><p>La planilla tiene ${eliminated} ${eliminated === 1 ? 'venta que eliminaste' : 'ventas que eliminaste'}. ¿Querés agregarlas también?</p><div class="cx-ask-actions"><button type="button" class="primary" data-connection-restore="${kind}">Sí, agregarlas</button><button type="button" class="secondary" data-connection-dismiss="${kind}">No, dejarlas</button></div></div>` : '';
     if (!created.length) {
       const dup = (summary.skipped || {}).duplicadas;
       const note = kind === 'meta' ? ' El día en curso no está consolidado en Meta: se carga hasta ayer.' : '';
-      return card('ok', 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}`), syncBtn('Sincronizar de nuevo', 'secondary'));
+      return card('ok', 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}`) + ask, syncBtn('Sincronizar de nuevo', 'secondary'));
     }
-    return card('ok', 'check', `<div class="cx-result"><div class="big">${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div></div>`, syncBtn('Sincronizar de nuevo'));
+    return card('ok', 'check', `<div class="cx-result"><div class="big">${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div>${ask}</div>`, syncBtn('Sincronizar de nuevo'));
   }
   if (!current.lastSync) return card('ok', 'check', head('check', 'Conectado', `Todavía no sincronizaste. ${connectionKinds[kind].blurb}`), syncBtn('Sincronizar ahora'));
   if (connStale(current)) return card('warn', 'alert', head('alert', `Sin sincronizar ${ago(current.lastSync)}`, `Última sincronía el ${dateFmt(current.lastSync.slice(0,10))}.`), syncBtn('Sincronizar ahora'));
@@ -377,7 +379,6 @@ function connectionDetail(kind){
   const tone = ui.phase === 'error' || (connected && connStale(current) && ui.phase === 'idle') ? ['amber', 'Requiere atención'] : connected ? ['green', 'Conectado'] : ['gray', 'Sin conectar'];
   const rows = kv(kind === 'shopify' ? 'Tienda' : kind === 'sheets' ? 'Planilla' : 'Cuenta publicitaria', kind === 'shopify' ? current.domain : kind === 'sheets' ? `${current.sheetName || ''}${current.month ? ' · ' + current.month : ' · mes sin indicar'}` : current.adAccountId)
     + kv('Se registra en', account ? `${account.name} · ${account.currency}` : '')
-    + (kind === 'shopify' && connected ? kv('Comisión', `${String(current.commission ?? '0').replace('.', ',')} %`) : '')
     + (kind === 'sheets' && connected ? kv('Cuenta de servicio', current.clientEmail) : '')
     + (kind === 'sheets' && connected ? kv('Cobra con', current.paidStates || 'toda fila con comisión') : '')
     + (kind === 'sheets' && connected ? kv('Material', current.materialColumn === 'none' ? 'No se registra' : current.materialColumn === 'plus10' ? 'Material + 10 %' : 'Material Real') : '')
@@ -397,7 +398,7 @@ const CONNECTION_HELP = {
   sheets: 'En Google Cloud, habilitá la API de Google Sheets en el proyecto y creá una cuenta de servicio con una clave JSON (Credenciales → Cuentas de servicio → Claves). Después compartí la planilla con el correo de esa cuenta (termina en .iam.gserviceaccount.com) con permiso de lector: así se lee sin publicarla en la web.'
 };
 function connectionWizard(kind){
-  const ui = connUiOf(kind), step = ui.step || 0, draft = ui.draft || (ui.draft = kind === 'shopify' ? {currency:'UYU', commission:'0'} : kind === 'sheets' ? {currency:'UYU', sheetName:'minorista'} : {});
+  const ui = connUiOf(kind), step = ui.step || 0, draft = ui.draft || (ui.draft = kind === 'shopify' ? {currency:'UYU'} : kind === 'sheets' ? {currency:'UYU', sheetName:'minorista'} : {});
   const off = state.access !== 'viewer' ? '' : 'disabled';
   const chips = WIZARD_STEPS[kind].map((label, i) => `<div class="cx-step ${i < step ? 'done' : i === step ? 'now' : ''}">${i < step ? '✓ ' : i === step ? `${i + 1} ` : ''}${label}</div>`).join('');
   let lead, fields;
@@ -412,7 +413,7 @@ function connectionWizard(kind){
     lead = 'Elegí la cuenta de LANDUR donde se van a registrar los movimientos.';
     const current = {currency: kind === 'shopify' || kind === 'sheets' ? draft.currency : '', accountId: draft.accountId};
     const head = kind === 'shopify'
-      ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label class="field">Comisión por venta<input name="commission" inputmode="decimal" value="${escape(draft.commission ?? '0')}" maxlength="12" ${off}></label></div>`
+      ? `<div class="form-grid"><label class="field">Moneda de la tienda<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>`
       : kind === 'sheets'
         ? `<div class="form-grid"><label class="field">Pestaña<input name="sheetName" value="${escape(draft.sheetName || 'minorista')}" maxlength="80" ${off}></label><label class="field">Mes de la planilla<input name="month" value="${escape(draft.month || '')}" placeholder="2026-11" maxlength="7" ${off}></label><label class="field">Estados que cuentan como cobrado<input name="paidStates" value="${escape(draft.paidStates || '')}" placeholder="Enviado, Entregado" maxlength="200" ${off}></label><label class="field">Costo de material<select name="materialColumn" ${off}><option value="real" ${(draft.materialColumn || 'real') === 'real' ? 'selected' : ''}>Material Real</option><option value="plus10" ${draft.materialColumn === 'plus10' ? 'selected' : ''}>Material + 10 %</option><option value="none" ${draft.materialColumn === 'none' ? 'selected' : ''}>No registrar gasto</option></select></label><label class="field">Moneda de la planilla<select name="currency" data-connection-currency ${off}>${CURRENCIES.map(c => `<option ${c === draft.currency ? 'selected' : ''}>${c}</option>`).join('')}</select></label></div>`
         : '';
@@ -477,7 +478,7 @@ function wireConnections(){
     button.disabled = true;
     try {
       await api('/api/connections', kind === 'shopify'
-        ? {kind, domain:data.domain, currency:data.currency, commission:data.commission || '0', accountId:data.accountId || '', accessToken:data.accessToken || ''}
+        ? {kind, domain:data.domain, currency:data.currency, accountId:data.accountId || '', accessToken:data.accessToken || ''}
         : kind === 'sheets'
           ? {kind, spreadsheetId:data.spreadsheetId, sheetName:data.sheetName, month:data.month || '', paidStates:data.paidStates || '', materialColumn:data.materialColumn || 'real', currency:data.currency, accountId:data.accountId || '', serviceAccount:data.serviceAccount || ''}
           : {kind, adAccountId:data.adAccountId, accountId:data.accountId || '', accessToken:data.accessToken || ''});
@@ -525,10 +526,37 @@ function wireConnections(){
       details?.querySelector('input[name="accessToken"]')?.focus();
       return;
     }
+    // Recuperar las ventas eliminadas: sólo con esta respuesta explícita se vuelven a crear.
+    if (event.target.closest('[data-connection-restore]')) {
+      const kind = event.target.closest('[data-connection-restore]').getAttribute('data-connection-restore'), ui = connUiOf(kind);
+      if (ui.phase === 'busy') return;
+      ui.phase = 'busy';
+      ui.restore = true;
+      showConnections();
+      try {
+        ui.summary = await api(`/api/sync/${kind}`, {restoreDeleted: true});
+        ui.at = new Date();
+        ui.phase = 'done';
+        await refresh();
+        await loadConnections(kind);
+        toast('Se agregaron las ventas eliminadas.');
+      } catch (error) {
+        ui.phase = 'error';
+        ui.error = error.message;
+        if ($('#connections-body')) showConnections(kind);
+      }
+      return;
+    }
+    if (event.target.closest('[data-connection-dismiss]')) {
+      connUiOf(event.target.closest('[data-connection-dismiss]').getAttribute('data-connection-dismiss')).restore = true;
+      showConnections();
+      return;
+    }
     const button = event.target.closest('[data-connection-sync]');
     if (!button) return;
     const kind = button.getAttribute('data-connection-sync'), ui = connUiOf(kind);
     if (ui.phase === 'busy') return;
+    delete ui.restore;
     ui.phase = 'busy';
     showConnections();
     try {

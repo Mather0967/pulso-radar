@@ -150,7 +150,8 @@ export async function integrationsAgainst() {
 }
 
 export function saveShopify({currency = 'USD', accountId, ...rest} = {}) {
-  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, commission: '2.00', accountId: accountId ?? null, ...rest};
+  // Shopify ya no descuenta comisión: el cobro entra por el total de la orden.
+  return {kind: 'shopify', domain: 'landur-qa.myshopify.com', accessToken: `shpat_${'a'.repeat(32)}`, currency, accountId: accountId ?? null, ...rest};
 }
 
 export function saveMeta({accountId, ...rest} = {}) {
