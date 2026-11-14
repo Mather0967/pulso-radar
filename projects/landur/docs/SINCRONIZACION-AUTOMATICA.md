@@ -10,13 +10,15 @@ Planilla (Apps Script)  ──aviso──▶  POST /landur/api/hooks/sync  ─�
   · al editar una celda                 (token)                        · junta avisos seguidos
   · al agregar/borrar filas                                            · nunca corre dos a la vez
   · latido cada 5 minutos                                              · mínimo 15 s entre corridas
-Reloj interno de LANDUR (cada LANDUR_SYNC_MINUTES, respaldo) ───────────┘
+Reloj interno de LANDUR (cada LANDUR_SYNC_MINUTES = 15, solo lo vencido) ──┘
 Botón «Sincronizar ahora» (Conexiones) ─────────────────────────────────┘ (comparte la corrida en curso)
 ```
 
 Passenger puede apagar el proceso por inactividad: por eso el disparo confiable es el aviso externo (el
 latido de 5 minutos de la planilla también lo despierta). El reloj interno solo cubre el tiempo en que
-el proceso ya está vivo.
+el proceso ya está vivo: sincroniza **Sheets, Shopify y Meta** cuando están vencidos (`lastSync`, cada
+`LANDUR_SYNC_MINUTES`, 15 por defecto) y hace una pasada apenas arranca el proceso. No repite lo que acaba de
+sincronizar un aviso.
 
 ## Puesta en marcha (una sola vez)
 
@@ -53,10 +55,13 @@ Para dejarlo funcionando aunque se borre el Apps Script, un cron de cPanel hace 
 
 ## Qué hace la sincronía con los cambios
 
-- Fila nueva → venta (+ cobro, material y envío).
+- Fila nueva → venta (+ material y envío). El **cobro** lo decide la columna «Transf.»: con TRUE y comisión (`MP Fee` o
+  `MP Neto`) se registra; sin TRUE la venta queda pendiente de cobro. Si la planilla desmarca «Transf.», el cobro se revierte.
 - Importe, fecha, comisión o estado cambiados → se **revierte** lo asentado y se registra lo nuevo.
 - Fila borrada, pedido pasado a Cancelado o con otro Nro. Pedido → se **revierte**.
-- Nada se borra: las reversiones quedan en el historial de LANDUR.
+- Nada se borra: las reversiones quedan en el historial de LANDUR. Lo rehecho lleva otra referencia (`row-X-r2`, `row-X-cobro-r2`…).
+- Una venta que **eliminaste en LANDUR** y sigue en la planilla no vuelve sola: la tarjeta de Conexiones pregunta «¿Querés
+  agregarlas también?» (`restoreDeleted`). Rehacer lo que la propia sincronía acaba de revertir por un cambio de la planilla sí es automático.
 - No se revierte nada si la pestaña perdió más de la mitad de sus filas (aviso), si alguna fila no se pudo leer
   en esa pasada, ni si la venta tiene un cobro cargado a mano.
 - Cada resultado trae `totals`; si la planilla y LANDUR no suman lo mismo, la tarjeta de Conexiones lo dice.
@@ -67,3 +72,5 @@ Para dejarlo funcionando aunque se borre el Apps Script, un cron de cPanel hace 
   (`sync.sheets.error`, una vez por mensaje distinto) y la próxima corrida reintenta.
 - Mantener **un solo proceso** de Passenger para LANDUR: dos procesos escribirían la misma base SQLite.
 - `LANDUR_SYNC_MINUTES=0` apaga el reloj interno; el aviso de la planilla sigue funcionando.
+- Si el saldo inicial de la cuenta es posterior a las fechas de la planilla, la venta entra pero no su cobro ni sus gastos: la
+  tarjeta lo avisa **una sola vez** con la fecha más vieja y a qué fecha mover el saldo inicial.

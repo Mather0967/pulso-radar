@@ -296,14 +296,15 @@ function readConfig(ledger, workspace, name) {
   return config;
 }
 // Una reversión no libera la referencia externa de la operación original (queda marcada, no se borra),
-// así que una fila rehecha lleva otra versión: «row-X», «row-X~2», «row-X~3»… `live` es la vigente.
+// así que una fila rehecha lleva otra versión: «row-X», «row-X-r2», «row-X-r3»… `live` es la vigente y
+// `count` cuántas hubo (si hubo y ninguna está vigente, alguien la eliminó).
 function externalVersions(ledger, workspace, base) {
   const rows = ledger.db.prepare("SELECT id, kind, amount, date, external_id, reversed_by FROM operations WHERE workspace=? AND source='sheets' AND substr(external_id,1,?)=?").all(workspace, base.length, base);
-  const own = rows.filter(row => row.external_id === base || /^~\d+$/.test(row.external_id.slice(base.length)));
-  return { live: own.find(row => !row.reversed_by) ?? null, next: own.length ? `${base}~${own.length + 1}` : base };
+  const own = rows.filter(row => row.external_id === base || /^-r\d+$/.test(row.external_id.slice(base.length)));
+  return { live: own.find(row => !row.reversed_by) ?? null, count: own.length, next: own.length ? `${base}-r${own.length + 1}` : base };
 }
 // La clave de idempotencia solo admite letras, números, guion y guion bajo y es única por versión.
-const opKey = (prefix, external) => `${prefix}-${external.replace(/~/g, '_').replace(/[^A-Za-z0-9_-]+/g, '-')}`.slice(0, 100);
+const opKey = (prefix, external) => `${prefix}-${external.replace(/[^A-Za-z0-9_-]+/g, '-')}`.slice(0, 100);
 
 function externalExists(ledger, workspace, source, externalId) {
   return !!ledger.db.prepare('SELECT 1 FROM operations WHERE workspace=? AND source=? AND external_id=?').get(workspace, source, externalId);
@@ -519,7 +520,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
 
   let account = null;
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
-  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0, sinEnvio: 0 }, errors = [], reverted = [];
+  const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0, sinEnvio: 0, eliminadas: 0 }, errors = [], reverted = [];
+  const beforeCutoff = { rows: 0, oldest: null };
   let read = 0, first = null, last = null, approxDates = 0;
   // Conciliación: lo que la planilla suma (toda fila con Bruto, también las omitidas) contra lo que
   // quedó asentado como venta. Si no coinciden, el resultado lo dice en vez de dejarlo a ojo.
@@ -559,11 +561,15 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     const cents = value === null ? 0 : Math.round(Number(value) * 100);
     const base = `${saleExternal}${suffix}`;
     let found = externalVersions(ledger, workspace, base);
+    let reversedHere = false;
     if (found.live && (cents === 0 || found.live.amount !== cents || found.live.date !== date)) {
       reverseOp(found.live, label);
+      reversedHere = true;
       found = externalVersions(ledger, workspace, base);
     }
     if (cents === 0 || found.live) return;
+    // Un gasto eliminado en LANDUR vuelve solo junto con las ventas eliminadas (`restoreDeleted`).
+    if (found.count > 0 && !reversedHere && !restoreDeleted) return;
     if (!account) { skipped[skipKey]++; return; }
     const run = ledger.command(workspace, actor, opKey(suffix === '-material' ? 'material-planilla' : 'envio-planilla', found.next),
       { kind: 'expense', concept: truncate(concept, 115), amount: value, currency: config.currency, date, category, accountId: account.id, source: 'sheets', externalId: found.next });
@@ -629,12 +635,18 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       presentRefs.add(base);
       const saleCents = Math.round(Number(gross) * 100);
       let found = externalVersions(ledger, workspace, base);
+      let reversedNow = false;
       if (found.live && (found.live.amount !== saleCents || found.live.date !== date)) {
         // La fila cambió después de sincronizarla (importe o fecha): se revierte lo asentado y se
         // vuelve a registrar con lo que dice la planilla. Con cobros cargados a mano no se toca.
         revertSale(found.live, label);
+        reversedNow = true;
         found = externalVersions(ledger, workspace, base);
       }
+      // Una venta que se eliminó en LANDUR y sigue en la planilla no se rehace sola: se cuenta y la app
+      // pregunta si hay que agregar también las eliminadas (`restoreDeleted`). Rehacer una fila que esta
+      // misma sincronía acaba de revertir por un cambio en la planilla no es eso, y sí se hace.
+      if (!found.live && found.count > 0 && !reversedNow && !restoreDeleted) { skipped.eliminadas++; continue; }
       const saleExternal = found.live ? found.live.external_id : found.next;
       let saleRow = found.live;
       if (!saleRow) {
@@ -645,6 +657,9 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         saleRow = { id: run.id };
       }
       appRows++; appCents += saleCents;
+      // LANDUR no asienta cobros ni gastos anteriores al saldo inicial de la cuenta: la venta entra, el resto
+      // no. Se cuenta y se avisa una sola vez (con la fecha más vieja) en vez de repetir el error por fila.
+      if (account && date < account.cutoff) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; continue; }
       // Gastos de la fila: material y envío salen de la misma cuenta que los cobros. Sin cuenta no
       // hay caja donde asentarlos, así que no se registran. Un valor editado se revierte y se rehace.
       if (materialField) syncExpense({ saleExternal, suffix: '-material', cell: cell(materialField), concept: `Material · ${detail || customer || 'planilla'}`, category: 'Materiales', date, label, skipKey: 'sinMaterial', what: 'El material' });
@@ -652,7 +667,9 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
       if (!account) continue;
       // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga
-      // «Estado» (que es logística) ni si hay comisión en la fila.
+      // «Estado» (que es logística) ni si hay comisión en la fila. Un cobro ya asentado de una fila
+      // que deja de estar transferida se revierte más abajo, con el resto de los cambios del cobro.
+      let unpaid = false;
       if (columns.paid >= 0) {
         const flag = cell('paid');
         const paid = sheetFlag(flag);
@@ -660,13 +677,13 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
           fail(`La columna «Transf.» tiene un valor que no se entiende («${truncate(String(flag), 12)}»). Usá TRUE o FALSE.`);
           continue;
         }
-        if (paid !== true) { if (dropCollection()) skipped.revertidas++; else skipped.sinCobro++; continue; }
+        unpaid = paid !== true;
       }
       // Si el cliente indicó qué estados significan «cobrado», una fila en otro estado deja
       // su venta y no genera cobro. Sin estados configurados se mantiene el comportamiento
       // anterior: el cobro se registra siempre que la fila traiga comisión.
       const paidStates = String(config.paidStates || '').split(',').map(foldCell).filter(Boolean);
-      const unpaid = paidStates.length > 0 && !paidStates.includes(foldCell(cell('status')));
+      if (paidStates.length > 0 && !paidStates.includes(foldCell(cell('status')))) unpaid = true;
       let commission = null;
       if (!unpaid) {
         const fee = columns.fee >= 0 ? sheetAmount(cell('fee')) : null;
@@ -701,6 +718,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       fail(error.message);
     }
   }
+  if (beforeCutoff.rows)
+    errors.push({ id: 'Saldo inicial', message: `${beforeCutoff.rows} ${beforeCutoff.rows === 1 ? 'fila tiene' : 'filas tienen'} fecha anterior al saldo inicial de la cuenta (${account.cutoff}), la más vieja del ${beforeCutoff.oldest}: LANDUR registró las ventas, pero no sus cobros ni sus gastos. Mové el saldo inicial de la cuenta a una fecha anterior al ${beforeCutoff.oldest}.` });
   // Filas que ya estaban asentadas y la planilla ya no tiene (borradas, canceladas, con otro número):
   // se revierten, para que LANDUR quede igual a la planilla. Solo se compara contra la lectura anterior
   // de ESTA misma pestaña, y solo si esta lectura pudo ubicar todas sus filas.
@@ -758,7 +777,7 @@ export function createIntegrations({ fetchImpl = fetch } = {}) {
       throw new DomainError('Primero guardá la configuración de la conexión en Configuración.', 400);
     // La planilla se lee entera (una pestaña por mes o por libro): no hay ventana que recortar.
     if (kind === 'sheets') {
-      const { nextImported, ...summary } = await syncSheets(ledger, workspace, actor, config, fetchImpl);
+      const { nextImported, ...summary } = await syncSheets(ledger, workspace, actor, config, fetchImpl, { restoreDeleted: input.restoreDeleted === true });
       return finish(ledger, workspace, kind, summary, summary.since, summary.until, nextImported);
     }
     let since = input.since !== undefined ? formatDate(input.since)

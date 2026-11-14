@@ -17,7 +17,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
 
 # Los nombres de la fila 1 son un contrato con LANDUR: tests/integrations.test.mjs los lee de acá.
-HEADERS = ["Fecha","Cliente","Canal","Nro. Pedido","Metodo de pago","Pedido","Unidades","Estado","Bruto","MP Fee","MP Neto","Material","Envío","Metodo de Envío","Pago del envio","Ganancia Bruta"]
+HEADERS = ["Fecha","Cliente","Canal","Nro. Pedido","Metodo de pago","Pedido","Unidades","Estado","Bruto","MP Fee","MP Neto","Material","Envío","Metodo de Envío","Pago del envio","Ganancia Bruta","Transf."]
 LAST = 500  # filas con validación y fórmulas
 
 here = Path(__file__).parent
@@ -34,15 +34,16 @@ for index, cell in enumerate(ws[1], start=1):
     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 ws.row_dimensions[1].height = 32
 ws.freeze_panes = "A2"
-for letter, width in zip("ABCDEFGHIJKLMNOP", (12, 26, 12, 13, 15, 30, 10, 12, 11, 10, 11, 11, 10, 15, 14, 14)):
+for letter, width in zip("ABCDEFGHIJKLMNOPQ", (12, 26, 12, 13, 15, 30, 10, 12, 11, 10, 11, 11, 10, 15, 14, 14, 10)):
     ws.column_dimensions[letter].width = width
 
 # Ejemplos: las tres ventas reales del «Fragmento contabilidad Landur», ahora con fecha completa.
-FIELDS = ("Fecha","Cliente","Canal","Nro. Pedido","Metodo de pago","Pedido","Unidades","Estado","Bruto","MP Fee","Material","Envío","Metodo de Envío","Pago del envio")
+FIELDS = ("Fecha","Cliente","Canal","Nro. Pedido","Metodo de pago","Pedido","Unidades","Estado","Bruto","MP Fee","Material","Envío","Metodo de Envío","Pago del envio","Transf.")
+# «Transf.» tal cual la tiene el cliente en el fragmento: FALSE = el dinero todavía no llegó.
 examples = [
-    (datetime.date(2026, 11, 8), "Esteban Fernandez", "Web", "#1275", "MP", "2 ilumimate1 (Negro)", 2, "Enviado", 970, 101, 80, 190, "Ues", "Cliente"),
-    (datetime.date(2026, 11, 9), "Patricia Martinez", "Web", "#1276", "MP", "1 Set Decantador Mundo", 1, "Enviado", 1680, 174, 730, 190, "Ues", "Cliente"),
-    (datetime.date(2026, 11, 9), "Mónica Elena Pereira Goicoechea", "Web", "#1277", "MP", "3 ilumimate 2.0 (Verde)", 3, "Enviado", 1730, 180, 120, 260, "Ues", "Cliente"),
+    (datetime.date(2026, 11, 8), "Esteban Fernandez", "Web", "#1275", "MP", "2 ilumimate1 (Negro)", 2, "Enviado", 970, 101, 80, 190, "Ues", "Cliente", False),
+    (datetime.date(2026, 11, 9), "Patricia Martinez", "Web", "#1276", "MP", "1 Set Decantador Mundo", 1, "Enviado", 1680, 174, 730, 190, "Ues", "Cliente", False),
+    (datetime.date(2026, 11, 9), "Mónica Elena Pereira Goicoechea", "Web", "#1277", "MP", "3 ilumimate 2.0 (Verde)", 3, "Enviado", 1730, 180, 120, 260, "Ues", "Cliente", False),
 ]
 col = {name: i + 1 for i, name in enumerate(HEADERS)}
 for row, data in enumerate(examples, start=2):
@@ -78,10 +79,11 @@ validation("decimal", rng("I"), "Bruto", "El bruto es un importe mayor que cero.
 for letter in "JLM":
     validation("decimal", rng(letter), "Importe", "Escribí un importe de cero o más (sin símbolos).", operator="greaterThanOrEqual", formula1="0")
 validation("list", rng("O"), "Pago del envío", "Elegí Cliente, Landur o Nadie.", formula1='"Cliente,Landur,Nadie"')
+validation("list", rng("Q"), "Transf.", "Elegí TRUE (el dinero ya llegó) o FALSE.", formula1='"TRUE,FALSE"')
 
 ws.conditional_formatting.add(f"D2:D{LAST}", FormulaRule(formula=[f'AND(D2<>"",COUNTIF($D$2:$D${LAST},D2)>1)'], fill=PatternFill("solid", bgColor="F4B6B0")))
-ws.conditional_formatting.add(f"A2:P{LAST}", FormulaRule(formula=['$H2="Cancelado"'], font=Font(color="999999", strike=True)))
-ws.auto_filter.ref = f"A1:P{LAST}"
+ws.conditional_formatting.add(f"A2:Q{LAST}", FormulaRule(formula=['$H2="Cancelado"'], font=Font(color="999999", strike=True)))
+ws.auto_filter.ref = f"A1:Q{LAST}"
 
 # ---- Instrucciones -------------------------------------------------------------------------------
 guide = wb.create_sheet("Instrucciones")
@@ -97,9 +99,10 @@ rules = [
     ("Nro. Pedido: obligatorio y único. Minorista: el de la tienda (#1275). Mayorista: M-001, M-002... La planilla marca en rojo un repetido.", ""),
     ("Estado: Pendiente, Enviado, Entregado o Cancelado. Al pasar un pedido a Cancelado, LANDUR revierte la venta, el cobro y los gastos.", ""),
     ("Bruto: lo que paga el cliente (incluye el envío si se lo cobrás).", ""),
-    ("MP Fee: vacío = todavía no se cobró (LANDUR registra la venta pero no el cobro). 0 = cobrado sin comisión (efectivo, transferencia). Un número = la comisión de Mercado Pago.", ""),
+    ("Transf.: TRUE cuando el dinero ya llegó, FALSE si no. Es lo que decide el cobro: sin TRUE LANDUR registra la venta pero no el cobro. Si la pasás de TRUE a FALSE, LANDUR revierte el cobro.", ""),
+    ("MP Fee: la comisión de Mercado Pago. 0 = cobrado sin comisión (efectivo, transferencia). Con Transf. en TRUE hace falta (vacío = no se registra el cobro).", ""),
     ("Material y Envío: los costos de esa venta. LANDUR los registra como gasto de la cuenta elegida (categorías Materiales y Envíos).", ""),
-    ("Ganancia Bruta = Bruto - MP Fee - Material - Envío. Es lo que suma el saldo de la cuenta en LANDUR (más el saldo inicial).", ""),
+    ("Ganancia Bruta = Bruto - MP Fee - Material - Envío. El saldo de la cuenta en LANDUR suma esto solo de las filas con Transf. en TRUE (más el saldo inicial).", ""),
     ("", ""),
     ("EDITAR Y BORRAR ES SEGURO", "title"),
     ("Si corregís un importe, una fecha o la comisión, o borrás una fila, LANDUR revierte lo anterior y registra lo nuevo. Queda en el historial; nada se pierde.", ""),

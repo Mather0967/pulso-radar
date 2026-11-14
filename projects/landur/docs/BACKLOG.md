@@ -445,7 +445,7 @@ filas, incluida la mayorista; un «Cancelado» inventado). Las planillas reales 
   entre Rafa, Luis y la reinversión, que LANDUR no modela como gasto.
 - **Fila editada, borrada o cancelada después de sincronizar → se revierte y se rehace.** Cambia importe/fecha/comisión/estado:
   se revierte lo asentado (cobro, material, envío, venta) y se vuelve a registrar. Las operaciones no se borran: la reversión
-  deja la original marcada, y la versión nueva lleva otra referencia externa (`row-X`, `row-X~2`…).
+  deja la original marcada, y la versión nueva lleva otra referencia externa (`row-X`, `row-X-r2`…, la misma convención que ya usaba el cobro).
   - Las filas «que faltan» se detectan contra la lectura anterior de la misma planilla y pestaña (`connections.config.imported`,
     interno: no viaja al navegador). La primera sincronización tras actualizar solo registra la lista; desde la segunda ya detecta borrados.
   - Salvaguardas: no se revierte nada si alguna fila no se pudo leer en esa pasada; ni si la pestaña perdió más de la mitad de
@@ -478,7 +478,7 @@ Pedido: que la planilla y LANDUR queden sincronizadas solas y en tiempo casi rea
   es el Apps Script de la planilla (al editar, al agregar/borrar filas y un latido cada 5 min), que además lo despierta.
 - **Plantilla** `docs/plantilla/` (también en Drive: «LANDUR · Ventas (plantilla sincronizable)»): superconjunto del formato del dueño. Fecha real
   obligatoria, Nro. Pedido único, listas cerradas, una sola pestaña para minorista y mayorista, MP Neto y Ganancia Bruta como fórmulas.
-  `MP Fee` vacío = vendida y sin cobrar; 0 = cobrada sin comisión. Una prueba lee los encabezados del generador y los pasa por el importador.
+  `Transf.` TRUE = el dinero llegó (decide el cobro); `MP Fee` 0 = sin comisión. Una prueba lee los encabezados del generador y los pasa por el importador.
 - Una fila totalmente vacía (fórmulas pre-armadas) ya no cuenta como «sin importe».
 
 **Pruebas:** `auto-sync.test.mjs` (7, sin esperas fijas), `tests/landur-hook.test.mjs` (4, portal con token) y la de la plantilla.

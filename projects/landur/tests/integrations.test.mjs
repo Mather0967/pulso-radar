@@ -4,7 +4,7 @@
 // source + external_id) y los errores de una fila no abortan el lote.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_HEADER} from './helpers/integrations-fixture.mjs';
+import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_UNPAID_ROWS, MINORISTA_HEADER} from './helpers/integrations-fixture.mjs';
 
 test('conexiones: el token se guarda completo y se informa enmascarado', async () => {
   const {ledger, connections} = await integrationsAgainst();
@@ -112,14 +112,14 @@ test('sheets: cada fila es una venta y, con cuenta, su cobro; repetir no duplica
   assert.equal(summary.rows, 3);
   assert.equal(summary.created.length, 8); // 2 ventas + 2 cobros + 2 materiales + 2 envíos
   assert.equal(summary.skipped.canceladas, 1);
-  assert.equal(summary.skipped.sinCobro, 2);
+  assert.equal(summary.skipped.sinCobro, 0);
   assert.deepEqual(summary.errors, []);
   assert.equal(summary.since, '2026-11-08');
   assert.equal(summary.until, '2026-11-09');
 
   const ops = ledger.snapshot('landur').operations.filter(o => o.source === 'sheets');
   assert.equal(ops.filter(o => o.kind === 'sale').length, 2);
-  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 2);
   const sale = ops.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
   assert.equal(sale.amount, 97000);
   assert.equal(sale.date, '2026-11-08');
@@ -226,8 +226,8 @@ test('sheets: la pestaña minorista real ubica cada columna en su lugar', async 
   assert.equal(sale.date, '2026-11-08');
   assert.match(sale.concept, /Esteban Fernandez/);
   assert.match(sale.concept, /2 ilumimate1/); // usa «Pedido», no «Material» ni «Cuenta Landur»
-  // La fila tiene «Transf.» = FALSE: queda como venta pendiente y no se registra cobro.
-  assert.equal(ops.filter(o => o.kind === 'collection').length, 0);
+  // Con «Transf.» en TRUE (el fixture marca el pago) cada fila deja su cobro; sin marcar no habría (ver «transf:»).
+  assert.equal(ops.filter(o => o.kind === 'collection').length, 2);
   ledger.close();
 });
 
@@ -308,7 +308,7 @@ test('sheets: si la referencia ya existe con otro importe, se revierte y se reha
   const live = ledger.snapshot('landur').operations.filter(o => o.kind === 'sale' && !o.reversed_by && o.concept.includes('#1275'));
   assert.equal(live.length, 1);
   assert.equal(live[0].amount, 97000); // 970 de la planilla, no los 50 viejos
-  assert.equal(live[0].external_id, 'row-#1275~2');
+  assert.equal(live[0].external_id, 'row-#1275-r2');
   // Repetir no revierte ni crea nada más.
   const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual([again.created, again.reverted], [[], []]);
@@ -482,8 +482,8 @@ test('plantilla: sus encabezados y reglas entran sin tocar nada y sin avisos', a
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'plantilla', month: ''})); // sin «mes de la planilla»
   sheetEdits.plantilla = [headers,
-    sale({Fecha: serial(2026, 11, 8), Cliente: 'Esteban Fernandez', Canal: 'Web', 'Nro. Pedido': '#1275', Pedido: '2 ilumimate1 (Negro)', Unidades: 2, Estado: 'Enviado', Bruto: 970, 'MP Fee': 101, Material: 80, 'Envío': 190}),
-    sale({Fecha: serial(2026, 11, 9), Cliente: 'Patricia Martinez', Canal: 'Web', 'Nro. Pedido': '#1276', Pedido: '1 Set Decantador Mundo', Unidades: 1, Estado: 'Enviado', Bruto: 1680, 'MP Fee': 174, Material: 730, 'Envío': 190}),
+    sale({Fecha: serial(2026, 11, 8), Cliente: 'Esteban Fernandez', Canal: 'Web', 'Nro. Pedido': '#1275', 'Transf.': true, Pedido: '2 ilumimate1 (Negro)', Unidades: 2, Estado: 'Enviado', Bruto: 970, 'MP Fee': 101, Material: 80, 'Envío': 190}),
+    sale({Fecha: serial(2026, 11, 9), Cliente: 'Patricia Martinez', Canal: 'Web', 'Nro. Pedido': '#1276', 'Transf.': true, Pedido: '1 Set Decantador Mundo', Unidades: 1, Estado: 'Enviado', Bruto: 1680, 'MP Fee': 174, Material: 730, 'Envío': 190}),
     // Mayorista: misma pestaña, número M-…, sin comisión cargada = vendida pero todavía sin cobro.
     sale({Fecha: serial(2026, 11, 9), Cliente: 'Mateico', Canal: 'Mayorista', 'Nro. Pedido': 'M-001', Pedido: 'Ilumimate placa', Unidades: 30, Estado: 'Enviado', Bruto: 2940, Material: 750}),
     // Las fórmulas pre-armadas dejan filas «vacías» hasta la 500: no cuentan ni avisan.
@@ -504,5 +504,97 @@ test('plantilla: sus encabezados y reglas entran sin tocar nada y sin avisos', a
     // Saldo = apertura 100 + Ganancia Bruta de las dos cobradas (599 + 586) − material de la mayorista (750).
     assert.equal(ledger.snapshot('landur').accounts[0].balance, 10000 + 59900 + 58600 - 75000);
   } finally { delete sheetEdits.plantilla; }
+  ledger.close();
+});
+
+// --- «Transf.»: la planilla del cliente marca el pago ahí, no en «Estado» -----------------------------
+test('transf: sin TRUE la venta entra y el cobro no; con TRUE entra el cobro', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  sheetEdits.minorista = MINORISTA_UNPAID_ROWS; // tal cual la carga el cliente: Transf. en FALSE
+  try {
+    const unpaid = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(unpaid.created.filter(item => item.kind === 'sale').length, 2);
+    assert.equal(unpaid.created.filter(item => item.kind === 'collection').length, 0);
+    assert.equal(unpaid.skipped.sinCobro, 2);
+    // Se marca «Transf.» en una de las dos: aparece su cobro, y solo el suyo.
+    const [header, r1275, r1276] = MINORISTA_UNPAID_ROWS;
+    sheetEdits.minorista = [header, r1275.map((value, column) => (column === 19 ? true : value)), r1276];
+    const paid = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(paid.created.map(item => item.kind), ['collection']);
+  } finally { delete sheetEdits.minorista; }
+  ledger.close();
+});
+
+test('transf: si la planilla desmarca el pago el cobro se revierte, y al volver a marcarlo se registra de nuevo', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  const [header, r1275] = MINORISTA_ROWS;
+  const marked = value => [header, r1275.map((cell, column) => (column === 19 ? value : cell))];
+  const live = kind => ledger.snapshot('landur').operations.filter(o => o.kind === kind && !o.reversed_by);
+  try {
+    sheetEdits.minorista = marked(true);
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(live('collection').length, 1);
+    sheetEdits.minorista = marked(false);
+    const off = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(off.reverted.map(item => item.kind), ['collection']);
+    assert.equal(live('collection').length, 0);
+    assert.equal(live('sale').length, 1); // la venta sigue
+    sheetEdits.minorista = marked(true);
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    const back = live('collection');
+    assert.equal(back.length, 1);
+    assert.equal(back[0].external_id, 'row-#1275-cobro-r2');
+  } finally { delete sheetEdits.minorista; }
+  ledger.close();
+});
+
+test('transf: un valor que no se entiende se avisa y no se inventa el cobro', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  const [header, r1275] = MINORISTA_ROWS;
+  sheetEdits.minorista = [header, r1275.map((cell, column) => (column === 19 ? 'no sé' : cell))];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.match(summary.errors[0].message, /Transf/);
+    assert.equal(summary.created.filter(item => item.kind === 'collection').length, 0);
+  } finally { delete sheetEdits.minorista; }
+  ledger.close();
+});
+
+// --- Ventas eliminadas en LANDUR: no se rehacen solas, se preguntan ---------------------------------
+test('eliminadas: una venta eliminada que sigue en la planilla no vuelve sola; con restoreDeleted sí', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  const sale = ledger.snapshot('landur').operations.find(o => o.kind === 'sale' && o.concept.includes('#1275'));
+  // Se elimina como lo hace la app: primero el cobro, el material y el envío, después la venta.
+  const children = ledger.snapshot('landur').operations.filter(o => o.external_id?.startsWith('row-#1275-') && !o.reversed_by);
+  for (const child of children) ledger.command('landur', 'tester', `eliminar-${child.id}`, {kind: 'reversal', operationId: child.id, date: '2026-11-14'});
+  ledger.command('landur', 'tester', `eliminar-${sale.id}`, {kind: 'reversal', operationId: sale.id, date: '2026-11-14'});
+  const live = () => ledger.snapshot('landur').operations.filter(o => o.concept.includes('#1275') && !o.reversed_by && o.kind === 'sale').length;
+  const second = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(second.skipped.eliminadas, 1);
+  assert.equal(live(), 0);
+  assert.deepEqual(second.created, []); // ni la venta ni sus gastos ni su cobro
+  const restored = await connections.sync(ledger, 'landur', 'tester', 'sheets', {restoreDeleted: true});
+  assert.equal(live(), 1);
+  assert.deepEqual(restored.created.map(item => item.kind).sort(), ['collection', 'expense', 'expense', 'sale']);
+  ledger.close();
+});
+
+// --- Corte de la cuenta: un aviso en vez de un error por fila -----------------------------------------
+test('corte: las ventas anteriores al saldo inicial entran y se avisa una sola vez con la fecha más vieja', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  const late = ledger.command('landur', 'tester', 'account-00000002', {kind: 'account', name: 'Caja nueva', accountKind: 'cash', currency: 'USD', opening: '0', cutoff: '2026-11-13', verified: true, accessible: true});
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId: late.id}));
+  const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.equal(summary.created.filter(item => item.kind === 'sale').length, 2);
+  assert.equal(summary.created.filter(item => item.kind !== 'sale').length, 0);
+  assert.equal(summary.errors.length, 1);
+  assert.match(summary.errors[0].message, /2 filas tienen fecha anterior al saldo inicial/);
+  assert.match(summary.errors[0].message, /2026-11-13/);
+  assert.match(summary.errors[0].message, /del 2026-11-08/);
   ledger.close();
 });

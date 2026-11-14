@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAutoSync, syncIntervalMs, tokenMatches} from '../server/auto-sync.mjs';
-import {integrationsAgainst, saveSheets} from './helpers/integrations-fixture.mjs';
+import {integrationsAgainst, saveSheets, saveShopify, saveMeta} from './helpers/integrations-fixture.mjs';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // Espera una condición en vez de un tiempo fijo: la prueba no depende de qué tan cargado esté el servidor.
@@ -80,8 +80,8 @@ test('auto: el reloj interno sincroniza solo y se detiene', async () => {
 });
 
 test('auto: el intervalo se interpreta y se acota', () => {
-  assert.equal(syncIntervalMs(undefined), 300000);
-  assert.equal(syncIntervalMs(''), 300000);
+  assert.equal(syncIntervalMs(undefined), 900000);
+  assert.equal(syncIntervalMs(''), 900000);
   assert.equal(syncIntervalMs('0'), 0);
   assert.equal(syncIntervalMs('abc'), 0);
   assert.equal(syncIntervalMs('1'), 60000);
@@ -95,4 +95,41 @@ test('auto: el token se compara sin atajos', () => {
   assert.equal(tokenMatches(token, ''), false);
   assert.equal(tokenMatches('', ''), false);
   assert.equal(tokenMatches(token, undefined), false);
+});
+
+// El reloj sincroniza todo lo configurado y vencido (Sheets, Shopify y Meta), y no repite lo reciente.
+test('auto: el reloj sincroniza Sheets, Shopify y Meta, y solo lo vencido', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  connections.save(ledger, 'landur', 'tester', saveShopify({accountId}));
+  connections.save(ledger, 'landur', 'tester', saveMeta({accountId}));
+  const auto = createAutoSync({ledger, workspace: 'landur', connections, everyMs: 60000, minGapMs: 0, log: {warn() {}, error() {}}});
+  const first = await auto.tick();
+  assert.deepEqual(first.map(entry => entry.kind), ['sheets', 'shopify', 'meta']);
+  assert.ok(first.every(entry => !entry.error), JSON.stringify(first));
+  const sources = new Set(ledger.snapshot('landur').operations.map(o => o.source));
+  assert.ok(['sheets', 'shopify', 'meta-ads'].every(source => sources.has(source)), [...sources].join());
+  // Acaban de sincronizarse: dentro del período no hay nada vencido.
+  assert.deepEqual(await auto.tick(), []);
+  auto.stop(); ledger.close();
+});
+
+test('auto: sin período (0) el reloj no hace nada', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  const auto = createAutoSync({ledger, workspace: 'landur', connections, everyMs: 0});
+  assert.deepEqual(await auto.tick(), []);
+  assert.equal(sales(ledger), 0);
+  auto.stop(); ledger.close();
+});
+
+test('auto: un error en una conexión no frena a las demás', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'privada'})); // sin compartir
+  connections.save(ledger, 'landur', 'tester', saveShopify({accountId}));
+  const auto = createAutoSync({ledger, workspace: 'landur', connections, everyMs: 60000, minGapMs: 0, log: {warn() {}, error() {}}});
+  const done = await auto.tick();
+  assert.match(done.find(entry => entry.kind === 'sheets').error, /compartí la planilla/);
+  assert.ok(done.find(entry => entry.kind === 'shopify').created > 0);
+  auto.stop(); ledger.close();
 });

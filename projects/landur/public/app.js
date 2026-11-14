@@ -329,7 +329,7 @@ function connectionForm(kind){
   </form>`;
 }
 // Resultado de la última sincronía, en palabras de Rafa: qué entró, qué ya estaba y qué falló.
-const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], sinEnvio:['sin gasto de envío','sin gasto de envío'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
+const SKIP_LABELS = {sinFecha:['sin fecha','sin fecha'], sinMaterial:['sin gasto de material','sin gasto de material'], sinEnvio:['sin gasto de envío','sin gasto de envío'], eliminadas:['venta eliminada (sigue en la planilla)','ventas eliminadas (siguen en la planilla)'], duplicadas:['ya estaba','ya estaban'], prueba:['de prueba','de prueba'], canceladas:['cancelada','canceladas'], vacias:['sin importe','sin importe'], sinCobro:['sin cobro todavía','sin cobro todavía'], sinGasto:['sin gasto','sin gasto']};
 const CREATED_LABELS = {sale:['venta','ventas'], collection:['cobro','cobros'], expense:['gasto','gastos']};
 const SYNC_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>';
 // Tarjeta de estado: una sola acción principal según lo que hay que hacer ahora.
@@ -367,14 +367,17 @@ function connectionStatus(kind){
       ? `Coincide con la planilla: ${fmt(t.sheetCents, cur)} en ${rows(t.sheetRows)}.`
       : `La planilla suma ${fmt(t.sheetCents, cur)} (${rows(t.sheetRows)}) y en LANDUR quedó ${fmt(t.appCents, cur)} (${rows(t.appRows)}). Revisá los avisos.`;
     const tone = mismatch ? 'warn' : 'ok';
+    // Ventas que se eliminaron y la planilla todavía tiene: no se rehacen solas, se preguntan.
+    const eliminated = (summary.skipped || {}).eliminadas || 0;
+    const ask = eliminated && !ui.restore ? `<div class="cx-ask"><p>La planilla tiene ${eliminated} ${eliminated === 1 ? 'venta que eliminaste' : 'ventas que eliminaste'}. ¿Querés agregarlas también?</p><div class="cx-ask-actions"><button type="button" class="primary" data-connection-restore="${kind}">Sí, agregarlas</button><button type="button" class="secondary" data-connection-dismiss="${kind}">No, dejarlas</button></div></div>` : '';
     if (!created.length && !reverted) {
       const dup = (summary.skipped || {}).duplicadas;
       const note = kind === 'meta' ? ' El día en curso no está consolidado en Meta: se carga hasta ayer.' : '';
-      return card(tone, 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}${approx ? ' ' + changes.join('. ') + '.' : ''}${recon ? ' ' + recon : ''}`), syncBtn('Sincronizar de nuevo', 'secondary'));
+      return card(tone, 'check', head('check', `Nada nuevo${dup ? ` · ${dup} ${dup === 1 ? 'ya estaba' : 'ya estaban'}` : ''}`, `${period}sincronizado a las ${when}.${note}${approx ? ' ' + changes.join('. ') + '.' : ''}${recon ? ' ' + recon : ''}`) + ask, syncBtn('Sincronizar de nuevo', 'secondary'));
     }
     const big = created.length ? `${created.length} ${created.length === 1 ? 'registro nuevo' : 'registros nuevos'}` : `${reverted} ${reverted === 1 ? 'registro revertido' : 'registros revertidos'}`;
     const extra = created.length ? changes : changes.slice(1);
-    return card(tone, 'check', `<div class="cx-result"><div class="big">${big}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${extra.length ? `<div class="mut">${extra.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}${recon ? `<div class="mut">${recon}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div></div>`, syncBtn('Sincronizar de nuevo'));
+    return card(tone, 'check', `<div class="cx-result"><div class="big">${big}</div>${parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : ''}${extra.length ? `<div class="mut">${extra.join(' · ')}</div>` : ''}${skipped.length ? `<div class="mut">${skipped.join(' · ')}</div>` : ''}${recon ? `<div class="mut">${recon}</div>` : ''}<div class="mut">${period}sincronizado a las ${when}</div>${ask}</div>`, syncBtn('Sincronizar de nuevo'));
   }
   if (!current.lastSync) return card('ok', 'check', head('check', 'Conectado', `Todavía no sincronizaste. ${connectionKinds[kind].blurb}`), syncBtn('Sincronizar ahora'));
   if (connStale(current)) return card('warn', 'alert', head('alert', `Sin sincronizar ${ago(current.lastSync)}`, `Última sincronía el ${dateFmt(current.lastSync.slice(0,10))}.`), syncBtn('Sincronizar ahora'));

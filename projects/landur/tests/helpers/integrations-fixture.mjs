@@ -51,12 +51,15 @@ export const SHEET_ID = 'SHEET_QA_1234567890abcdefghij';
 // Encabezado exacto de la pestaña minorista del Excel del cliente, incluidas las dos
 // columnas «Transf.» repetidas. Solo se leen las columnas que la importación entiende.
 export const MINORISTA_HEADER = ['Fecha','Cliente','Canal','Nro. Pedido','Metodo de pago','Pedido','Unidades','Estado','Bruto','MP Fee','MP Neto','Material','Envío','Metodo de Envío','Pago del envio','Ganancia Bruta','Reinversion','Retention Ratio','Cuenta Landur','Transf.','Ganancia Neta','Rafa','Luis','Transf. reparto'];
-export const MINORISTA_ROWS = [
+// Las filas tal cual las carga el cliente: «Transf.» (columna 19) en FALSE = el dinero todavía no llegó.
+export const MINORISTA_UNPAID_ROWS = [
   MINORISTA_HEADER,
   [8,'Esteban Fernandez','Web','#1275','MP','2 ilumimate1 (Negro)',2,'Enviado',970,101,869,80,190,'Ues','Cliente',599,360,0.6,630,false,239,239,'',false],
   [9,'Patricia Martinez','Web','#1276','MP','1 Set Decantador Mundo',1,'Enviado',1680,174,1506,730,190,'Ues','Cliente',586,352,0.6,1272,false,234,234,'',false],
   [9,'Mónica Elena Pereira','Web','#1277','MP','3 ilumimate 2.0 (Verde)',3,'Cancelado',1730,180,1550,120,260,'Ues','Cliente',1170,702,0.6,1082,false,468,468,'',false],
 ];
+// «Transf.» en TRUE es la marca de pago que habilita el cobro: las pruebas que esperan un cobro parten de acá.
+export const MINORISTA_ROWS = MINORISTA_UNPAID_ROWS.map((row, index) => (index === 0 ? row : row.map((value, column) => (column === 19 ? true : value))));
 // La pestaña real escribe el día suelto: el mes vive en el título de la pestaña.
 const DAY_ONLY_ROWS = [MINORISTA_HEADER, MINORISTA_ROWS[1]];
 
