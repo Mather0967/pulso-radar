@@ -765,3 +765,31 @@ test('limpieza: no afecta lo cargado a mano ni deja a la sincronía rehacer lo e
   assert.equal(restored.created.filter(item => item.kind === 'sale').length, 2);
   ledger.close();
 });
+
+// --- Canal: la lista de Ventas distingue mayorista de minorista ---------------------------------------------
+test('canal: la venta lleva el canal de la planilla como categoría', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'canales', month: ''}));
+  const serial = Math.round((Date.UTC(2026, 10, 9) - Date.UTC(1899, 11, 30)) / 864e5);
+  const header = ['Fecha', 'Cliente', 'Canal', 'Nro. Pedido', 'Pedido', 'Unidades', 'Estado', 'Bruto'];
+  sheetEdits.canales = [header,
+    [serial, 'Ana', 'Web', '#9001', '1 lámpara', 1, 'Enviado', 970],
+    [serial, 'Matesuru', 'Mayorista', 'M-001', 'Ilumimate caja', 50, '', 5000],
+    [serial, 'Beto', 'Instagram', 'IG0001', '1 lámpara', 1, 'Enviado', 390],
+    [serial, 'Sin canal', '', '#9002', '1 lámpara', 1, 'Enviado', 100],
+  ];
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    const byOrder = Object.fromEntries(liveOf(ledger, 'sale').map(o => [o.concept.split(' · ')[0], o.category]));
+    assert.deepEqual(byOrder, {'Pedido #9001': 'Web', 'Pedido M-001': 'Mayorista', 'Pedido IG0001': 'Instagram', 'Pedido #9002': null});
+  } finally { delete sheetEdits.canales; }
+  ledger.close();
+});
+
+test('canal: la minorista del cliente trae «Canal» y sus ventas lo conservan', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
+  await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+  assert.deepEqual(liveOf(ledger, 'sale').map(o => o.category), ['Web', 'Web']);
+  ledger.close();
+});
