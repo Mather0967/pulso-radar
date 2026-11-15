@@ -231,6 +231,9 @@ const SHEET_COLUMNS = {
   detail: ['pedido', 'producto', 'detalle', 'descripcion'],
   units: ['unidades', 'cantidad', 'unid'],
   status: ['estado', 'estado del pedido', 'status'],
+  // El canal de la venta (Web, Instagram, Mayorista…): viaja como categoría de la venta para que la lista de
+  // Ventas distinga mayorista de minorista.
+  channel: ['canal', 'channel'],
   gross: ['bruto', 'total', 'importe bruto'],
   fee: ['mp fee', 'fee', 'comision', 'comision mp', 'arancel'],
   net: ['mp neto', 'neto', 'importe neto'],
@@ -600,6 +603,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       const customer = String(cell('customer') ?? '').trim();
       const detail = String(cell('detail') ?? '').trim();
       const order = String(cell('order') ?? '').trim();
+      const channel = String(cell('channel') ?? '').trim();
       const label = truncate((several ? `${tab} · ` : '') + ([customer, detail].filter(Boolean).join(' · ') || `fila ${index + 1}`), several ? 44 : 32);
       const fail = message => { errors.push({ id: label, message }); };
       let keyed = false;
@@ -667,7 +671,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         if (!saleRow) {
           const concept = truncate([order ? `Pedido ${order}` : '', customer, detail].filter(Boolean).join(' · ') || 'Venta de planilla', 115);
           const run = ledger.command(workspace, actor, opKey('venta-planilla', saleExternal),
-            { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: saleExternal });
+            { kind: 'sale', concept, amount: gross, currency: config.currency, date, source: 'sheets', externalId: saleExternal, ...(channel ? { category: truncate(channel, 60) } : {}) });
           created.push({ kind: 'sale', id: run.id, ref: label });
           saleRow = { id: run.id };
         }

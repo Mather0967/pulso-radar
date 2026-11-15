@@ -168,7 +168,7 @@ const SEGMENTS=[['all','Todo'],['expenses','Gastos'],['sales','Ventas'],['other'
 const segNow=()=>view==='expenses'?'expenses':view==='sales'?'sales':actOther?'other':'all';
 const opSign=o=>o.reversed_by||o.kind==='reversal'?'':o.kind==='collection'?'+':['expense','payment','withdrawal'].includes(o.kind)?'−':'';
 const opTone=o=>o.kind==='collection'?'in':o.kind==='sale'?'sale':o.kind==='obligation'?'due':['transfer','reversal'].includes(o.kind)?'flat':'out';
-function opGlyph(o){return o.category?categoryEmoji(o.category):icon(o.kind==='collection'?'down':o.kind==='transfer'?'moves':o.kind==='sale'?'sales':o.kind==='obligation'?'pending':'up');}
+function opGlyph(o){return o.category&&o.kind!=='sale'?categoryEmoji(o.category):icon(o.kind==='collection'?'down':o.kind==='transfer'?'moves':o.kind==='sale'?'sales':o.kind==='obligation'?'pending':'up');}
 function opAccounts(o){
   const names=(state.entries||[]).filter(e=>e.operation===o.id).map(e=>state.accounts.find(a=>a.id===e.account)?.name).filter(Boolean);
   return [...new Set(names)].slice(0,2).join(' → ');
