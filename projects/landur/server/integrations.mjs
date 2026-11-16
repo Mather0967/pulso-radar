@@ -674,6 +674,12 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     if (hasFlag && flag === null && String(flagCell ?? '').trim() !== '') { errors.push({ id: label, message: `La casilla «Transf. reparto» de ${payable.label} tiene un valor que no se entiende («${truncate(String(flagCell), 12)}»). Usá TRUE o FALSE.` }); return; }
     const paid = flag === true;
     const pendingKey = `${base}#${payable.key}`;
+    // Antes de la fecha «desde» todo compromiso (sueldo o envío) se da por pagado; si ya se había cargado, se retira.
+    if (config.payablesFrom && date < config.payablesFrom) {
+      const stale = externalVersions(ledger, workspace, `${saleExternal}-pago-${payable.key}`).live;
+      if (stale) reverseObligation(stale, label);
+      return 'settled';
+    }
     if (!hasFlag) {
       // Sin casilla no se sabe si se pagó: una cuenta histórica no lo carga, y lo anterior a «desde» se da por pagado.
       if (account?.kind === 'history' || date < (config.payablesFrom || account?.cutoff || '')) return 'settled';

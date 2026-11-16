@@ -682,6 +682,26 @@ test('ingresos: el cobro del modo Bruto no tapa al nuevo cuando el importe de la
   ledger.close();
 });
 
+// La fecha «desde» vale también para los sueldos: lo anterior se da por pagado, y si ya estaba cargado se retira.
+test('ingresos: los sueldos anteriores a la fecha «desde» no quedan por pagar y se retiran los ya cargados', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    minoristaRow('#4001', 'Setiembre 20', {gross: 1000, fee: 100, material: 80, shipping: 0, method: 'Retiro', paid: true, rafa: 300, luis: 0, repartido: false}),
+    minoristaRow('#4002', 'octubre 5', {gross: 1000, fee: 100, material: 80, shipping: 0, method: 'Retiro', paid: true, rafa: 500, luis: 0, repartido: false}),
+  ];
+  const payable = () => ledger.snapshot('landur').totals.find(item => item.currency === 'USD').payable;
+  try {
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-09', incomeMode: 'account'}));
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(payable(), 30000 + 50000); // sin fecha: los dos sueldos
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-09', incomeMode: 'account', payablesFrom: '2026-10-01'}));
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(payable(), 50000); // el de septiembre se retira
+    assert.equal(liveOf(ledger, 'obligation').length, 1);
+  } finally { delete sheetEdits.Minorista; }
+  ledger.close();
+});
+
 test('ingresos: sin la opción, la venta sigue siendo el Bruto', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
