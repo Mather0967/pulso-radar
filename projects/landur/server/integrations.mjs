@@ -823,6 +823,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
         if (!account) continue;
         if (incomes.length) {
+          // El cobro por el Bruto completo (modo anterior) ya no corresponde: si la venta no cambió de importe (Bruto = lo que entra)
+          // no se rehízo con el cambio de modo y su cobro viejo taparía los nuevos.
+          const legacy = externalVersions(ledger, workspace, `${saleExternal}-cobro`).live;
+          if (legacy) reverseOp(legacy, label);
           let settled = false;
           for (const income of incomes) {
             const part = sheetAmount(row[income.amount]);
