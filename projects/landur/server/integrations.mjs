@@ -709,7 +709,9 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         } else {
           // Sin número de pedido, dos filas idénticas (misma venta cargada dos veces el mismo día) son
           // dos ventas: la repetición se numera por orden de aparición, estable entre sincronías.
-          const fingerprint = createHash('sha256').update(JSON.stringify([date, customer, detail, gross, Number.isFinite(units) ? units : null])).digest('hex').slice(0, 16);
+          // Se usa el Bruto de la planilla aunque la venta sea otra columna: así la fila no cambia de identidad al cambiar de modo.
+          const stable = incomes.length ? sheetAmount(rawGross) ?? gross : gross;
+          const fingerprint = createHash('sha256').update(JSON.stringify([date, customer, detail, stable, Number.isFinite(units) ? units : null])).digest('hex').slice(0, 16);
           const nth = (identical.get(fingerprint) ?? 0) + 1;
           identical.set(fingerprint, nth);
           reference = nth > 1 ? `${fingerprint}-${nth}` : fingerprint;

@@ -561,6 +561,28 @@ test('ingresos: en la minorista la venta es «Cuenta Landur» y se cobra con su 
   ledger.close();
 });
 
+// Pasar de «Bruto completo» a «Solo lo que ingresa a la cuenta» no puede duplicar las ventas de la mayorista (no tiene Nro. Pedido:
+// su identidad sale de una huella de la fila, y esa huella no depende del modo).
+test('ingresos: cambiar de modo rehace la venta de la mayorista, no la duplica', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  // Más de 5 filas: la guarda de «la planilla perdió media contabilidad» no se activa solo si cada fila conserva su identidad.
+  const filas = Array.from({length: 12}, (_, i) => ['Noviembre', 'Cliente ' + i, 'p', 10, 1000, 400, 440, i % 2 === 0, 0, 0, 100, i % 2 === 0, 0, 0, false, 'Luis', 0, false]);
+  sheetEdits.Mayorista = [[], MAYORISTA_HEADER, ...filas];
+  try {
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'sale').length, 12);
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11', incomeMode: 'account'}));
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'sale').length, 12); // las mismas doce ventas, ahora por lo que entra
+    assert.ok(liveOf(ledger, 'sale').every(o => o.amount === 54000));
+    assert.equal(ledger.snapshot('landur').totals.find(item => item.currency === 'USD').receivable, 6 * 54000); // las 6 sin Transf.
+    const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(again.created.length, 0);
+  } finally { delete sheetEdits.Mayorista; }
+  ledger.close();
+});
+
 test('ingresos: sin la opción, la venta sigue siendo el Bruto', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
