@@ -126,6 +126,12 @@ function normalizePaidStates(value) {
 }
 // Qué columna del material se registra como gasto. «real» es el costo efectivo; «plus10»
 // incluye el 10 % que la planilla carga; «none» no registra gasto.
+function normalizePayablesFrom(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new DomainError('Indicá la fecha desde la que los envíos UES quedan por pagar (AAAA-MM-DD).');
+  return formatDate(text);
+}
 function normalizeIncomeMode(value) {
   const option = String(value ?? 'gross').trim();
   if (!['gross', 'account'].includes(option)) throw new DomainError('Elegí qué se registra como venta: el Bruto completo o solo lo que ingresa a la cuenta.');
@@ -402,6 +408,7 @@ function validateSave(ledger, workspace, input) {
     config.paidStates = input.paidStates === undefined ? previous?.paidStates ?? '' : normalizePaidStates(input.paidStates);
     config.materialColumn = input.materialColumn === undefined ? previous?.materialColumn ?? 'real' : normalizeMaterialColumn(input.materialColumn);
     config.incomeMode = input.incomeMode === undefined ? previous?.incomeMode ?? 'gross' : normalizeIncomeMode(input.incomeMode);
+    config.payablesFrom = input.payablesFrom === undefined ? previous?.payablesFrom ?? '' : normalizePayablesFrom(input.payablesFrom);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la planilla (UYU, USD o BRL).');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
@@ -667,10 +674,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     if (hasFlag && flag === null && String(flagCell ?? '').trim() !== '') { errors.push({ id: label, message: `La casilla «Transf. reparto» de ${payable.label} tiene un valor que no se entiende («${truncate(String(flagCell), 12)}»). Usá TRUE o FALSE.` }); return; }
     const paid = flag === true;
     const pendingKey = `${base}#${payable.key}`;
-    // Una cuenta histórica guarda el pasado ya resuelto: un compromiso sin casilla (envío UES) no se sabe pendiente, se da por pagado.
-    if (!hasFlag && account?.kind === 'history') return 'settled';
-    if (preCutoff) {
-      if (!hasFlag) return 'settled';
+    if (!hasFlag) {
+      // Sin casilla no se sabe si se pagó: una cuenta histórica no lo carga, y lo anterior a «desde» se da por pagado.
+      if (account?.kind === 'history' || date < (config.payablesFrom || account?.cutoff || '')) return 'settled';
+    } else if (preCutoff) {
       if (!paid) pendingNow.add(pendingKey);
       else if (!wasPending.has(pendingKey)) return 'settled';
     }
@@ -829,7 +836,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
             if (syncPayable({ saleExternal, payable, value: part, flagCell: payable.flag >= 0 ? row[payable.flag] : undefined, date, preCutoff, base, label, who: order || customer || detail || 'planilla', force: reversedNow }) === 'settled') settled = true;
           }
           // Cobrada desde antes de que LANDUR la viera: ya está en el saldo inicial. Se cuenta y se avisa una sola vez.
-          if (settled) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; }
+          if (settled && preCutoff) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; }
           continue;
         }
         // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga

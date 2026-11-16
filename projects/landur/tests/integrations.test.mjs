@@ -645,6 +645,23 @@ test('ingresos: la cuenta histórica no deja envíos UES por pagar pero sí los 
   ledger.close();
 });
 
+// Los envíos UES no tienen casilla: solo quedan por pagar los de la fecha elegida en adelante; los anteriores se dan por pagados.
+test('ingresos: el envío UES queda por pagar solo desde la fecha elegida', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-09', incomeMode: 'account', payablesFrom: '2026-10-01'}));
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    minoristaRow('#5001', 'Setiembre 20', {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 0, luis: 0, repartido: true}),
+    minoristaRow('#5002', 'octubre 5', {gross: 1000, fee: 100, material: 80, shipping: 250, method: 'Ues', paid: true, rafa: 0, luis: 0, repartido: true}),
+    minoristaRow('#5003', 'octubre 6', {gross: 1000, fee: 100, material: 80, shipping: 0, method: 'Retiro', paid: true, rafa: 0, luis: 0, repartido: true}),
+  ];
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(liveOf(ledger, 'obligation').map(o => [o.concept.split(' · ')[0], o.amount]), [['Envío UES', 25000]]); // solo octubre y con envío UES
+    assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', payablesFrom: '1/10'})), /fecha/i);
+  } finally { delete sheetEdits.Minorista; }
+  ledger.close();
+});
+
 test('ingresos: sin la opción, la venta sigue siendo el Bruto', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
