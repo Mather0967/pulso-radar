@@ -267,7 +267,19 @@ function sheetColumns(header) {
   // Cada parte que entra a la cuenta tiene su propia casilla «Transf.»: la primera que aparece a su derecha.
   const flagAfter = start => keys.findIndex((key, index) => index > start && key === 'transf');
   map.incomes = [];
-  if (map.landurAccount >= 0) map.incomes.push({ key: 'cuenta', label: 'Cuenta Landur', amount: map.landurAccount, flag: flagAfter(map.landurAccount) });
+  map.payables = [];
+  if (map.landurAccount >= 0 && map.net >= 0) {
+    // Minorista: lo que cobra Mercado Pago (MP Neto) es lo que llega a la cuenta, cuando Rafa lo transfiere («Transf.» junto a Cuenta Landur).
+    // De ahí Landur paga los sueldos (columnas Rafa y Luis, hasta «Transf. reparto») y el envío cuando el método es UES (sin casilla).
+    map.incomes.push({ key: 'neto', label: 'MP Neto', amount: map.net, flag: flagAfter(map.landurAccount) });
+    const reparto = keys.indexOf('transf reparto');
+    for (const [key, name, label] of [['rafa', 'rafa', 'Rafa'], ['luis', 'luis', 'Luis']]) {
+      const column = keys.indexOf(name);
+      if (column >= 0) map.payables.push({ key, label: `Sueldo ${label}`, category: 'Sueldos', amount: column, flag: reparto });
+    }
+    const method = keys.indexOf('metodo de envio');
+    if (method >= 0 && map.shipping >= 0) map.payables.push({ key: 'ues', label: 'Envío UES', category: 'Envíos', amount: map.shipping, flag: -1, method });
+  } else if (map.landurAccount >= 0) map.incomes.push({ key: 'cuenta', label: 'Cuenta Landur', amount: map.landurAccount, flag: flagAfter(map.landurAccount) });
   else if (map.reinvest >= 0) {
     if (map.materialPlus >= 0) map.incomes.push({ key: 'material', label: 'Material + 10 %', amount: map.materialPlus, flag: flagAfter(map.materialPlus) });
     map.incomes.push({ key: 'reinversion', label: 'Reinversión', amount: map.reinvest, flag: flagAfter(map.reinvest) });
@@ -582,6 +594,11 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     ledger.command(workspace, actor, `reversal-planilla-${op.id}`, { kind: 'reversal', operationId: op.id, date: todayIso });
     reverted.push({ kind: op.kind, ref });
   };
+  // Un compromiso (sueldo, envío UES) se revierte después de los pagos que lo cancelaron: con pagos aplicados no se puede deshacer.
+  const reverseObligation = (obligation, ref) => {
+    for (const payment of ledger.db.prepare("SELECT id, kind FROM operations WHERE workspace=? AND related_id=? AND kind='payment' AND reversed_by IS NULL").all(workspace, obligation.id)) reverseOp(payment, ref);
+    reverseOp(obligation, ref);
+  };
   // Revierte la venta y lo que nació de ella (cobros, material, envío). Con cobros cargados a mano no
   // toca nada: lo que alguien asentó a mano no lo deshace una sincronización.
   const revertSale = (sale, ref) => {
@@ -593,6 +610,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       const { live } = externalVersions(ledger, workspace, `${sale.external_id}${suffix}`);
       if (live) reverseOp(live, ref);
     }
+    for (const obligation of ledger.db.prepare("SELECT id, kind FROM operations WHERE workspace=? AND kind='obligation' AND source='sheets' AND external_id LIKE ? AND reversed_by IS NULL").all(workspace, `${sale.external_id}-pago-%`)) reverseObligation(obligation, ref);
     reverseOp(sale, ref);
   };
   const syncExpense = ({ saleExternal, suffix, cell: raw, concept, category, date, label, skipKey, what, force }) => {
@@ -640,6 +658,50 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       { kind: 'collection', concept: truncate(`Cobro ${income.label} · ${who}`, 115), accountId: account.id, targetId: saleRow.id, amount: value, currency: config.currency, commission: '0.00', date: preCutoff ? (today > account.cutoff ? today : account.cutoff) : date, source: 'sheets', externalId: collection.next });
     created.push({ kind: 'collection', id: run.id, ref: label });
   };
+  // Un compromiso de Landur (sueldo de Rafa o Luis, envío UES) nace con la venta y queda por pagar hasta que su casilla «Transf. reparto» esté en
+  // TRUE; entonces se registra el pago desde la cuenta. El envío UES no tiene casilla: queda pendiente hasta que se pague desde Landur.
+  // Antes del corte de la cuenta: lo ya pagado está en el saldo inicial (no se registra) y lo pendiente sí figura por pagar.
+  const syncPayable = ({ saleExternal, payable, value, flagCell, date, preCutoff, base, label, who, force }) => {
+    const hasFlag = payable.flag >= 0;
+    const flag = hasFlag ? sheetFlag(flagCell) : null;
+    if (hasFlag && flag === null && String(flagCell ?? '').trim() !== '') { errors.push({ id: label, message: `La casilla «Transf. reparto» de ${payable.label} tiene un valor que no se entiende («${truncate(String(flagCell), 12)}»). Usá TRUE o FALSE.` }); return; }
+    const paid = flag === true;
+    const pendingKey = `${base}#${payable.key}`;
+    // Una cuenta histórica guarda el pasado ya resuelto: un compromiso sin casilla (envío UES) no se sabe pendiente, se da por pagado.
+    if (!hasFlag && account?.kind === 'history') return 'settled';
+    if (preCutoff) {
+      if (!hasFlag) return 'settled';
+      if (!paid) pendingNow.add(pendingKey);
+      else if (!wasPending.has(pendingKey)) return 'settled';
+    }
+    const cents = Math.round(Number(value) * 100);
+    const obligationBase = `${saleExternal}-pago-${payable.key}`;
+    let found = externalVersions(ledger, workspace, obligationBase);
+    let reversedHere = force === true;
+    if (found.live && found.live.amount !== cents) { reverseObligation(found.live, label); reversedHere = true; found = externalVersions(ledger, workspace, obligationBase); }
+    if (!found.live && found.count > 0 && !reversedHere && !restoreDeleted) return;
+    let obligation = found.live;
+    if (!obligation) {
+      const due = new Date(Date.parse(`${date}T12:00:00Z`) + 30 * DAY).toISOString().slice(0, 10);
+      const run = ledger.command(workspace, actor, opKey('compromiso-planilla', found.next),
+        { kind: 'obligation', concept: truncate(`${payable.label} · ${who}`, 115), amount: value, currency: config.currency, date, due, category: payable.category, source: 'sheets', externalId: found.next });
+      created.push({ kind: 'obligation', id: run.id, ref: label });
+      obligation = { id: run.id };
+    }
+    if (!hasFlag) return;
+    const paymentBase = `${obligationBase}-abono`;
+    let payment = externalVersions(ledger, workspace, paymentBase);
+    if (payment.live) {
+      if (paid) { skipped.duplicadas++; return; }
+      reverseOp(payment.live, label);
+      payment = externalVersions(ledger, workspace, paymentBase);
+    }
+    if (!paid) return;
+    if (account.currency !== config.currency) { errors.push({ id: label, message: `La cuenta elegida maneja ${account.currency}; la planilla está en ${config.currency}.` }); return; }
+    const run = ledger.command(workspace, actor, opKey('pago-planilla', payment.next),
+      { kind: 'payment', concept: truncate(`Pago ${payable.label} · ${who}`, 115), accountId: account.id, targetId: obligation.id, amount: value, currency: config.currency, date: preCutoff ? (today > account.cutoff ? today : account.cutoff) : date, source: 'sheets', externalId: payment.next });
+    created.push({ kind: 'payment', id: run.id, ref: label });
+  };
   // La cuenta guardada puede haberse eliminado después: se avisa una vez y se siguen
   // registrando las ventas, que no dependen de una cuenta.
   const accountMissing = Boolean(config.accountId) && !account;
@@ -649,11 +711,12 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     const marker = { month: config.month, approx: false };
     // Con «solo lo que ingresa a la cuenta» la venta es la suma de esas columnas; sin ellas, o en modo Bruto, es el Bruto.
     const incomes = config.incomeMode === 'account' ? columns.incomes : [];
+    const payables = config.incomeMode === 'account' ? columns.payables : [];
     // Material: en la mayorista «Material Real» o «Material + 10 %» según la conexión; la minorista tiene
     // una sola columna. «No registrar gasto» apaga material y envío.
     const wantedMaterial = config.materialColumn === 'plus10' ? 'materialPlus' : 'material';
     const materialField = config.materialColumn === 'none' ? null : columns[wantedMaterial] >= 0 ? wantedMaterial : columns.materialMin >= 0 ? 'materialMin' : null;
-    const shippingField = config.materialColumn === 'none' || columns.shipping < 0 ? null : 'shipping';
+    const shippingField = config.materialColumn === 'none' || columns.shipping < 0 || payables.some(item => item.key === 'ues') ? null : 'shipping';
     for (let index = headerIndex + 1; index < rows.length; index++) {
       const row = rows[index] ?? [];
       const cell = field => (columns[field] >= 0 ? row[columns[field]] : undefined);
@@ -759,6 +822,12 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
             if (part === null || Number(part) <= 0) continue;
             if (syncIncome({ saleRow, saleExternal, income, value: part, flagCell: income.flag >= 0 ? row[income.flag] : undefined, date, preCutoff, base, label, who: order || customer || detail || 'planilla' }) === 'settled') settled = true;
           }
+          for (const payable of payables) {
+            const part = sheetAmount(row[payable.amount]);
+            if (part === null || Number(part) <= 0) continue;
+            if (payable.method !== undefined && !/\bues\b/.test(foldCell(row[payable.method]))) continue;
+            if (syncPayable({ saleExternal, payable, value: part, flagCell: payable.flag >= 0 ? row[payable.flag] : undefined, date, preCutoff, base, label, who: order || customer || detail || 'planilla', force: reversedNow }) === 'settled') settled = true;
+          }
           // Cobrada desde antes de que LANDUR la viera: ya está en el saldo inicial. Se cuenta y se avisa una sola vez.
           if (settled) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; }
           continue;
@@ -782,8 +851,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         const paidStates = String(config.paidStates || '').split(',').map(foldCell).filter(Boolean);
         if (paidStates.length > 0 && !paidStates.includes(foldCell(cell('status')))) unpaid = true;
         if (preCutoff) {
-          if (unpaid) pendingNow.add(base);
-          else if (!wasPending.has(base)) {
+          if (unpaid) pendingNow.add(`${base}#cobro`);
+          else if (!wasPending.has(`${base}#cobro`)) {
             // Cobrada desde antes de que LANDUR la viera: ya está en el saldo inicial. Se cuenta y se avisa una sola vez.
             beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date;
             continue;
@@ -850,7 +919,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
   }
   // Si algo quedó sin ubicar o sin revertir, se conserva la lista anterior para no olvidar esas filas.
   const nextImported = { key: sheetKey, refs: reconciled ? [...presentRefs] : [...new Set([...previous, ...presentRefs])],
-    pending: [...new Set([...wasPending, ...pendingNow])].filter(ref => !reconciled || presentRefs.has(ref)) };
+    // Cada clave es «fila#parte» (p. ej. row-#9002#rafa): se conserva mientras la fila siga en la planilla.
+    pending: [...new Set([...wasPending, ...pendingNow])].filter(key => !reconciled || presentRefs.has(key.slice(0, key.lastIndexOf('#')))) };
   return { source: 'sheets', rows: read, sheet: { name: config.sheetName }, since: first, until: last, created, skipped, errors, reverted, approxDates,
     totals: { sheetRows, sheetCents, appRows, appCents }, nextImported };
 }
