@@ -129,7 +129,7 @@ function content(){
 function home(){
   const t=state.totals.find(t=>t.currency===unit);
   if(!t)return `<section class="card"><div class="empty">${icon('accounts')}<h2>Todavía no hay cuentas</h2><p>Registrá una cuenta con su saldo inicial y su fecha de corte.<br>No hace falta conectar un banco.</p><button class="primary" data-form="account">${icon('plus')} Agregar mi primera cuenta</button></div></section>`;
-  const accounts=state.accounts.filter(a=>a.currency===unit);
+  const accounts=state.accounts.filter(a=>a.currency===unit&&a.kind!=='history');
   const payables=outstanding('obligation'),receivables=outstanding('sale');
   const overdue=payables.filter(o=>o.due<today()).length;
   const duplicates=doubtfulDuplicates().length;
@@ -156,7 +156,7 @@ function home(){
 const opStatusText=o=>o.reversed_by?'Revertido':o.kind==='reversal'?'Reversión':['sale','obligation'].includes(o.kind)?(o.applied===o.amount?(o.kind==='sale'?'Cobrado':'Pagado'):o.applied?'Parcial':'Pendiente'):'';
 function accountRow(a){return `<div class="account-row"><div class="account-logo ${a.kind}">${icon(a.kind==='bank'?'accounts':a.kind==='cash'?'cash':'wallet')}</div><div><div class="account-name">${escape(a.name)}</div><div class="account-sub">${a.verified?'Apertura verificada':'Apertura sin verificar'} · ${dateFmt(a.cutoff)}</div></div><div class="account-amount">${fmt(a.balance,a.currency)}<div class="account-sub">${a.accessible?'Fondos accesibles':'Acceso restringido'}</div></div></div>`;}
 // Cuentas: total arriba y una fila por cuenta. El detalle, sus datos técnicos y «Eliminar» viven en una hoja.
-const ACCOUNT_KIND_NAME={bank:'Cuenta bancaria',cash:'Efectivo',wallet:'Billetera digital'};
+const ACCOUNT_KIND_NAME={bank:'Cuenta bancaria',cash:'Efectivo',wallet:'Billetera digital',history:'Histórico (no suma al saldo)'};
 function accounts(){
   const list=state.accounts.filter(a=>!unit||a.currency===unit);
   const t=state.totals.find(t=>t.currency===unit);
@@ -908,7 +908,7 @@ const KIND_INFO={expense:['Gasto pagado','Ya salió de una cuenta'],obligation:[
 const KIND_NEEDS={expense:['amount','account','concept'],obligation:['amount','concept'],sale:['amount','concept'],payment:['target','amount','account','concept'],collection:['target','amount','commission','account','concept'],transfer:['amount','account','toAccount','concept'],withdrawal:['amount','account','concept'],account:['name','amount']};
 let lastCaptureAt=0;
 const KIND_FILE=['expense','obligation','sale','payment','collection'];
-const ACCOUNT_KINDS=[['bank','🏦','Banco'],['wallet','📱','Billetera digital'],['cash','💵','Efectivo']];
+const ACCOUNT_KINDS=[['bank','🏦','Banco'],['wallet','📱','Billetera digital'],['cash','💵','Efectivo'],['history','🗂️','Histórico (no suma al saldo)']];
 function quickCapture(kind='expense',targetId='',opts={}){
   if(!state)return;
   // Un mismo toque puede llegar por más de un manejador de la página: el segundo aviso se ignora.

@@ -449,7 +449,7 @@ export class Ledger {
     if (kind === 'account.update') {
       const account = this.account(workspace, String(input.accountId ?? ''));
       const accountKind = input.accountKind === undefined ? account.kind : input.accountKind;
-      if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
+      if (!['bank', 'wallet', 'cash', 'history'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
       if (typeof input.verified !== 'boolean' || typeof input.accessible !== 'boolean') throw new DomainError('Indicá verificación y accesibilidad del saldo.');
       const name = text(input.name, 'Nombre', 60);
       const opening = money(input.opening, { zero: true });
@@ -480,7 +480,7 @@ export class Ledger {
         if (input.toAccountId !== undefined) target = this.account(workspace, String(input.toAccountId));
         else if (input.newAccount && typeof input.newAccount === 'object' && !Array.isArray(input.newAccount)) {
           const accountKind = input.newAccount.accountKind ?? account.kind;
-          if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
+          if (!['bank', 'wallet', 'cash', 'history'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
           const id = randomUUID();
           // Nace en cero: el saldo inicial se asigna en el traspaso, que suma el de la original.
           this.db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?,?,?,?)').run(id, workspace,
@@ -572,7 +572,7 @@ export class Ledger {
     const id = randomUUID();
     if (kind === 'account') {
       const accountKind = input.accountKind;
-      if (!['bank', 'wallet', 'cash'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
+      if (!['bank', 'wallet', 'cash', 'history'].includes(accountKind)) throw new DomainError('Seleccioná el tipo de cuenta.');
       if (typeof input.verified !== 'boolean' || typeof input.accessible !== 'boolean') throw new DomainError('Indicá verificación y accesibilidad del saldo.');
       this.db.prepare('INSERT INTO accounts VALUES (?,?,?,?,?,?,?,?,?)').run(id, workspace,
         text(input.name, 'Nombre', 60), accountKind, currency(input.currency), money(input.opening, {zero: true}),
@@ -649,8 +649,10 @@ export class Ledger {
       const byKind = (...kinds) => live.filter(o => kinds.includes(o.kind)).reduce((s,o) => s+o.amount,0);
       return {
         currency: unit,
-        balance: accounts.filter(a => a.currency === unit).reduce((s,a) => s+a.balance,0),
-        verifiedAccessible: accounts.filter(a => a.currency === unit && a.verified && a.accessible).reduce((s,a) => s+a.balance,0),
+        // Una cuenta «histórica» solo guarda movimientos del pasado (lo que ya se cobró y gastó antes del saldo real):
+        // no es dinero disponible y no suma al saldo.
+        balance: accounts.filter(a => a.currency === unit && a.kind !== 'history').reduce((s,a) => s+a.balance,0),
+        verifiedAccessible: accounts.filter(a => a.currency === unit && a.kind !== 'history' && a.verified && a.accessible).reduce((s,a) => s+a.balance,0),
         payable: live.filter(o => o.kind === 'obligation').reduce((s,o) => s+o.amount-o.applied,0),
         receivable: live.filter(o => o.kind === 'sale').reduce((s,o) => s+o.amount-o.applied,0),
         sales: byKind('sale'), expenses: byKind('expense', 'obligation', 'commission'),

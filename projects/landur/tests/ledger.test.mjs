@@ -523,3 +523,15 @@ test('cobros en bloque: borra los de la planilla con su comisión y deja el rest
   assert.equal(ledger.snapshot('a').totals[0].receivable,100000);
   assert.ok(ledger.snapshot('a').audit.some(entry=>entry.action==='collections.deleted'));
 });
+
+// Una cuenta «histórica» guarda lo que ya pasó (cobros y gastos importados de antes del saldo real): no suma al saldo.
+test('una cuenta histórica no suma al saldo registrado ni al disponible', t => {
+  const {ledger, account} = fixture(t);
+  account({opening: '60000'});
+  account({name: 'Histórico planilla', accountKind: 'history', opening: '5000'});
+  const totals = ledger.snapshot('a').totals[0];
+  assert.equal(totals.balance, 6000000);
+  assert.equal(totals.verifiedAccessible, 6000000);
+  const history = ledger.snapshot('a').accounts.find(a => a.kind === 'history');
+  assert.equal(history.balance, 500000); // existe y tiene saldo propio, pero no entra en el total
+});
