@@ -544,6 +544,13 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
   if (config.accountId) { try { account = ledger.account(workspace, config.accountId); } catch { account = null; } }
   const created = [], skipped = { duplicadas: 0, canceladas: 0, vacias: 0, sinFecha: 0, sinCobro: 0, sinMaterial: 0, sinEnvio: 0, eliminadas: 0 }, errors = [], reverted = [];
   const beforeCutoff = { rows: 0, oldest: null };
+  // Saldo inicial = lo que la cuenta ya tiene hoy. Una venta anterior al corte que estaba cobrada (Transf. TRUE) cuando LANDUR la vio
+  // ya está en ese saldo: no se cobra de nuevo. Una que estaba sin cobrar se recuerda en `pending`: si después se marca como
+  // cobrada, el dinero llega ahora y el cobro se registra con la fecha de hoy.
+  const importKey = `${config.spreadsheetId}|${config.sheetName}`;
+  const wasPending = new Set(config.imported?.key === importKey && Array.isArray(config.imported.pending) ? config.imported.pending : []);
+  const pendingNow = new Set();
+  const today = new Date().toISOString().slice(0, 10);
   let read = 0, first = null, last = null, approxDates = 0;
   // Conciliación: lo que la planilla suma (toda fila con Bruto, también las omitidas) contra lo que
   // quedó asentado como venta. Si no coinciden, el resultado lo dice en vez de dejarlo a ojo.
@@ -685,13 +692,13 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
           saleRow = { id: run.id };
         }
         appRows++; appCents += saleCents;
-        // LANDUR no asienta cobros ni gastos anteriores al saldo inicial de la cuenta: la venta entra, el resto
-        // no. Se cuenta y se avisa una sola vez (con la fecha más vieja) en vez de repetir el error por fila.
-        if (account && date < account.cutoff) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; continue; }
+        // LANDUR no asienta gastos anteriores al saldo inicial de la cuenta (ya están en el saldo): la venta entra,
+        // el gasto no. El cobro se decide más abajo.
+        const preCutoff = Boolean(account) && date < account.cutoff;
         // Gastos de la fila: material y envío salen de la misma cuenta que los cobros. Sin cuenta no
         // hay caja donde asentarlos, así que no se registran. Un valor editado se revierte y se rehace.
-        if (materialField) syncExpense({ saleExternal, suffix: '-material', cell: cell(materialField), concept: `Material · ${detail || customer || 'planilla'}`, category: 'Materiales', date, label, skipKey: 'sinMaterial', what: 'El material' });
-        if (shippingField) syncExpense({ saleExternal, suffix: '-envio', cell: cell(shippingField), concept: `Envío · ${order || customer || detail || 'planilla'}`, category: 'Envíos', date, label, skipKey: 'sinEnvio', what: 'El envío' });
+        if (!preCutoff && materialField) syncExpense({ saleExternal, suffix: '-material', cell: cell(materialField), concept: `Material · ${detail || customer || 'planilla'}`, category: 'Materiales', date, label, skipKey: 'sinMaterial', what: 'El material' });
+        if (!preCutoff && shippingField) syncExpense({ saleExternal, suffix: '-envio', cell: cell(shippingField), concept: `Envío · ${order || customer || detail || 'planilla'}`, category: 'Envíos', date, label, skipKey: 'sinEnvio', what: 'El envío' });
         // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
         if (!account) continue;
         // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga
@@ -712,6 +719,14 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         // anterior: el cobro se registra siempre que la fila traiga comisión.
         const paidStates = String(config.paidStates || '').split(',').map(foldCell).filter(Boolean);
         if (paidStates.length > 0 && !paidStates.includes(foldCell(cell('status')))) unpaid = true;
+        if (preCutoff) {
+          if (unpaid) pendingNow.add(base);
+          else if (!wasPending.has(base)) {
+            // Cobrada desde antes de que LANDUR la viera: ya está en el saldo inicial. Se cuenta y se avisa una sola vez.
+            beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date;
+            continue;
+          }
+        }
         let commission = null;
         if (!unpaid) {
           const fee = columns.fee >= 0 ? sheetAmount(cell('fee')) : null;
@@ -734,14 +749,14 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         let collection = externalVersions(ledger, workspace, collectionBase);
         if (collection.live) {
           const liveCommission = ledger.db.prepare("SELECT COALESCE(SUM(amount),0) n FROM operations WHERE workspace=? AND related_id=? AND kind='commission' AND reversed_by IS NULL").get(workspace, collection.live.id).n;
-          if (collect && collection.live.amount === saleCents && collection.live.date === date && liveCommission === Math.round(Number(commission) * 100)) { skipped.duplicadas++; continue; }
+          if (collect && collection.live.amount === saleCents && (preCutoff || collection.live.date === date) && liveCommission === Math.round(Number(commission) * 100)) { skipped.duplicadas++; continue; }
           // El estado, la comisión o la fecha cambiaron: el cobro asentado ya no es el de la planilla.
           reverseOp(collection.live, label);
           collection = externalVersions(ledger, workspace, collectionBase);
         }
         if (!collect) { skipped.sinCobro++; continue; }
         const run = ledger.command(workspace, actor, opKey('cobro-planilla', collection.next),
-          { kind: 'collection', concept: truncate(`Cobro · ${order || customer || 'planilla'}`, 115), accountId: account.id, targetId: saleRow.id, amount: gross, currency: config.currency, commission, date, source: 'sheets', externalId: collection.next });
+          { kind: 'collection', concept: truncate(`Cobro · ${order || customer || 'planilla'}`, 115), accountId: account.id, targetId: saleRow.id, amount: gross, currency: config.currency, commission, date: preCutoff ? (today > account.cutoff ? today : account.cutoff) : date, source: 'sheets', externalId: collection.next });
         created.push({ kind: 'collection', id: run.id, ref: label });
       } catch (error) {
         if (!(error instanceof DomainError)) throw error;
@@ -751,7 +766,7 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     }
   }
   if (beforeCutoff.rows)
-    errors.push({ id: 'Saldo inicial', message: `${beforeCutoff.rows} ${beforeCutoff.rows === 1 ? 'fila tiene' : 'filas tienen'} fecha anterior al saldo inicial de la cuenta (${account.cutoff}), la más vieja del ${beforeCutoff.oldest}: LANDUR registró las ventas, pero no sus cobros ni sus gastos. Mové el saldo inicial de la cuenta a una fecha anterior al ${beforeCutoff.oldest}.` });
+    errors.push({ id: 'Saldo inicial', message: `${beforeCutoff.rows} ${beforeCutoff.rows === 1 ? 'fila tiene' : 'filas tienen'} fecha anterior al saldo inicial de la cuenta (${account.cutoff}), la más vieja del ${beforeCutoff.oldest}: LANDUR registró las ventas, pero no sus cobros ni sus gastos porque ya están en el saldo inicial. Si no es así, mové el corte de la cuenta a una fecha anterior al ${beforeCutoff.oldest}.` });
   // Filas que ya estaban asentadas y la planilla ya no tiene (borradas, canceladas, con otro número):
   // se revierten, para que LANDUR quede igual a la planilla. Solo se compara contra la lectura anterior
   // de ESTA misma pestaña, y solo si esta lectura pudo ubicar todas sus filas.
@@ -772,7 +787,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     }
   }
   // Si algo quedó sin ubicar o sin revertir, se conserva la lista anterior para no olvidar esas filas.
-  const nextImported = { key: sheetKey, refs: reconciled ? [...presentRefs] : [...new Set([...previous, ...presentRefs])] };
+  const nextImported = { key: sheetKey, refs: reconciled ? [...presentRefs] : [...new Set([...previous, ...presentRefs])],
+    pending: [...new Set([...wasPending, ...pendingNow])].filter(ref => !reconciled || presentRefs.has(ref)) };
   return { source: 'sheets', rows: read, sheet: { name: config.sheetName }, since: first, until: last, created, skipped, errors, reverted, approxDates,
     totals: { sheetRows, sheetCents, appRows, appCents }, nextImported };
 }

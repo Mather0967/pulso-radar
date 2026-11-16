@@ -477,6 +477,38 @@ test('sheets: una celda de error suelta en una fila sin nada más se ignora', as
   ledger.close();
 });
 
+// El saldo inicial de la cuenta es lo que Rafa tiene HOY: lo que la planilla ya marca como cobrado (Transf. TRUE) está en ese
+// saldo y no se cobra de nuevo; lo que estaba sin cobrar se cobra, con la fecha de hoy, cuando se marca.
+test('corte: lo cobrado antes del corte ya está en el saldo y lo pendiente se cobra al marcarlo, una sola vez', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'corte', month: '2026-09'}));
+  const header = ['Fecha', 'Cliente', 'Nro. Pedido', 'Pedido', 'Unidades', 'Estado', 'Bruto', 'MP Fee', 'MP Neto', 'Transf.'];
+  sheetEdits.corte = [header,
+    ['Setiembre 5', 'Cobrada', '#1', 'x', 1, 'Enviado', 1000, 100, 900, true],
+    [6, 'Pendiente', '#2', 'x', 1, 'Enviado', 500, 50, 450, false],
+  ];
+  const balance = () => ledger.snapshot('landur').accounts.find(a => a.id === accountId).balance / 100;
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'sale').length, 2);
+    assert.equal(liveOf(ledger, 'collection').length, 0);
+    assert.equal(balance(), 100); // nada se suma al saldo: lo cobrado ya estaba, lo pendiente todavía no llegó
+
+    sheetEdits.corte[2][9] = true; // Rafa cobra la pendiente
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    const [cobro, ...otros] = liveOf(ledger, 'collection');
+    assert.deepEqual([otros.length, cobro.date, cobro.concept.includes('#2')], [0, today > '2026-10-01' ? today : '2026-10-01', true]);
+    assert.equal(balance(), 550); // 100 de apertura + 450 netos de la que recién llegó
+
+    const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {}); // no se repite ni se mueve la fecha
+    assert.equal(again.created.length, 0);
+    assert.equal(liveOf(ledger, 'collection').length, 1);
+    assert.equal(balance(), 550);
+  } finally { delete sheetEdits.corte; }
+  ledger.close();
+});
+
 test('sheets: el resultado compara lo que suma la planilla con lo que quedó en LANDUR', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId}));
