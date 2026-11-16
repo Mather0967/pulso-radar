@@ -181,14 +181,18 @@ function monthDay(day, month, label) {
 }
 // La planilla real escribe el mes en la primera fecha de cada tramo («Setiembre 16», «Octubre») y
 // después solo el día (16, 17…). El mes escrito rige para las filas siguientes; antes de que
-// aparezca uno, rige el mes configurado. El año sale del mes configurado: no se supone.
+// aparezca uno, rige el mes configurado. El año sale del mes configurado y avanza solo al pasar de diciembre a enero.
 const MONTH_NAMES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, setiembre: 9, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
 // `marker.month` (AAAA-MM) es el mes vigente y se actualiza cuando la planilla escribe uno.
 function sheetDate(value, marker, label) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     // Las celdas de fecha de Google llegan como número de serie (días desde 1899-12-30); la parte
     // decimal es la hora: redondear fecharía en el día siguiente toda venta cargada después del mediodía.
-    if (value >= 20000) return new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 864e5).toISOString().slice(0, 10);
+    if (value >= 20000) {
+      const iso = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 864e5).toISOString().slice(0, 10);
+      marker.month = iso.slice(0, 7); // «octubre 1» escrito como fecha real: las filas de abajo (solo el día) son de ese mes
+      return iso;
+    }
     if (Number.isInteger(value) && value >= 1 && value <= 31) return monthDay(value, marker.month, label);
     throw new DomainError(`${label}: la fecha «${value}» no se entiende.`);
   }
@@ -200,15 +204,17 @@ function sheetDate(value, marker, label) {
     marker.approx = true;
     return `${marker.month}-01`;
   }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return formatDate(text);
   const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (dmy) return formatDate(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`);
+  const full = dmy ? `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}` : /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+  if (full) { const iso = formatDate(full); marker.month = iso.slice(0, 7); return iso; }
   if (/^\d{1,2}$/.test(text)) return monthDay(Number(text), marker.month, label);
   const named = foldCell(text).match(/^([a-z]+)(?: (\d{1,2}))?$/);
   const monthNumber = named && MONTH_NAMES[named[1]];
   if (monthNumber) {
     if (!marker.month) throw new DomainError(`${label}: la fecha dice «${truncate(text, 20)}» pero falta el año. Indicá el mes de la planilla en la conexión (por ejemplo, 2026-11).`);
-    marker.month = `${marker.month.slice(0, 4)}-${String(monthNumber).padStart(2, '0')}`;
+    // La planilla va de lo viejo a lo nuevo: un mes anterior al vigente (Diciembre → Enero) es del año siguiente.
+    const year = Number(marker.month.slice(0, 4)) + (monthNumber < Number(marker.month.slice(5, 7)) ? 1 : 0);
+    marker.month = `${year}-${String(monthNumber).padStart(2, '0')}`;
     if (!named[2]) { marker.approx = true; return `${marker.month}-01`; }
     return monthDay(Number(named[2]), marker.month, label);
   }
@@ -608,7 +614,10 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       const fail = message => { errors.push({ id: label, message }); };
       let keyed = false;
       try {
-        const gross = sheetAmount(cell('gross'));
+        const rawGross = cell('gross');
+        // Una celda de error de Google (#REF!, #DIV/0!…) suelta en una fila sin nada más no es una venta: se ignora.
+        if (typeof rawGross === 'string' && /^#[A-Z/0]+[!?]?$/.test(rawGross.trim()) && !customer && !detail && !order) continue;
+        const gross = sheetAmount(rawGross);
         // Una fila sin nada escrito (fórmulas pre-armadas, formato hasta el final de la hoja) no es una
         // venta «sin importe»: no se cuenta ni se informa.
         if (gross === null && !customer && !detail && !order) continue;

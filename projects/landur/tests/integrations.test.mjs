@@ -396,7 +396,7 @@ test('sheets: una referencia con puntos o dos puntos no rompe la clave de la ope
 // día. Antes esa primera fila se perdía y las demás caían en el mes configurado (otro período).
 test('sheets: el mes escrito en la fecha rige para las filas siguientes, también tras una cancelada', async () => {
   const {ledger, connections} = await integrationsAgainst();
-  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'setiembre'})); // sin cuenta: solo ventas
+  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'setiembre', month: '2026-09'})); // sin cuenta: solo ventas
   const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
   assert.deepEqual(summary.errors, []);
   const sales = ledger.snapshot('landur').operations.filter(o => o.kind === 'sale');
@@ -408,6 +408,72 @@ test('sheets: el mes escrito en la fecha rige para las filas siguientes, tambié
     'Beto Octubre': '2026-10-03', // lo fecha el «Octubre 2» de la fila cancelada de arriba
   });
   assert.equal(summary.skipped.canceladas, 1);
+  ledger.close();
+});
+
+// La Minorista real: «Setiembre 16» es texto, pero «octubre 1» y «noviembre 1» son celdas de fecha (formato «mmmm d»).
+// La fecha completa también fija el mes de las filas siguientes, que traen solo el día. Antes quedaban todas en
+// septiembre y solo fallaba el día 31.
+test('fechas: una fecha real en medio de la pestaña fija el mes de las filas que traen solo el día', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'tramos', month: '2026-09'}));
+  const serial = (y, m, d) => Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 864e5);
+  sheetEdits.tramos = [['Fecha', 'Cliente', 'Nro. Pedido', 'Pedido', 'Unidades', 'Estado', 'Bruto'],
+    ['Setiembre 16', 'Uno', '#1', 'x', 1, 'Enviado', 100],
+    [30, 'Dos', '#2', 'x', 1, 'Enviado', 100],
+    [serial(2026, 10, 1), 'Tres', '#3', 'x', 1, 'Enviado', 100],
+    [31, 'Cuatro', '#4', 'x', 1, 'Enviado', 100],
+    [serial(2026, 11, 1), 'Cinco', '#5', 'x', 1, 'Enviado', 100],
+    [9, 'Seis', '#6', 'x', 1, 'Enviado', 100],
+  ];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    const dates = Object.fromEntries(liveOf(ledger, 'sale').map(o => [o.concept.split(' · ')[1], o.date]));
+    assert.deepEqual(dates, {Uno: '2026-09-16', Dos: '2026-09-30', Tres: '2026-10-01', Cuatro: '2026-10-31', Cinco: '2026-11-01', Seis: '2026-11-09'});
+  } finally { delete sheetEdits.tramos; }
+  ledger.close();
+});
+
+// La Mayorista real corre de Noviembre de un año a Noviembre del siguiente, con el mes escrito y sin día: el año
+// avanza solo al pasar de Diciembre a Enero. Con el mes de la conexión en 2025-11, la Minorista (que arranca en
+// «Setiembre» de 2026) también cae en el año correcto.
+test('fechas: el año avanza al pasar de diciembre a enero, en cada pestaña', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'mayor, minor', month: '2025-11'}));
+  sheetEdits.mayor = [['Fecha', 'Cliente', 'Producto', 'Unidades', 'Bruto'],
+    ['Noviembre', 'A', 'p', 1, 100], ['', 'B', 'p', 1, 100],
+    ['Diciembre', 'C', 'p', 1, 100],
+    ['Enero', 'D', 'p', 1, 100],
+    ['Octubre', 'E', 'p', 1, 100],
+    ['Noviembre', 'F', 'p', 1, 100],
+  ];
+  sheetEdits.minor = [['Fecha', 'Cliente', 'Nro. Pedido', 'Pedido', 'Unidades', 'Estado', 'Bruto'],
+    ['Setiembre 16', 'G', '#7', 'x', 1, 'Enviado', 100],
+    [20, 'H', '#8', 'x', 1, 'Enviado', 100],
+  ];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    const dates = Object.fromEntries(liveOf(ledger, 'sale').map(o => [o.concept.split(' · ').slice(-2)[0], o.date]));
+    assert.deepEqual(dates, {A: '2025-11-01', B: '2025-11-01', C: '2025-12-01', D: '2026-01-01', E: '2026-10-01', F: '2026-11-01', G: '2026-09-16', H: '2026-09-20'});
+  } finally { delete sheetEdits.mayor; delete sheetEdits.minor; }
+  ledger.close();
+});
+
+// La planilla real tiene un «#REF!» suelto al pie de Mayorista (fila sin cliente): no es una venta ni un error a mostrar.
+test('sheets: una celda de error suelta en una fila sin nada más se ignora', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({sheetName: 'suelta', month: '2026-09'}));
+  sheetEdits.suelta = [['Fecha', 'Cliente', 'Producto', 'Unidades', 'Bruto'],
+    ['Setiembre 5', 'Ana', 'p', 1, 100],
+    ['', '', '', '', '#REF!'],
+  ];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    assert.equal(liveOf(ledger, 'sale').length, 1);
+  } finally { delete sheetEdits.suelta; }
   ledger.close();
 });
 
@@ -650,7 +716,7 @@ test('pestañas: se aceptan hasta 4 y el nombre se valida pestaña por pestaña'
 // sin columna de comisión, y una fila sin importe («Microfono»): nada de eso se le pide cambiar.
 test('mayorista real: mes escrito, días vacíos y Transf. mixto entran sin pedirle nada a la planilla', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
-  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista'}));
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-10'}));
   const header = ['Fecha','Cliente','Producto','Unidades','Bruto','Material Real','Material + 10%','Transf.','Ganancia Total','Reinversion','Transf.','Rafa','Parte Vendedor','Transf.','Vendedor','15% Ahorro Personal','15% Ahorro Personal'];
   const row = (date, client, product, units, gross, material, paid) => [date, client, product, units, gross, material, material * 1.1, paid, 0, 0, paid, 0, 0, paid, 'Luis', 0, false];
   sheetEdits.Mayorista = [[], header,
