@@ -662,6 +662,26 @@ test('ingresos: el envío UES queda por pagar solo desde la fecha elegida', asyn
   ledger.close();
 });
 
+// Si el Bruto es justo lo que entra (Bruto = Material + 10 %, sin ganancia), la venta no cambia de importe al pasar de modo: su cobro
+// viejo por el Bruto tiene que cederle el lugar al nuevo, sin avisos de «supera el saldo pendiente».
+test('ingresos: el cobro del modo Bruto no tapa al nuevo cuando el importe de la venta no cambia', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  sheetEdits.Mayorista = [[], MAYORISTA_HEADER,
+    ['Noviembre', 'Solo material', 'p', 1, 500, 500, 500, true, 0, 0, '', false, 0, 0, false, 'Luis', 0, false],
+  ];
+  try {
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'collection').length, 1); // el cobro por el Bruto
+    connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11', incomeMode: 'account'}));
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    assert.deepEqual(liveOf(ledger, 'collection').map(o => [o.concept.startsWith('Cobro Material'), o.amount]), [[true, 50000]]);
+    assert.equal((await connections.sync(ledger, 'landur', 'tester', 'sheets', {})).created.length, 0);
+  } finally { delete sheetEdits.Mayorista; }
+  ledger.close();
+});
+
 test('ingresos: sin la opción, la venta sigue siendo el Bruto', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
