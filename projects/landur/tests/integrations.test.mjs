@@ -4,7 +4,7 @@
 // source + external_id) y los errores de una fila no abortan el lote.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_UNPAID_ROWS, MAYORISTA_ROWS, MINORISTA_HEADER} from './helpers/integrations-fixture.mjs';
+import {integrationsAgainst, saveShopify, saveMeta, saveSheets, sheetEdits, MINORISTA_ROWS, MINORISTA_UNPAID_ROWS, MAYORISTA_ROWS, MINORISTA_HEADER, MAYORISTA_HEADER} from './helpers/integrations-fixture.mjs';
 
 test('conexiones: el token se guarda completo y se informa enmascarado', async () => {
   const {ledger, connections} = await integrationsAgainst();
@@ -506,6 +506,69 @@ test('corte: lo cobrado antes del corte ya está en el saldo y lo pendiente se c
     assert.equal(liveOf(ledger, 'collection').length, 1);
     assert.equal(balance(), 550);
   } finally { delete sheetEdits.corte; }
+  ledger.close();
+});
+
+// «Solo lo que ingresa a la cuenta»: al negocio le entra una parte del Bruto (Material + 10 % y Reinversión en la mayorista;
+// «Cuenta Landur» en la minorista), cada una con su propia casilla «Transf.». El resto es de los socios y no pasa por la cuenta.
+test('ingresos: en la mayorista la venta es Material + 10 % más Reinversión y cada parte se cobra con su Transf.', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11', incomeMode: 'account'}));
+  // Fecha, Cliente, Producto, Unidades, Bruto, Material Real, Material + 10%, Transf., Ganancia Bruta, Ganancia Neta, Reinversion, Transf., …
+  const row = (client, gross, mat10, paidMat, reinv, paidReinv) => ['Noviembre', client, 'Ilumimate placa', 10, gross, 400, mat10, paidMat, 0, 0, reinv, paidReinv, 0, 0, false, 'Luis', 0, false];
+  sheetEdits.Mayorista = [[], MAYORISTA_HEADER,
+    row('Cobrada', 1000, 440, true, 100, true),       // 540 entran
+    row('Parcial', 1000, 440, true, 100, false),      // 440 entraron, 100 por cobrar
+    row('Pendiente', 1000, 440, false, 100, false),   // 540 por cobrar
+    row('SinReinversion', 800, 330, true, '', false), // solo Material + 10 %: 330 entran
+  ];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    assert.deepEqual(liveOf(ledger, 'sale').map(o => o.amount).sort((a, b) => a - b), [33000, 54000, 54000, 54000]);
+    assert.equal(liveOf(ledger, 'collection').length, 4); // Cobrada ×2, Parcial ×1, SinReinversion ×1
+    const totals = ledger.snapshot('landur').totals.find(item => item.currency === 'USD');
+    assert.equal(totals.receivable, 10000 + 54000); // lo que falta transferir: 100 + 540
+    assert.equal(summary.totals.sheetCents, 33000 + 3 * 54000); // la conciliación compara contra lo que entra, no contra el Bruto
+    const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(again.created.length, 0);
+    // Rafa transfiere la Reinversión que faltaba: entra ese cobro y lo pendiente baja.
+    sheetEdits.Mayorista[3][11] = true;
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'collection').length, 5);
+    assert.equal(ledger.snapshot('landur').totals.find(item => item.currency === 'USD').receivable, 54000);
+  } finally { delete sheetEdits.Mayorista; }
+  ledger.close();
+});
+
+test('ingresos: en la minorista la venta es «Cuenta Landur» y se cobra con su Transf.', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-11', incomeMode: 'account'}));
+  // Cuenta Landur (columna 19) = Material + Envío + Reinversión; Transf. (columna 20) marca que llegó.
+  const row = (order, gross, landur, paid) => {
+    const cells = Array(24).fill('');
+    Object.assign(cells, {0: 9, 1: order, 3: order, 5: '1 lámpara', 6: 1, 7: 'Enviado', 8: gross, 9: 101, 10: gross - 101, 11: 80, 12: 190, 16: 300, 18: landur, 19: paid});
+    return cells;
+  };
+  sheetEdits.Minorista = [MINORISTA_HEADER, row('#7001', 970, 570, true), row('#7002', 1680, 1272, false)];
+  try {
+    const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(summary.errors, []);
+    assert.deepEqual(liveOf(ledger, 'sale').map(o => o.amount).sort((a, b) => a - b), [57000, 127200]);
+    assert.equal(liveOf(ledger, 'collection').length, 1);
+    assert.equal(ledger.snapshot('landur').totals.find(item => item.currency === 'USD').receivable, 127200);
+  } finally { delete sheetEdits.Minorista; }
+  ledger.close();
+});
+
+test('ingresos: sin la opción, la venta sigue siendo el Bruto', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Mayorista', month: '2026-11'}));
+  sheetEdits.Mayorista = [[], MAYORISTA_HEADER, ['Noviembre', 'A', 'p', 10, 1000, 400, 440, true, 0, 0, 100, true, 0, 0, false, 'Luis', 0, false]];
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(liveOf(ledger, 'sale').map(o => o.amount), [100000]);
+  } finally { delete sheetEdits.Mayorista; }
   ledger.close();
 });
 

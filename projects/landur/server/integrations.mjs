@@ -126,6 +126,11 @@ function normalizePaidStates(value) {
 }
 // Qué columna del material se registra como gasto. «real» es el costo efectivo; «plus10»
 // incluye el 10 % que la planilla carga; «none» no registra gasto.
+function normalizeIncomeMode(value) {
+  const option = String(value ?? 'gross').trim();
+  if (!['gross', 'account'].includes(option)) throw new DomainError('Elegí qué se registra como venta: el Bruto completo o solo lo que ingresa a la cuenta.');
+  return option;
+}
 function normalizeMaterialColumn(value) {
   const option = String(value ?? 'real').trim();
   if (!['real', 'plus10', 'none'].includes(option)) throw new DomainError('Elegí qué valor de material se registra como gasto: el real, el que incluye el 10 % o ninguno.');
@@ -251,11 +256,22 @@ const SHEET_COLUMNS = {
   // La minorista tiene una sola columna de material y una de envío.
   materialMin: ['material'],
   shipping: ['envio', 'costo de envio'],
+  // Lo que la planilla manda a la cuenta del negocio: «Cuenta Landur» (minorista) o «Material + 10 %» y «Reinversión» (mayorista).
+  landurAccount: ['cuenta landur'],
+  reinvest: ['reinversion'],
 };
 function sheetColumns(header) {
   const keys = header.map(foldCell);
   const map = {};
   for (const [field, names] of Object.entries(SHEET_COLUMNS)) map[field] = names.map(name => keys.indexOf(name)).find(index => index >= 0) ?? -1;
+  // Cada parte que entra a la cuenta tiene su propia casilla «Transf.»: la primera que aparece a su derecha.
+  const flagAfter = start => keys.findIndex((key, index) => index > start && key === 'transf');
+  map.incomes = [];
+  if (map.landurAccount >= 0) map.incomes.push({ key: 'cuenta', label: 'Cuenta Landur', amount: map.landurAccount, flag: flagAfter(map.landurAccount) });
+  else if (map.reinvest >= 0) {
+    if (map.materialPlus >= 0) map.incomes.push({ key: 'material', label: 'Material + 10 %', amount: map.materialPlus, flag: flagAfter(map.materialPlus) });
+    map.incomes.push({ key: 'reinversion', label: 'Reinversión', amount: map.reinvest, flag: flagAfter(map.reinvest) });
+  }
   return map;
 }
 // La primera fila con «Bruto» y algo que identifique la venta es el encabezado: arriba puede
@@ -373,6 +389,7 @@ function validateSave(ledger, workspace, input) {
     config.month = input.month === undefined ? previous?.month ?? '' : normalizeMonth(input.month);
     config.paidStates = input.paidStates === undefined ? previous?.paidStates ?? '' : normalizePaidStates(input.paidStates);
     config.materialColumn = input.materialColumn === undefined ? previous?.materialColumn ?? 'real' : normalizeMaterialColumn(input.materialColumn);
+    config.incomeMode = input.incomeMode === undefined ? previous?.incomeMode ?? 'gross' : normalizeIncomeMode(input.incomeMode);
     config.currency = input.currency !== undefined ? unitOf(input.currency) : previous?.currency;
     if (!config.currency) throw new DomainError('Seleccioná la moneda de la planilla (UYU, USD o BRL).');
     config.accountId = typeof input.accountId === 'string' && input.accountId.trim() ? input.accountId.trim() : previous?.accountId ?? '';
@@ -578,13 +595,13 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
     }
     reverseOp(sale, ref);
   };
-  const syncExpense = ({ saleExternal, suffix, cell: raw, concept, category, date, label, skipKey, what }) => {
+  const syncExpense = ({ saleExternal, suffix, cell: raw, concept, category, date, label, skipKey, what, force }) => {
     const value = sheetAmount(raw);
     if (value !== null && Number(value) < 0) { errors.push({ id: label, message: `${what} de la fila es negativo (${value}). Revisá la planilla.` }); return; }
     const cents = value === null ? 0 : Math.round(Number(value) * 100);
     const base = `${saleExternal}${suffix}`;
     let found = externalVersions(ledger, workspace, base);
-    let reversedHere = false;
+    let reversedHere = force === true;
     if (found.live && (cents === 0 || found.live.amount !== cents || found.live.date !== date)) {
       reverseOp(found.live, label);
       reversedHere = true;
@@ -598,6 +615,31 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
       { kind: 'expense', concept: truncate(concept, 115), amount: value, currency: config.currency, date, category, accountId: account.id, source: 'sheets', externalId: found.next });
     created.push({ kind: 'expense', id: run.id, ref: label });
   };
+  // «Solo lo que ingresa a la cuenta»: cada parte (Cuenta Landur, o Material + 10 % y Reinversión) es un cobro de la venta con su propia
+  // casilla «Transf.». Sin comisión: esas columnas ya están netas. Antes del corte de la cuenta rige lo mismo que para el Bruto.
+  const syncIncome = ({ saleRow, saleExternal, income, value, flagCell, date, preCutoff, base, label, who }) => {
+    const flag = sheetFlag(flagCell);
+    if (flag === null && String(flagCell ?? '').trim() !== '') { errors.push({ id: label, message: `La casilla «Transf.» de ${income.label} tiene un valor que no se entiende («${truncate(String(flagCell), 12)}»). Usá TRUE o FALSE.` }); return; }
+    const paid = flag === true;
+    const pendingKey = `${base}#${income.key}`;
+    if (preCutoff) {
+      if (!paid) pendingNow.add(pendingKey);
+      else if (!wasPending.has(pendingKey)) return 'settled';
+    }
+    const cents = Math.round(Number(value) * 100);
+    const collectionBase = `${saleExternal}-cobro-${income.key}`;
+    let collection = externalVersions(ledger, workspace, collectionBase);
+    if (collection.live) {
+      if (paid && collection.live.amount === cents && (preCutoff || collection.live.date === date)) { skipped.duplicadas++; return; }
+      reverseOp(collection.live, label);
+      collection = externalVersions(ledger, workspace, collectionBase);
+    }
+    if (!paid) { skipped.sinCobro++; return; }
+    if (account.currency !== config.currency) { errors.push({ id: label, message: `La cuenta elegida maneja ${account.currency}; la planilla está en ${config.currency}.` }); return; }
+    const run = ledger.command(workspace, actor, opKey('cobro-planilla', collection.next),
+      { kind: 'collection', concept: truncate(`Cobro ${income.label} · ${who}`, 115), accountId: account.id, targetId: saleRow.id, amount: value, currency: config.currency, commission: '0.00', date: preCutoff ? (today > account.cutoff ? today : account.cutoff) : date, source: 'sheets', externalId: collection.next });
+    created.push({ kind: 'collection', id: run.id, ref: label });
+  };
   // La cuenta guardada puede haberse eliminado después: se avisa una vez y se siguen
   // registrando las ventas, que no dependen de una cuenta.
   const accountMissing = Boolean(config.accountId) && !account;
@@ -605,6 +647,8 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
   for (const { tab, rows, headerIndex, columns } of sheets) {
     // El mes vigente arranca en el de la conexión en cada pestaña (cada una tiene su propia cronología).
     const marker = { month: config.month, approx: false };
+    // Con «solo lo que ingresa a la cuenta» la venta es la suma de esas columnas; sin ellas, o en modo Bruto, es el Bruto.
+    const incomes = config.incomeMode === 'account' ? columns.incomes : [];
     // Material: en la mayorista «Material Real» o «Material + 10 %» según la conexión; la minorista tiene
     // una sola columna. «No registrar gasto» apaga material y envío.
     const wantedMaterial = config.materialColumn === 'plus10' ? 'materialPlus' : 'material';
@@ -624,7 +668,12 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         const rawGross = cell('gross');
         // Una celda de error de Google (#REF!, #DIV/0!…) suelta en una fila sin nada más no es una venta: se ignora.
         if (typeof rawGross === 'string' && /^#[A-Z/0]+[!?]?$/.test(rawGross.trim()) && !customer && !detail && !order) continue;
-        const gross = sheetAmount(rawGross);
+        let gross;
+        if (incomes.length) {
+          let sum = 0, any = false;
+          for (const income of incomes) { const part = sheetAmount(row[income.amount]); if (part !== null && Number(part) > 0) { any = true; sum += Math.round(Number(part) * 100); } }
+          gross = any ? (sum / 100).toFixed(2) : null;
+        } else gross = sheetAmount(rawGross);
         // Una fila sin nada escrito (fórmulas pre-armadas, formato hasta el final de la hoja) no es una
         // venta «sin importe»: no se cuenta ni se informa.
         if (gross === null && !customer && !detail && !order) continue;
@@ -697,10 +746,21 @@ async function syncSheets(ledger, workspace, actor, config, fetchImpl, options =
         const preCutoff = Boolean(account) && date < account.cutoff;
         // Gastos de la fila: material y envío salen de la misma cuenta que los cobros. Sin cuenta no
         // hay caja donde asentarlos, así que no se registran. Un valor editado se revierte y se rehace.
-        if (!preCutoff && materialField) syncExpense({ saleExternal, suffix: '-material', cell: cell(materialField), concept: `Material · ${detail || customer || 'planilla'}`, category: 'Materiales', date, label, skipKey: 'sinMaterial', what: 'El material' });
-        if (!preCutoff && shippingField) syncExpense({ saleExternal, suffix: '-envio', cell: cell(shippingField), concept: `Envío · ${order || customer || detail || 'planilla'}`, category: 'Envíos', date, label, skipKey: 'sinEnvio', what: 'El envío' });
+        if (!preCutoff && materialField) syncExpense({ saleExternal, suffix: '-material', cell: cell(materialField), concept: `Material · ${detail || customer || 'planilla'}`, category: 'Materiales', date, label, skipKey: 'sinMaterial', what: 'El material', force: reversedNow });
+        if (!preCutoff && shippingField) syncExpense({ saleExternal, suffix: '-envio', cell: cell(shippingField), concept: `Envío · ${order || customer || detail || 'planilla'}`, category: 'Envíos', date, label, skipKey: 'sinEnvio', what: 'El envío', force: reversedNow });
         // Sin cuenta elegida se registran solo las ventas: el cobro no se inventa.
         if (!account) continue;
+        if (incomes.length) {
+          let settled = false;
+          for (const income of incomes) {
+            const part = sheetAmount(row[income.amount]);
+            if (part === null || Number(part) <= 0) continue;
+            if (syncIncome({ saleRow, saleExternal, income, value: part, flagCell: income.flag >= 0 ? row[income.flag] : undefined, date, preCutoff, base, label, who: order || customer || detail || 'planilla' }) === 'settled') settled = true;
+          }
+          // Cobrada desde antes de que LANDUR la viera: ya está en el saldo inicial. Se cuenta y se avisa una sola vez.
+          if (settled) { beforeCutoff.rows++; if (!beforeCutoff.oldest || date < beforeCutoff.oldest) beforeCutoff.oldest = date; }
+          continue;
+        }
         // La planilla marca el pago en «Transf.»: sin TRUE no hay cobro, sin importar qué diga
         // «Estado» (que es logística) ni si hay comisión en la fila. Un cobro ya asentado de una fila
         // que deja de estar transferida se revierte más abajo, con el resto de los cambios del cobro.
