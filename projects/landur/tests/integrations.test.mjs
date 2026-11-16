@@ -541,22 +541,68 @@ test('ingresos: en la mayorista la venta es Material + 10 % más Reinversión y 
   ledger.close();
 });
 
-test('ingresos: en la minorista la venta es «Cuenta Landur» y se cobra con su Transf.', async () => {
+// Minorista: lo que cobra Mercado Pago (MP Neto) llega a la cuenta cuando Rafa lo transfiere («Transf.»); de ahí Landur paga los
+// sueldos (columnas Rafa y Luis, hasta «Transf. reparto») y el envío cuando el método es UES (sin casilla: queda pendiente).
+const minoristaRow = (order, month, {gross, fee, material, shipping, method, paid, rafa, luis, repartido}) => {
+  const cells = Array(24).fill('');
+  Object.assign(cells, {0: month, 1: 'Cliente ' + order, 3: order, 5: '1 lámpara', 6: 1, 7: 'Enviado', 8: gross, 9: fee, 10: gross - fee, 11: material, 12: shipping, 13: method, 19: paid, 21: rafa, 22: luis, 23: repartido});
+  return cells;
+};
+
+test('ingresos: en la minorista la venta es el MP Neto, y los sueldos y el envío UES son compromisos', async () => {
   const {ledger, connections, accountId} = await integrationsAgainst();
   connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-11', incomeMode: 'account'}));
-  // Cuenta Landur (columna 19) = Material + Envío + Reinversión; Transf. (columna 20) marca que llegó.
-  const row = (order, gross, landur, paid) => {
-    const cells = Array(24).fill('');
-    Object.assign(cells, {0: 9, 1: order, 3: order, 5: '1 lámpara', 6: 1, 7: 'Enviado', 8: gross, 9: 101, 10: gross - 101, 11: 80, 12: 190, 16: 300, 18: landur, 19: paid});
-    return cells;
-  };
-  sheetEdits.Minorista = [MINORISTA_HEADER, row('#7001', 970, 570, true), row('#7002', 1680, 1272, false)];
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    // Cobrada y repartida; el envío es UES: queda por pagar.
+    minoristaRow('#8001', 9, {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 300, luis: 100, repartido: true}),
+    // Sin cobrar ni repartir; retira en persona: no hay envío.
+    minoristaRow('#8002', 9, {gross: 2000, fee: 200, material: 100, shipping: 0, method: 'Retiro', paid: false, rafa: 500, luis: 0, repartido: false}),
+  ];
+  const totals = () => ledger.snapshot('landur').totals.find(item => item.currency === 'USD');
+  const balance = () => ledger.snapshot('landur').accounts.find(item => item.id === accountId).balance;
+  const kinds = kind => liveOf(ledger, kind).length;
   try {
     const summary = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
     assert.deepEqual(summary.errors, []);
-    assert.deepEqual(liveOf(ledger, 'sale').map(o => o.amount).sort((a, b) => a - b), [57000, 127200]);
-    assert.equal(liveOf(ledger, 'collection').length, 1);
-    assert.equal(ledger.snapshot('landur').totals.find(item => item.currency === 'USD').receivable, 127200);
+    assert.deepEqual(liveOf(ledger, 'sale').map(o => o.amount).sort((a, b) => a - b), [90000, 180000]); // MP Neto
+    assert.equal(kinds('collection'), 1);
+    assert.equal(kinds('obligation'), 4); // Rafa y Luis de la 1.ª, UES de la 1.ª, Rafa de la 2.ª
+    assert.equal(kinds('payment'), 2);    // Rafa y Luis de la 1.ª, ya repartidos
+    assert.equal(totals().receivable, 180000);
+    assert.equal(totals().payable, 19000 + 50000); // UES de la 1.ª + Rafa de la 2.ª
+    assert.equal(balance(), 10000 + 90000 - 30000 - 10000 - 8000 - 10000); // apertura + cobro − sueldos − material (el envío no es gasto inmediato)
+    assert.equal((await connections.sync(ledger, 'landur', 'tester', 'sheets', {})).created.length, 0);
+
+    sheetEdits.Minorista[2][23] = true; // se le paga a Rafa lo de la 2.ª
+    sheetEdits.Minorista[2][19] = true; // y Rafa transfiere lo cobrado de la 2.ª
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(totals().receivable, 0);
+    assert.equal(totals().payable, 19000); // queda solo el envío UES
+  } finally { delete sheetEdits.Minorista; }
+  ledger.close();
+});
+
+// Antes del corte de la cuenta lo ya pagado está en el saldo inicial; lo que quedó sin pagar sigue siendo una deuda.
+test('ingresos: antes del corte un sueldo sin pagar figura por pagar y, al pagarlo, sale de la cuenta hoy', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-09', incomeMode: 'account'}));
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    minoristaRow('#9001', 9, {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 300, luis: 0, repartido: true}),   // ya cobrada y repartida
+    minoristaRow('#9002', 9, {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 300, luis: 0, repartido: false}),  // cobrada, sueldo sin pagar
+  ];
+  const totals = () => ledger.snapshot('landur').totals.find(item => item.currency === 'USD');
+  const balance = () => ledger.snapshot('landur').accounts.find(item => item.id === accountId).balance;
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(liveOf(ledger, 'obligation').length, 1); // solo el sueldo que sigue sin pagarse; el envío UES anterior al corte se da por pagado
+    assert.equal(totals().payable, 30000);
+    assert.equal(balance(), 10000); // nada se suma ni se resta: lo anterior al corte ya está en el saldo inicial
+
+    sheetEdits.Minorista[2][23] = true; // se paga ahora
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.equal(totals().payable, 0);
+    assert.equal(balance(), 10000 - 30000); // sale de la cuenta, con la fecha de hoy
+    assert.equal((await connections.sync(ledger, 'landur', 'tester', 'sheets', {})).created.length, 0);
   } finally { delete sheetEdits.Minorista; }
   ledger.close();
 });
@@ -580,6 +626,39 @@ test('ingresos: cambiar de modo rehace la venta de la mayorista, no la duplica',
     const again = await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
     assert.equal(again.created.length, 0);
   } finally { delete sheetEdits.Mayorista; }
+  ledger.close();
+});
+
+// En una cuenta histórica el pasado ya está resuelto: el envío UES (sin casilla) no queda como deuda; el sueldo sin pagar sí.
+test('ingresos: la cuenta histórica no deja envíos UES por pagar pero sí los sueldos sin pagar', async () => {
+  const {ledger, connections} = await integrationsAgainst();
+  const history = ledger.command('landur', 'tester', 'account-00000009', {kind: 'account', name: 'Histórico', accountKind: 'history', currency: 'USD', opening: '0', cutoff: '2026-01-01', verified: true, accessible: true});
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId: history.id, sheetName: 'Minorista', month: '2026-11', incomeMode: 'account'}));
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    minoristaRow('#6001', 9, {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 300, luis: 0, repartido: false}),
+  ];
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(liveOf(ledger, 'obligation').map(o => o.amount), [30000]); // solo el sueldo de Rafa
+    assert.equal(ledger.snapshot('landur').totals.find(item => item.currency === 'USD').balance, 10000); // solo cuenta Banco QA: la histórica no suma
+  } finally { delete sheetEdits.Minorista; }
+  ledger.close();
+});
+
+// Los envíos UES no tienen casilla: solo quedan por pagar los de la fecha elegida en adelante; los anteriores se dan por pagados.
+test('ingresos: el envío UES queda por pagar solo desde la fecha elegida', async () => {
+  const {ledger, connections, accountId} = await integrationsAgainst();
+  connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', month: '2026-09', incomeMode: 'account', payablesFrom: '2026-10-01'}));
+  sheetEdits.Minorista = [MINORISTA_HEADER,
+    minoristaRow('#5001', 'Setiembre 20', {gross: 1000, fee: 100, material: 80, shipping: 190, method: 'Ues', paid: true, rafa: 0, luis: 0, repartido: true}),
+    minoristaRow('#5002', 'octubre 5', {gross: 1000, fee: 100, material: 80, shipping: 250, method: 'Ues', paid: true, rafa: 0, luis: 0, repartido: true}),
+    minoristaRow('#5003', 'octubre 6', {gross: 1000, fee: 100, material: 80, shipping: 0, method: 'Retiro', paid: true, rafa: 0, luis: 0, repartido: true}),
+  ];
+  try {
+    await connections.sync(ledger, 'landur', 'tester', 'sheets', {});
+    assert.deepEqual(liveOf(ledger, 'obligation').map(o => [o.concept.split(' · ')[0], o.amount]), [['Envío UES', 25000]]); // solo octubre y con envío UES
+    assert.throws(() => connections.save(ledger, 'landur', 'tester', saveSheets({accountId, sheetName: 'Minorista', payablesFrom: '1/10'})), /fecha/i);
+  } finally { delete sheetEdits.Minorista; }
   ledger.close();
 });
 
