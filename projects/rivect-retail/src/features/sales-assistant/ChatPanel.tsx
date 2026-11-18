@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { BadgeCheck, RotateCcw, Send, ShieldCheck } from 'lucide-react'
+import { BadgeCheck, RotateCcw, Send, ShieldCheck, UserRound } from 'lucide-react'
 import type { AssistantMessage, Product } from '@/domain/models'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, formatTime } from '@/utils/format'
@@ -147,6 +147,13 @@ export function ChatPanel({
                       </button>
                     ))}
                   </div>
+                ) : null}
+
+                {!isCustomer && message.meta?.handoff ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                    <UserRound className="h-3 w-3" />
+                    Derivado a una persona · con el contexto de la charla
+                  </p>
                 ) : null}
 
                 {!isCustomer && message.meta?.detected?.length ? (

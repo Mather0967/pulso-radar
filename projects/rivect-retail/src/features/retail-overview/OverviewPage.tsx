@@ -56,7 +56,7 @@ export function OverviewPage() {
     {
       to: '/recovery',
       stat: num(recovery.withoutFollowUp),
-      statLabel: 'sin seguimiento',
+      statLabel: 'sin seguimiento (CRM de ejemplo)',
     },
     {
       to: '/stock',
@@ -71,7 +71,7 @@ export function OverviewPage() {
     {
       to: '/report',
       stat: money(simulator.additionalContribution),
-      statLabel: 'margen potencial',
+      statLabel: 'margen potencial/mes (proyección)',
     },
   ]
 
@@ -110,7 +110,7 @@ export function OverviewPage() {
               <div className="mt-6 flex flex-wrap items-center gap-2">
                 <Link to="/simulator">
                   <Button size="lg">
-                    Abrir Business Simulator
+                    Abrir Simulador de negocio
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -144,7 +144,9 @@ export function OverviewPage() {
                 <p className="mt-2 font-display text-lg font-semibold text-white">
                   {money(simulator.additionalContribution)}
                 </p>
-                <p className="mt-1 text-[11px] text-brand-200/70">estimado por mes</p>
+                <p className="mt-1 text-[11px] text-brand-200/70">
+                  proyección mensual · {num(profile.recoveredSales)} ventas/mes
+                </p>
               </div>
               <div className="col-span-2 rounded-2xl border border-line/80 bg-ink-950/60 p-4 backdrop-blur">
                 <div className="flex items-center justify-between">
@@ -188,12 +190,12 @@ export function OverviewPage() {
             hint={`${num(simulator.fullWorkdaysRecovered, 1)} jornadas equivalentes`}
           />
           <StatTile
-            label="Margen adicional potencial"
+            label="Margen potencial mensual (proyección)"
             value={simulator.additionalContribution}
             prefix="$ "
             icon={<Banknote className="h-4 w-4" />}
             tone="amber"
-            hint={`${num(profile.recoveredSales)} ventas recuperadas/mes`}
+            hint={`Supuesto: ${num(profile.recoveredSales)} ventas recuperadas/mes × ticket`}
           />
           <StatTile
             label="Oportunidades abiertas"
@@ -272,9 +274,9 @@ export function OverviewPage() {
                 hint={`${num(assistant.metrics.conversationsStarted)} conversaciones iniciadas`}
               />
               <MetricRow
-                label="Recuperación de clientes"
+                label="Recuperación (muestra del CRM de ejemplo)"
                 value={`${num(recovery.won)} compras`}
-                hint={`${money(recovery.recoveredRevenue)} recuperados`}
+                hint={`${money(recovery.recoveredRevenue)} en ${num(recovery.total)} oportunidades de ejemplo`}
               />
             </div>
             <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">

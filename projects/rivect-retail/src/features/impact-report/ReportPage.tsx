@@ -54,7 +54,7 @@ export function ReportPage() {
         <AnimatedContent>
           <SectionHeading
             eyebrow="Módulo 06 · Informe"
-            title="Impact Report"
+            title="Informe de impacto"
             description="Informe consolidado con los datos actuales del simulador, el CRM y el inventario. Se actualiza en tiempo real y puede descargarse en PDF o CSV."
             action={
               <div className="flex flex-wrap gap-2">
@@ -108,7 +108,10 @@ export function ReportPage() {
 
           <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <Summary label="Horas recuperables" value={`${num(report.simulator.recoverableHours, 1)} h/mes`} />
-            <Summary label="Margen adicional" value={money(report.simulator.additionalContribution)} />
+            <Summary
+              label={`Margen potencial mensual (proyección: ${num(profile.recoveredSales)} ventas/mes)`}
+              value={money(report.simulator.additionalContribution)}
+            />
             <Summary
               label="Capital inmovilizado"
               value={money(report.inventory.totals.inventoryCapital)}
@@ -213,11 +216,11 @@ export function ReportPage() {
             Con {pct(profile.automationPercentage)} de automatización sobre {num(report.simulator.monthlyQueries)}{' '}
             consultas mensuales, {report.storeName} podría liberar{' '}
             {num(report.simulator.recoverableHours, 0)} horas de atención y agregar{' '}
-            {money(report.simulator.additionalContribution)} de margen mediante ventas recuperadas y
-            seguimiento comercial.
+            {money(report.simulator.additionalContribution)} de margen por mes si se recuperan{' '}
+            {num(profile.recoveredSales)} ventas mensuales (supuesto del escenario, no un resultado).
           </p>
           <p className="mt-2 text-[10px] text-slate-600">
-            Fuente: módulos Business Simulator, Customer Recovery y Stock Intelligence.
+            Fuente: módulos Simulador de negocio (proyección con supuestos), Recuperación de clientes (muestra del CRM de ejemplo) y Control de stock. Datos de demostración, no resultados reales.
           </p>
         </div>
       </div>

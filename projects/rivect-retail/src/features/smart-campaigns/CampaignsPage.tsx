@@ -135,7 +135,7 @@ export function CampaignsPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 05 · Marketing"
-          title="Smart Campaigns"
+          title="Campañas inteligentes"
           description="Detectá productos con exceso de stock, construí segmentos sobre el CRM simulado y proyectá el rendimiento de una campaña antes de invertir en ella."
           action={<Badge tone="amber" dot>Sin envíos reales</Badge>}
         />

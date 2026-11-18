@@ -96,10 +96,22 @@ const INTENT_LABELS: Record<string, string> = {
   reserva: 'Reserva simulada',
   envio: 'Consulta de envío',
   pago: 'Medios de pago',
+  impuestos: 'Consulta de impuestos',
+  politica: 'Cambios y devoluciones',
+  derivacion: 'Derivación a una persona',
   horario: 'Horarios',
   agradecimiento: 'Cierre',
   fallback: 'Consulta general',
 }
+
+/** Palabras que no identifican un producto (evitan coincidencias falsas). */
+const STOPWORDS = new Set([
+  'que', 'cuanto', 'cuanta', 'sale', 'salen', 'cuesta', 'cuestan', 'esta', 'precio', 'precios',
+  'la', 'el', 'los', 'las', 'un', 'una', 'de', 'del', 'con', 'en', 'por', 'para', 'me', 'mi',
+  'tienen', 'hay', 'tenes', 'quiero', 'busco', 'hola', 'buenas', 'y', 'o', 'al', 'lo', 'le',
+  'es', 'son', 'se', 'si', 'no', 'mas', 'muy', 'algo', 'otro', 'otra', 'ese', 'esa', 'este',
+  'tarjeta', 'cuotas', 'efectivo', 'transferencia', 'debito', 'credito', 'pago', 'pagar',
+])
 
 interface Query {
   category: string | null
@@ -110,7 +122,9 @@ interface Query {
 
 function detectQuery(text: string): Query {
   const normalized = normalize(text)
-  const tokens = normalized.split(/[^a-z0-9]+/).filter((t) => t.length > 1)
+  const tokens = normalized
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t))
 
   let category: string | null = null
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
@@ -167,6 +181,14 @@ function score(product: Product, query: Query): number {
   return value
 }
 
+/** Coincidencia real con el catálogo (no solo popularidad). */
+function matchesQuery(product: Product, query: Query): boolean {
+  if (query.category && product.category === query.category) return true
+  if (query.color && product.variants.some((v) => normalize(v.name).includes(query.color!))) return true
+  const haystack = normalize(`${product.name} ${product.tags.join(' ')}`)
+  return query.tokens.some((token) => token.length > 2 && new RegExp(`\\b${token}`).test(haystack))
+}
+
 const ref = (
   product: Product,
   reason: AssistantProductRef['reason'],
@@ -203,8 +225,11 @@ export function createAssistantReply(input: {
   products: Product[]
   profile: StoreProfile
   context: AssistantContextState
+  /** Mensajes anteriores del cliente, para el resumen al derivar a una persona. */
+  history?: string[]
 }): AssistantReply & { nextContext: AssistantContextState } {
   const { products, profile, context } = input
+  const history = input.history ?? []
   const raw = normalize(input.text)
   const query = detectQuery(input.text)
 
@@ -212,16 +237,25 @@ export function createAssistantReply(input: {
   const hasGreeting = /^(hola|buenas|buen dia|hey|hola buenas)\b/.test(raw)
 
   let intent: string = 'fallback'
-  if (hasBuyingSignal) intent = 'reserva'
-  else if (/(cuanto (sale|cuesta|esta|salen)|precio|sale el|sale la)/.test(raw)) intent = 'precio'
+  if (
+    /(persona|humano|vendedor|vendedora|encargad|asesor|operador|hablar con alguien|atencion personal)/.test(
+      raw,
+    )
+  )
+    intent = 'derivacion'
+  else if (/(devoluc|devolver|cambio|cambiar|garantia|reclamo|fallad)/.test(raw)) intent = 'politica'
+  else if (hasBuyingSignal) intent = 'reserva'
+  else if (/(cuotas|tarjeta|transferencia|efectivo|debito|credito|medios? de pago|mercado ?pago)/.test(raw))
+    intent = 'pago'
+  else if (/(impuesto|iva\b|factura)/.test(raw)) intent = 'impuestos'
+  else if (/(envio|envian|llega|domicilio|flete|interior|despacho)/.test(raw)) intent = 'envio'
+  else if (/(cuanto (sale|cuesta|esta|salen|cuestan)|precio|sale el|sale la)/.test(raw)) intent = 'precio'
   else if (/(colores|de que color|hay en color)/.test(raw)) intent = 'colores'
   else if (/(talles|talle|numero|medidas|queda el)/.test(raw)) intent = 'talles'
   else if (/(economic|barat|menos plata|presupuesto|mas barato)/.test(raw)) intent = 'economico'
   else if (/(recomend|suger|que me conviene|que me recomendas)/.test(raw)) intent = 'recomendacion'
   else if (/(otro modelo|otros modelos|alternativa|algo parecido|similar|otra opcion)/.test(raw))
     intent = 'alternativas'
-  else if (/(envio|envian|llega|domicilio|flete)/.test(raw)) intent = 'envio'
-  else if (/(cuotas|tarjeta|transferencia|efectivo|pago|debito)/.test(raw)) intent = 'pago'
   else if (/(horario|abren|cierran|atienden|abierto)/.test(raw)) intent = 'horario'
   else if (/(gracias|genial|perfecto|dale)/.test(raw)) intent = 'agradecimiento'
   else if (query.category || query.color || query.size || /(tienen|hay|disponible|stock|quedan|busco)/.test(raw))
@@ -249,9 +283,11 @@ export function createAssistantReply(input: {
     resolved = true,
     reserved = false,
     nextCategory: string | null = query.category ?? context.lastCategory,
+    handoff = false,
   ) => ({
     text,
     intent,
+    handoff,
     products: productRefs,
     quickReplies,
     detected: [
@@ -270,6 +306,55 @@ export function createAssistantReply(input: {
       lastCategory: nextCategory,
     },
   })
+
+  /** Lo que no está en el perfil ni en el catálogo no se inventa: se consulta al equipo. */
+  const checkWithTeam = (topic: string, prefix = '') =>
+    finish(
+      `${prefix}No tengo información confirmada sobre ${topic} de ${profile.name}. Para no darte un dato equivocado, lo consulto con el equipo y te responden por este chat.\n\n¿Querés que te pase ahora con una persona?`,
+      contextProducts.slice(0, 1).map((p) => ref(p, 'consulta')),
+      ['Hablar con una persona', '¿Qué me recomiendan?', 'Ver zapatillas'],
+      false,
+    )
+
+  if (intent === 'derivacion' || intent === 'politica') {
+    const previous = history.filter((h) => normalize(h) !== raw).slice(-3)
+    const summary = [
+      ...(previous.length > 0
+        ? [`• Consultas: ${previous.map((h) => `«${h}»`).join(', ')}`]
+        : []),
+      ...(intent === 'politica' ? [`• Motivo: «${input.text}»`] : []),
+      ...(contextProducts.length > 0
+        ? [`• Productos vistos: ${contextProducts.map((p) => p.name).join(', ')}`]
+        : []),
+      ...(context.lastCategory ? [`• Categoría de interés: ${context.lastCategory}`] : []),
+    ]
+    const intro =
+      intent === 'politica'
+        ? `Los cambios, devoluciones y garantías los resuelve el equipo de ${profile.name}, así que te paso con una persona.`
+        : `Te paso con una persona del equipo de ${profile.name}.`
+    return finish(
+      `${intro} Le dejo este resumen para que no tengas que repetir nada:\n\n${
+        summary.length > 0 ? summary.join('\n') : '• Todavía no hay consultas previas en esta conversación.'
+      }\n\nTe responden por este mismo chat. (Demo: no se envía ningún mensaje real.)`,
+      contextProducts.map((p) => ref(p, 'consulta')),
+      [],
+      false,
+      false,
+      context.lastCategory,
+      true,
+    )
+  }
+
+  if (intent === 'envio') return checkWithTeam('envíos y costos de entrega')
+  if (intent === 'impuestos') return checkWithTeam('impuestos y facturación')
+
+  if (intent === 'pago') {
+    const product = contextProducts[0] ?? available.find((p) => matchesQuery(p, query))
+    const prefix = product
+      ? `El precio de catálogo de *${product.name}* es ${money(product.price)}. `
+      : ''
+    return checkWithTeam('medios de pago, cuotas y recargos', prefix)
+  }
 
   if (intent === 'saludo') {
     return finish(
@@ -293,7 +378,7 @@ export function createAssistantReply(input: {
       variant?.label ??
       `${product.variants[0]?.name ?? 'Estándar'} · ${product.variants[0]?.size ?? 'Único'}`
     return finish(
-      `Listo, dejé una *reserva simulada* de:\n\n• *${product.name}* — ${variantLabel}\n• Precio: ${money(product.price)}\n\nLa reserva es válida por 24 h en la demo. No se envía ningún mensaje real ni se descuenta stock.\n\n¿Querés que te muestre algo complementario?`,
+      `Listo, dejé una *reserva simulada* de:\n\n• *${product.name}* — ${variantLabel}\n• Precio: ${money(product.price)}\n\nLa reserva queda pendiente de confirmación del equipo. En la demo no se envía ningún mensaje real ni se descuenta stock.\n\n¿Querés que te muestre algo complementario?`,
       [ref(product, 'consulta', variantLabel)],
       ['Sí, mostrame algo más', '¿Cuánto cuesta?', '¿Hacen envíos?'],
       true,
@@ -370,9 +455,9 @@ export function createAssistantReply(input: {
       .slice(0, 3)
     const extras = complements(products, query.category ?? recommended[0]?.category ?? null).slice(0, 1)
     return finish(
-      `Según lo que más se está vendiendo esta semana, te recomiendo:\n\n${[...recommended, ...extras]
+      `Según lo más vendido del último mes (datos de ejemplo), te recomiendo:\n\n${[...recommended, ...extras]
         .map((p) => lineFor(p, query))
-        .join('\n')}\n\nEl primero es el de mayor rotación y suele agotarse rápido.`,
+        .join('\n')}\n\nEl primero es el de mayor rotación.`,
       [
         ...recommended.map((p) => ref(p, 'recomendacion')),
         ...extras.map((p) => ref(p, 'complemento')),
@@ -407,33 +492,25 @@ export function createAssistantReply(input: {
   }
 
   if (intent === 'precio') {
-    const pool = targets.length > 0 ? targets : contextProducts.length > 0 ? contextProducts : products.slice(0, 3)
+    const matched = available.filter((p) => matchesQuery(p, query)).slice(0, 3)
+    const pool = matched.length > 0 ? matched : contextProducts
+    if (pool.length === 0) {
+      return finish(
+        '¿De qué modelo querés saber el precio? Decime el nombre, la categoría o el color y te paso el precio de catálogo.',
+        [],
+        ['Zapatillas negras talle 42', '¿Qué me recomiendan?', '¿Tienen algo más económico?'],
+        false,
+      )
+    }
     return finish(
-      `Precios actualizados:\n\n${pool.map((p) => lineFor(p, query)).join('\n')}\n\nLos precios incluyen impuestos. ¿Querés que te reserve alguno?`,
+      `Precios de catálogo:\n\n${pool.map((p) => lineFor(p, query)).join('\n')}\n\n¿Querés que te reserve alguno?`,
       pool.map((p) => ref(p, 'consulta')),
-      ['¿Puedo reservar?', '¿Tienen algo más económico?', '¿Hacen envíos?'],
-    )
-  }
-
-  if (intent === 'envio') {
-    return finish(
-      `Hacemos envíos a todo el país. En la zona céntrica el envío es sin cargo en compras superiores a ${money(
-        profile.averageTicket,
-      )}.\n\nEl plazo estimado es de 2 a 5 días hábiles. En la demo no se genera ningún envío real.`,
-      [],
-      ['¿Puedo reservar?', '¿Qué medios de pago aceptan?', 'Ver zapatillas'],
-    )
-  }
-
-  if (intent === 'pago') {
-    return finish(
-      'Aceptamos efectivo, transferencia y tarjetas en hasta 3 cuotas sin interés. También podés pagar al retirar en el local.',
-      [],
-      ['¿Puedo reservar?', '¿Hacen envíos?', 'Ver zapatillas'],
+      ['¿Puedo reservar?', '¿Tienen algo más económico?', 'Hablar con una persona'],
     )
   }
 
   if (intent === 'horario') {
+    if (!profile.operatingHours.trim()) return checkWithTeam('los horarios de atención')
     return finish(
       `Nuestro horario es ${profile.operatingHours}. Fuera de ese horario, el asistente puede responder consultas de catálogo y tomar reservas simuladas.`,
       [],
@@ -500,7 +577,7 @@ export function createAssistantReply(input: {
   return finish(
     'Puedo ayudarte con búsquedas por categoría, color y talle, comparar precios, recomendar alternativas y simular reservas.\n\nProbá con: «zapatillas negras talle 42» o «¿tienen botines marrones?».',
     [],
-    ['Zapatillas negras talle 42', '¿Tienen botines marrones?', '¿Qué me recomiendan?'],
+    ['Zapatillas negras talle 42', '¿Qué me recomiendan?', 'Hablar con una persona'],
     false,
   )
 }

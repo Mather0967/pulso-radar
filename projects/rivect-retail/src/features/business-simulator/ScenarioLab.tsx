@@ -3,6 +3,7 @@ import type { Scenario, ScenarioKey } from '@/domain/models'
 import { NumberField } from '@/components/ui/Field'
 import { Badge } from '@/components/ui/Badge'
 import { cn, num, pct } from '@/utils/format'
+import { useFieldLimits } from './useFieldLimits'
 
 export function ScenarioLab({
   scenarios,
@@ -17,6 +18,7 @@ export function ScenarioLab({
   onUpdate: (key: ScenarioKey, assumptions: Partial<Scenario['assumptions']>) => void
   automationPercentage: number
 }) {
+  const { bind } = useFieldLimits()
   return (
     <div className="panel panel-pad">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -116,14 +118,22 @@ export function ScenarioLab({
                 <NumberField
                   label="Ventas recuperadas"
                   value={target.assumptions.recoveredSales}
-                  onChange={(value) => onUpdate(target.key, { recoveredSales: value })}
+                  {...bind(
+                    'recoveredSales',
+                    (value) => onUpdate(target.key, { recoveredSales: value }),
+                    `${target.key}-recoveredSales`,
+                  )}
                   suffix="u."
                   disabled={disabled}
                 />
                 <NumberField
                   label="Minutos por consulta"
                   value={target.assumptions.averageMinutesPerQuery}
-                  onChange={(value) => onUpdate(target.key, { averageMinutesPerQuery: value })}
+                  {...bind(
+                    'averageMinutesPerQuery',
+                    (value) => onUpdate(target.key, { averageMinutesPerQuery: value }),
+                    `${target.key}-averageMinutesPerQuery`,
+                  )}
                   suffix="min"
                   step={0.5}
                   disabled={disabled}

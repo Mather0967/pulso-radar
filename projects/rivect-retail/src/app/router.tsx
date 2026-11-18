@@ -22,7 +22,7 @@ function NotFound() {
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Button onClick={() => navigate('/escena/1')}>Volver a la presentación</Button>
         <Button variant="secondary" onClick={() => navigate('/overview')}>
-          Volver al overview
+          Volver al resumen
         </Button>
       </div>
     </div>

@@ -39,11 +39,13 @@ export function AssistantPage() {
     sendAssistantMessage(message)
     setTyping(true)
 
+    const history = assistant.messages.filter((m) => m.role === 'customer').map((m) => m.text)
     const reply = createAssistantReply({
       text,
       products,
       profile,
       context,
+      history,
     })
 
     window.clearTimeout(timerRef.current)
@@ -86,6 +88,12 @@ export function AssistantPage() {
         tone: 'amber' as const,
       },
       {
+        label: 'Derivadas a una persona',
+        value: metrics.handoffs ?? 0,
+        icon: <Users className="h-4 w-4" />,
+        tone: 'neutral' as const,
+      },
+      {
         label: 'Oportunidades de compra',
         value: metrics.purchaseOpportunities,
         icon: <TrendingUp className="h-4 w-4" />,
@@ -100,14 +108,14 @@ export function AssistantPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 02 · Vendedor virtual"
-          title="Sales Assistant"
+          title="Asistente de ventas"
           description="Probá cómo respondería el asistente de Rivect en WhatsApp: entiende categoría, color, talle y presupuesto, consulta el catálogo simulado y sugiere alternativas con stock."
           action={<Badge tone="amber" dot>Conversación simulada</Badge>}
         />
       </AnimatedContent>
 
       <AnimatedContent delay={0.05}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {metricsTiles.map((tile) => (
             <StatTile
               key={tile.label}

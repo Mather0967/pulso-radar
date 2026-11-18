@@ -59,7 +59,7 @@ export function RecoveryPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 03 · Recuperación comercial"
-          title="Customer Recovery"
+          title="Recuperación de clientes"
           description="Un CRM simulado con las conversaciones que hoy quedan sin seguimiento. Cambiá estados, revisá el historial y simulá el mensaje de recuperación."
           action={<Badge tone="amber" dot>Probabilidades hipotéticas</Badge>}
         />
@@ -68,11 +68,11 @@ export function RecoveryPage() {
       <AnimatedContent delay={0.05}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile
-            label="Clientes sin seguimiento"
+            label="Sin seguimiento en el CRM de ejemplo"
             value={metrics.withoutFollowUp}
             icon={<Users className="h-4 w-4" />}
             tone="amber"
-            hint={`${num(metrics.total)} oportunidades en el CRM`}
+            hint={`${num(metrics.total)} oportunidades de ejemplo (muestra)`}
           />
           <StatTile
             label="Oportunidades pendientes"
@@ -81,20 +81,20 @@ export function RecoveryPage() {
             hint={`${money(metrics.pipelineValue)} en pipeline`}
           />
           <StatTile
-            label="Ventas recuperadas (simulación)"
+            label="Ventas recuperadas en la muestra"
             value={metrics.recoveredRevenue}
             prefix="$ "
             icon={<Banknote className="h-4 w-4" />}
             tone="mint"
-            hint={`${num(metrics.won)} compras concretadas`}
+            hint={`${num(metrics.won)} compras concretadas en la muestra`}
           />
           <StatTile
-            label="Margen de contribución estimado"
+            label="Margen de la muestra"
             value={metrics.recoveredContribution}
             prefix="$ "
             icon={<HeartHandshake className="h-4 w-4" />}
             tone="brand"
-            hint={`${pct(profile.contributionMargin)} de margen`}
+            hint={`${pct(profile.contributionMargin)} de margen · la proyección mensual está en el Simulador`}
           />
         </div>
       </AnimatedContent>

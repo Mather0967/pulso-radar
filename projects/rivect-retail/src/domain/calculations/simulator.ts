@@ -9,7 +9,7 @@ export const safeNumber = (value: number): number =>
   Number.isFinite(value) && value > 0 ? value : 0
 
 /**
- * Motor económico del Business Simulator.
+ * Motor económico del Simulador de negocio.
  *
  * Fórmulas (brief §4):
  *   monthlyQueries      = dailyQueries × workingDays
@@ -88,4 +88,81 @@ export function buildScenarioComparison(metrics: SimulatorMetrics) {
       margen: Math.round(metrics.projectedContribution),
     },
   ]
+}
+
+/** Campos numéricos del perfil con límites razonables para un comercio minorista. */
+export type LimitedProfileField =
+  | 'dailyQueries'
+  | 'averageMinutesPerQuery'
+  | 'workingDays'
+  | 'employeesInService'
+  | 'averageTicket'
+  | 'monthlySales'
+  | 'recoveredSales'
+  | 'customersWithoutFollowUp'
+  | 'totalProducts'
+
+export interface FieldLimit {
+  min: number
+  max: number
+  /** Cómo se nombra el valor en el mensaje («consultas por día»). */
+  unit: string
+}
+
+export const PROFILE_LIMITS: Record<LimitedProfileField, FieldLimit> = {
+  dailyQueries: { min: 0, max: 5_000, unit: 'consultas por día' },
+  averageMinutesPerQuery: { min: 0.5, max: 240, unit: 'minutos por consulta' },
+  workingDays: { min: 1, max: 31, unit: 'días por mes' },
+  employeesInService: { min: 0, max: 500, unit: 'personas' },
+  averageTicket: { min: 1, max: 10_000_000, unit: 'de ticket promedio' },
+  monthlySales: { min: 0, max: 10_000_000_000, unit: 'de ventas mensuales' },
+  recoveredSales: { min: 0, max: 10_000, unit: 'ventas recuperadas' },
+  customersWithoutFollowUp: { min: 0, max: 100_000, unit: 'clientes' },
+  totalProducts: { min: 0, max: 100_000, unit: 'productos' },
+}
+
+const MONEY_FIELDS: LimitedProfileField[] = ['averageTicket', 'monthlySales']
+
+const formatLimit = (field: LimitedProfileField, value: number): string => {
+  const text = value.toLocaleString('es-AR', { maximumFractionDigits: 1 })
+  return MONEY_FIELDS.includes(field) ? `$ ${text}` : text
+}
+
+/**
+ * Ajusta un valor a su rango y devuelve un mensaje visible si hubo que corregirlo.
+ * Así un dato absurdo (999.999.999 consultas, 0 minutos) no llega a los cálculos.
+ */
+export function clampProfileField(
+  field: LimitedProfileField,
+  raw: number,
+): { value: number; message?: string } {
+  const { min, max, unit } = PROFILE_LIMITS[field]
+  if (!Number.isFinite(raw)) {
+    return { value: min, message: `Valor inválido: se ajustó al mínimo (${formatLimit(field, min)} ${unit}).` }
+  }
+  if (raw > max) {
+    return {
+      value: max,
+      message: `Máximo ${formatLimit(field, max)} ${unit}: se ajustó a ${formatLimit(field, max)}.`,
+    }
+  }
+  if (raw < min) {
+    return {
+      value: min,
+      message: `Mínimo ${formatLimit(field, min)} ${unit}: se ajustó a ${formatLimit(field, min)}.`,
+    }
+  }
+  return { value: raw }
+}
+
+/** Corrige un perfil completo (por ejemplo, uno guardado en el navegador con datos fuera de rango). */
+export function sanitizeProfile<T extends StoreProfile>(profile: T): T {
+  const next = { ...profile }
+  for (const field of Object.keys(PROFILE_LIMITS) as LimitedProfileField[]) {
+    next[field] = clampProfileField(field, Number(profile[field])).value
+  }
+  next.automationPercentage = clampPct(profile.automationPercentage)
+  next.contributionMargin = clampPct(profile.contributionMargin)
+  next.unresolvedQueries = clampPct(profile.unresolvedQueries)
+  return next
 }

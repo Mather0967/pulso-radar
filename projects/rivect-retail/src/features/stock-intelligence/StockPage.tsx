@@ -92,7 +92,7 @@ export function StockPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 04 · Inventario"
-          title="Stock Intelligence"
+          title="Control de stock"
           description="Análisis automático del catálogo: cobertura de stock, riesgo de agotamiento, capital inmovilizado y oportunidades de promoción en productos de baja rotación."
           action={<Badge tone="brand" dot>Productos simulados</Badge>}
         />

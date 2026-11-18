@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { cn } from '@/utils/format'
 
 interface BaseProps {
@@ -21,6 +21,7 @@ export function NumberField({
   error,
   className,
   disabled,
+  clamp = true,
 }: BaseProps & {
   value: number
   onChange: (value: number) => void
@@ -30,7 +31,15 @@ export function NumberField({
   suffix?: string
   prefix?: string
   disabled?: boolean
+  /**
+   * true: ajusta en silencio a [min, max]. false: entrega el número tal cual,
+   * para que quien lo usa lo ajuste y muestre un mensaje.
+   */
+  clamp?: boolean
 }) {
+  // Mientras se escribe se conserva el texto (permite borrar y reescribir);
+  // al salir del campo se vuelve a mostrar el valor guardado.
+  const [draft, setDraft] = useState<string | null>(null)
   return (
     <label className={cn('block', className)}>
       <span className="field-label">{label}</span>
@@ -43,17 +52,20 @@ export function NumberField({
         <input
           type="number"
           className={cn('input', prefix ? 'pl-7' : '', suffix ? 'pr-12' : '', error && 'input-error')}
-          value={Number.isFinite(value) ? value : ''}
+          value={draft ?? (Number.isFinite(value) ? value : '')}
           min={min}
           max={max}
           step={step}
           disabled={disabled}
           onChange={(event) => {
-            const next = event.target.value === '' ? 0 : Number(event.target.value)
+            const text = event.target.value
+            setDraft(text)
+            if (text.trim() === '') return
+            const next = Number(text)
             if (Number.isNaN(next)) return
-            const clamped = Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.max(min, next))
-            onChange(clamped)
+            onChange(clamp ? Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.max(min, next)) : next)
           }}
+          onBlur={() => setDraft(null)}
         />
         {suffix ? (
           <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-medium text-slate-500">

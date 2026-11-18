@@ -52,7 +52,7 @@ export function SimulatorResults({
           hint="Operaciones posibles, no ventas cerradas"
         />
         <StatTile
-          label="Margen adicional potencial"
+          label="Margen potencial mensual (proyección)"
           value={metrics.additionalContribution}
           prefix="$ "
           tone="amber"

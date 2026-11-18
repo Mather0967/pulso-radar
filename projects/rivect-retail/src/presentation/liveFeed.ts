@@ -16,14 +16,15 @@ export interface LiveEvent {
 
 const KINDS: readonly LiveEventKind[] = ['pedido', 'mensaje', 'stock', 'recuperado', 'campana']
 
-const QUESTIONS = [
-  '¿Tienen talle M?',
-  '¿Hacen envíos al interior?',
-  '¿Tienen en otro color?',
-  '¿Cuánto sale con tarjeta?',
-  '¿Me lo reservan hasta el sábado?',
-  '¿Está disponible para retirar hoy?',
-  '¿Tienen el mismo modelo en talle 40?',
+// team: el perfil del comercio no tiene ese dato, así que el asistente lo deriva al equipo.
+const QUESTIONS: readonly { text: string; team: boolean }[] = [
+  { text: '¿Tienen talle M?', team: false },
+  { text: '¿Hacen envíos al interior?', team: true },
+  { text: '¿Tienen en otro color?', team: false },
+  { text: '¿Cuánto sale con tarjeta?', team: true },
+  { text: '¿Me lo reservan hasta el sábado?', team: true },
+  { text: '¿Está disponible para retirar hoy?', team: true },
+  { text: '¿Tienen el mismo modelo en talle 40?', team: false },
 ]
 
 const LOW_STOCK = products.filter((p) => p.stock <= p.minStock)
@@ -64,8 +65,13 @@ function mensajeAt(index: number, round: number): LiveEvent {
   return {
     id: index,
     kind: 'mensaje',
-    title: conv.status === 'derivada' ? 'Chat derivado a un vendedor' : 'Consulta respondida',
-    detail: `${firstName(conv.customerName)} · «${question}» · en ${seconds} s`,
+    title:
+      conv.status === 'derivada'
+        ? 'Chat derivado a un vendedor'
+        : question.team
+          ? 'Consulta derivada al equipo'
+          : 'Consulta respondida',
+    detail: `${firstName(conv.customerName)} · «${question.text}» · en ${seconds} s`,
   }
 }
 

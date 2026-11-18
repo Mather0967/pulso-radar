@@ -25,7 +25,7 @@ export function SimulatorPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 01 · Núcleo económico"
-          title="Business Simulator"
+          title="Simulador de negocio"
           description="Ingresá los datos del comercio y observá en tiempo real cuánto tiempo consume la atención manual y qué margen adicional podría generar la automatización."
           action={
             <div className="flex items-center gap-2">
