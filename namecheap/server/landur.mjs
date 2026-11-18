@@ -270,14 +270,14 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
     if(evidenceId===null&&!['/api/state','/api/export.csv','/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path))return json({error:'Ruta no encontrada.'},404);
     try{
       if(method==='GET'&&(evidenceId!==null||['/api/state','/api/export.csv','/api/connections'].includes(path))){
-        const {ledger,exportOperations,connections}=await engine();const snapshot=ledger.snapshot('landur');
+        const {ledger,exportOperations,connections}=await engine();
         if(evidenceId!==null){
           const file=ledger.evidenceFile('landur',evidenceId);
           return new Response(file.content,{headers:{'Content-Type':file.mime,'Cache-Control':'no-store','Content-Length':String(file.content.length),'Content-Disposition':`${file.mime==='application/pdf'?'attachment':'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`}});
         }
-        if(path==='/api/export.csv')return new Response(exportOperations(snapshot),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'no-store','Content-Disposition':'attachment; filename="landur-operaciones.csv"'}});
+        if(path==='/api/export.csv')return new Response(exportOperations(ledger.snapshot('landur')),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'no-store','Content-Disposition':'attachment; filename="landur-operaciones.csv"'}});
         if(path==='/api/connections')return json(connections.status(ledger,'landur'));
-        return jsonZip(req,{...snapshot,demo:false,portal:true,actor:user.name,access});
+        return jsonZip(req,{...ledger.snapshot('landur',{hideReversedBefore:new Date(Date.now()-30*864e5).toISOString()}),demo:false,portal:true,actor:user.name,access});
       }
       if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path)){
         if(!req.headers.get('content-type')?.startsWith('application/json')||req.headers.get('x-landur-request')!=='1')return json({error:'Se requiere una solicitud JSON de la aplicación.'},415);

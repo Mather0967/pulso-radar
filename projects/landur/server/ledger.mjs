@@ -639,14 +639,28 @@ export class Ledger {
     this.audit(workspace, actor, `${kind}.created`, id);
     return { id };
   }
-  snapshot(workspace) {
+  // `hideReversedBefore` (ISO): para la pantalla, deja fuera las operaciones revertidas antes de esa fecha, junto
+  // con su contra-asiento y sus asientos. Totales y saldos se calculan con todo; la exportación usa la versión completa.
+  // Cada reversión de la planilla multiplicaba las filas (82 % de las operaciones de producción eran revertidas) y
+  // `state` tardaba más de 12 s en bajar. Cada cuenta lleva su cantidad real de asientos (`movements`).
+  snapshot(workspace, { hideReversedBefore } = {}) {
     const accounts = this.db.prepare(`SELECT a.*, a.opening + COALESCE(SUM(e.amount),0) balance FROM accounts a
       LEFT JOIN entries e ON e.account=a.id WHERE a.workspace=? GROUP BY a.id ORDER BY a.rowid`).all(workspace);
     const operations = this.db.prepare(`SELECT o.*, b.due,
       (SELECT COALESCE(SUM(p.amount),0) FROM applications p WHERE p.target=o.id AND p.reversed=0) applied
       FROM operations o LEFT JOIN obligations b ON b.operation=o.id
       WHERE o.workspace=? ORDER BY o.date DESC, o.rowid DESC`).all(workspace);
-    const entries = this.db.prepare(`SELECT e.* FROM entries e JOIN operations o ON e.operation=o.id WHERE o.workspace=?`).all(workspace);
+    let entries = this.db.prepare(`SELECT e.* FROM entries e JOIN operations o ON e.operation=o.id WHERE o.workspace=?`).all(workspace);
+    let shown = operations;
+    if (hideReversedBefore) {
+      const hidden = new Set();
+      for (const o of operations) if (o.reversed_by && o.reversed_at && o.reversed_at < hideReversedBefore) { hidden.add(o.id); hidden.add(o.reversed_by); }
+      const movements = new Map();
+      for (const e of entries) movements.set(e.account, (movements.get(e.account) ?? 0) + 1);
+      for (const a of accounts) a.movements = movements.get(a.id) ?? 0;
+      shown = operations.filter(o => !hidden.has(o.id));
+      entries = entries.filter(e => !hidden.has(e.operation));
+    }
     const currencies = [...new Set([...accounts, ...operations].map(a => a.currency))];
     const totals = currencies.map(unit => {
       const ops = operations.filter(o => o.currency === unit);
@@ -669,7 +683,7 @@ export class Ledger {
     const evidence = this.db.prepare('SELECT id, operation, name, mime, bytes, created_at, actor FROM evidence WHERE workspace=? ORDER BY rowid DESC').all(workspace);
     // El identificador interno del espacio no se publica: las consultas ya están fijadas a él.
     const published = rows => rows.map(row => { const { workspace: _omit, ...rest } = row; return rest; });
-    return { accounts: published(accounts), operations: published(operations), entries, evidence, totals, policy: 'pending',
+    return { accounts: published(accounts), operations: published(shown), entries, evidence, totals, policy: 'pending',
       audit: published(this.db.prepare('SELECT * FROM audit WHERE workspace=? ORDER BY rowid DESC LIMIT 30').all(workspace)) };
   }
   seed(workspace) {
