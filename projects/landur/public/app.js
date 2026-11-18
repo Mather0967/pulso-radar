@@ -1483,9 +1483,19 @@ document.addEventListener('click',async e=>{
     case 'update':if(busy||modal.open){toast('Terminá o cerrá el formulario antes de actualizar.');return;}updateWorker?.postMessage('ACTIVATE_UPDATE');break;
   }
 });
+let bootRetry;
 async function boot(){
+  clearTimeout(bootRetry);
   try{session=await api('/api/session');if(session.authenticated)await refresh();else lock();}
-  catch(error){lock(error.message);}
+  catch(error){
+    // Un 401 ya bloqueó la app dentro de api(). Cualquier otro fallo (servidor lento, respuesta cortada)
+    // no es una sesión vencida: ir al login en modo portal devolvía a la app y armaba un bucle.
+    if(error.status===401)return;
+    clearTimeout(bootRetry);
+    app.innerHTML=`<main class="loading"><span class="wordmark">LANDUR<span>®</span></span><p>${escape(error.message)}</p><button class="primary" type="button" id="boot-retry">Reintentar</button></main>`;
+    $('#boot-retry').onclick=boot;
+    bootRetry=setTimeout(boot,15000);
+  }
 }
 // Un corte de red no es una sesión vencida: no se cierra el formulario ni se pierde lo escrito.
 // Guardar sin red falla con su propio aviso; solo un 401 del servidor bloquea la aplicación.

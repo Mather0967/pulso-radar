@@ -146,6 +146,13 @@ export class Ledger {
         id TEXT PRIMARY KEY, operation TEXT NOT NULL REFERENCES operations(id),
         target TEXT NOT NULL REFERENCES operations(id), amount INTEGER NOT NULL CHECK(amount > 0)
       );
+      -- Sin estos índices /api/state recorría la tabla entera por cada operación (cuadrático):
+      -- con miles de ventas sincronizadas el servidor quedaba bloqueado varios segundos.
+      CREATE INDEX IF NOT EXISTS applications_target ON applications(target);
+      CREATE INDEX IF NOT EXISTS entries_account ON entries(account);
+      CREATE INDEX IF NOT EXISTS entries_operation ON entries(operation);
+      CREATE INDEX IF NOT EXISTS obligations_operation ON obligations(operation);
+      CREATE INDEX IF NOT EXISTS operations_workspace ON operations(workspace, date);
       CREATE TABLE IF NOT EXISTS audit (
         id TEXT PRIMARY KEY, workspace TEXT NOT NULL REFERENCES workspaces(id),
         actor TEXT NOT NULL, action TEXT NOT NULL, entity TEXT NOT NULL, at TEXT NOT NULL
