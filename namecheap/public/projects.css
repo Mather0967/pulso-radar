@@ -1838,3 +1838,296 @@ footer {
     display: none !important;
   }
 }
+
+/* ============ Panel de administración: resumen, avatares y mensajes ============ */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+}
+.admin-stat {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(10, 21, 28, 0.55);
+}
+.admin-stat dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.admin-stat dd {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.admin-stat.is-accent dd {
+  color: var(--mandarin);
+}
+
+.tab-count,
+.tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 1px;
+}
+.tab-count {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+}
+.tab-count:empty {
+  display: none;
+}
+.tab-badge {
+  background: var(--mandarin);
+  color: var(--ink-on-accent);
+}
+
+.avatar {
+  --avatar-hue: 200;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  background: hsl(var(--avatar-hue) 32% 30%);
+  border: 1px solid hsl(var(--avatar-hue) 40% 45% / 0.6);
+}
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.user-ident {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.user-ident strong,
+.user-ident .user-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mensajes */
+.msg-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.msg-compose,
+.msg-inbox {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(10, 21, 28, 0.55);
+}
+.msg-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 88px;
+}
+.msg-compose h3,
+.msg-inbox h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.admin-panel textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: vertical;
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color-scheme: dark;
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.admin-panel textarea:focus {
+  background: var(--surface-2);
+  border-color: var(--mandarin);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  outline: none;
+}
+.msg-compose-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.msg-inbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.msg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.msg-list > .admin-empty {
+  padding: 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.msg-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(17, 34, 44, 0.6);
+  animation: msg-in var(--dur-slow) var(--ease-out) both;
+}
+.msg-item.is-unread {
+  border-color: rgba(255, 118, 46, 0.45);
+  background: rgba(255, 118, 46, 0.06);
+  box-shadow: inset 3px 0 0 var(--mandarin);
+}
+.msg-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+.msg-meta strong {
+  color: var(--ink);
+}
+.msg-to,
+.msg-meta time {
+  color: var(--ink-3);
+}
+.msg-meta time {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.msg-body {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg-mark {
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.msg-mark:hover {
+  border-color: var(--mandarin);
+  color: var(--ink);
+}
+.msg-mark:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+#messages-status:not(:empty) {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  max-width: min(92vw, 520px);
+  margin: 0;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #11222c;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  transform: translateX(-50%);
+  animation: admin-toast-in var(--dur-base) var(--ease-out);
+}
+
+@media (max-width: 860px) {
+  .msg-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .msg-compose {
+    position: static;
+  }
+}
+@media (max-width: 640px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .msg-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .msg-mark {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .admin-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-item,
+  #messages-status:not(:empty) {
+    animation: none !important;
+  }
+}
+
+/* Acciones de cada fila en una sola línea en escritorio. */
+.row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
