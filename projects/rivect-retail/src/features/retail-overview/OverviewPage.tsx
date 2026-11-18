@@ -14,6 +14,8 @@ import {
 import { Aurora } from '@/components/reactbits/Aurora'
 import { AnimatedContent } from '@/components/reactbits/AnimatedContent'
 import { ShinyText, GradientText } from '@/components/reactbits/ShinyText'
+import { Stagger, StaggerItem } from '@/components/reactbits/Stagger'
+import { RevealText } from '@/components/reactbits/RevealText'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Panel, PanelHeader, SectionHeading } from '@/components/ui/Card'
@@ -98,9 +100,11 @@ export function OverviewPage() {
                 </span>
               </div>
               <h1 className="mt-5 font-display text-3xl font-semibold leading-[1.1] tracking-tight text-white sm:text-[42px]">
-                Recuperá el tiempo de tu tienda.
+                <RevealText text="Recuperá el tiempo de tu tienda." />
                 <br />
-                <GradientText>Capturá las ventas que hoy se pierden.</GradientText>
+                <GradientText>
+                  <RevealText text="Capturá las ventas que hoy se pierden." delay={0.35} />
+                </GradientText>
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-400">
                 Este entorno calcula, con los datos de{' '}
@@ -171,40 +175,50 @@ export function OverviewPage() {
       </AnimatedContent>
 
       <AnimatedContent delay={0.05}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatTile
-            label="Horas mensuales repetitivas"
-            value={simulator.manualHours}
-            decimals={1}
-            suffix=" h"
-            icon={<Clock className="h-4 w-4" />}
-            hint={`${num(simulator.monthlyQueries)} consultas/mes`}
-          />
-          <StatTile
-            label="Horas potencialmente recuperables"
-            value={simulator.recoverableHours}
-            decimals={1}
-            suffix=" h"
-            icon={<Timer className="h-4 w-4" />}
-            tone="mint"
-            hint={`${num(simulator.fullWorkdaysRecovered, 1)} jornadas equivalentes`}
-          />
-          <StatTile
-            label="Margen potencial mensual (proyección)"
-            value={simulator.additionalContribution}
-            prefix="$ "
-            icon={<Banknote className="h-4 w-4" />}
-            tone="amber"
-            hint={`Supuesto: ${num(profile.recoveredSales)} ventas recuperadas/mes × ticket`}
-          />
-          <StatTile
-            label="Oportunidades abiertas"
-            value={recovery.open}
-            icon={<HeartHandshake className="h-4 w-4" />}
-            tone="coral"
-            hint={`${money(recovery.pipelineValue)} en pipeline`}
-          />
-        </div>
+        <Stagger>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StaggerItem>
+              <StatTile
+                label="Horas mensuales repetitivas"
+                value={simulator.manualHours}
+                decimals={1}
+                suffix=" h"
+                icon={<Clock className="h-4 w-4" />}
+                hint={`${num(simulator.monthlyQueries)} consultas/mes`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Horas potencialmente recuperables"
+                value={simulator.recoverableHours}
+                decimals={1}
+                suffix=" h"
+                icon={<Timer className="h-4 w-4" />}
+                tone="mint"
+                hint={`${num(simulator.fullWorkdaysRecovered, 1)} jornadas equivalentes`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Margen potencial mensual (proyección)"
+                value={simulator.additionalContribution}
+                prefix="$ "
+                icon={<Banknote className="h-4 w-4" />}
+                tone="amber"
+                hint={`Supuesto: ${num(profile.recoveredSales)} ventas recuperadas/mes × ticket`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Oportunidades abiertas"
+                value={recovery.open}
+                icon={<HeartHandshake className="h-4 w-4" />}
+                tone="coral"
+                hint={`${money(recovery.pipelineValue)} en pipeline`}
+              />
+            </StaggerItem>
+          </div>
+        </Stagger>
       </AnimatedContent>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">

@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { axisProps, gridProps, tooltipProps } from './chartTheme'
+import { axisProps, gridProps, tooltipProps, useChartMotion } from './chartTheme'
 
 interface Series {
   key: string
@@ -34,6 +34,8 @@ export function CompareBars({
   /** Colores por índice de dato (para barras con significado propio). */
   colors?: string[]
 }) {
+  const motionProps = useChartMotion()
+
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
@@ -61,7 +63,7 @@ export function CompareBars({
               series.find((s) => s.key === name)?.label ?? name,
             ]}
           />
-          {series.map((item) => (
+          {series.map((item, seriesIndex) => (
             <Bar
               key={item.key}
               dataKey={item.key}
@@ -69,6 +71,8 @@ export function CompareBars({
               radius={[6, 6, 0, 0]}
               stackId={stacked ? 'stack' : undefined}
               maxBarSize={layout === 'horizontal' ? 54 : 22}
+              {...motionProps}
+              animationBegin={seriesIndex * 120}
             >
               {data.map((entry, index) => (
                 <Cell

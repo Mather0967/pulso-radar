@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useReducedMotion } from 'framer-motion'
 import { Download, FileSpreadsheet, FileText, Printer, ShieldCheck } from 'lucide-react'
 import { AnimatedContent } from '@/components/reactbits/AnimatedContent'
+import { CountUp } from '@/components/reactbits/CountUp'
+import { Stagger, StaggerItem } from '@/components/reactbits/Stagger'
+import { RevealText } from '@/components/reactbits/RevealText'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { SectionHeading } from '@/components/ui/Card'
@@ -26,6 +30,8 @@ export function ReportPage() {
   const scenario = useSimulationStore((s) => s.scenario)
   const settings = useSimulationStore((s) => s.campaignSettings)
   const [message, setMessage] = useState<string | null>(null)
+  const reduceMotion = useReducedMotion()
+  const countDuration = reduceMotion ? 0 : 900
 
   const report = useMemo(
     () =>
@@ -86,7 +92,7 @@ export function ReportPage() {
                 </span>
               </div>
               <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight text-white">
-                Informe de oportunidades
+                <RevealText text="Informe de oportunidades" />
               </h1>
               <p className="mt-1 text-sm text-slate-400">
                 {report.storeName} · {report.businessType}
@@ -106,33 +112,68 @@ export function ReportPage() {
             </div>
           </div>
 
-          <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <Summary label="Horas recuperables" value={`${num(report.simulator.recoverableHours, 1)} h/mes`} />
-            <Summary
-              label={`Margen potencial mensual (proyección: ${num(profile.recoveredSales)} ventas/mes)`}
-              value={money(report.simulator.additionalContribution)}
-            />
-            <Summary
-              label="Capital inmovilizado"
-              value={money(report.inventory.totals.inventoryCapital)}
-            />
-            <Summary
-              label="Mejora sobre margen"
-              value={pct(report.simulator.upliftPct, 1)}
-            />
+          <Stagger>
+            <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <StaggerItem>
+                <Summary
+                  label="Horas recuperables"
+                  value={
+                    <CountUp
+                      value={report.simulator.recoverableHours}
+                      decimals={1}
+                      suffix=" h/mes"
+                      duration={countDuration}
+                    />
+                  }
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label={`Margen potencial mensual (proyección: ${num(profile.recoveredSales)} ventas/mes)`}
+                  value={money(report.simulator.additionalContribution)}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label="Capital inmovilizado"
+                  value={money(report.inventory.totals.inventoryCapital)}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label="Mejora sobre margen"
+                  value={
+                    <CountUp
+                      value={report.simulator.upliftPct}
+                      decimals={1}
+                      suffix="%"
+                      duration={countDuration}
+                    />
+                  }
+                />
+              </StaggerItem>
+            </div>
+          </Stagger>
+        </div>
+
+        <Stagger>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {report.sections.slice(0, 4).map((section) => (
+              <StaggerItem key={section.id}>
+                <ReportSectionCard section={section} />
+              </StaggerItem>
+            ))}
           </div>
-        </div>
+        </Stagger>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {report.sections.slice(0, 4).map((section) => (
-            <ReportSectionCard key={section.id} section={section} />
-          ))}
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {report.sections.slice(4, 6).map((section) => (
-            <ReportSectionCard key={section.id} section={section} />
-          ))}
+        <Stagger>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {report.sections.slice(4, 6).map((section) => (
+              <StaggerItem key={section.id}>
+                <ReportSectionCard section={section} />
+              </StaggerItem>
+            ))}
+            <StaggerItem>
           <div className="print-panel rounded-2xl border border-line/90 bg-ink-850/60 p-5">
             <h3 className="font-display text-sm font-semibold text-white">Comparativa económica</h3>
             <p className="mt-1 text-[11px] text-slate-500">
@@ -152,7 +193,9 @@ export function ReportPage() {
               hipotética basada en supuestos editables.
             </p>
           </div>
-        </div>
+            </StaggerItem>
+          </div>
+        </Stagger>
 
         <ReportSectionCard section={report.sections[6]} />
 
@@ -228,7 +271,7 @@ export function ReportPage() {
   )
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-xl border border-line/80 bg-ink-950/40 px-3 py-2.5">
       <p className="text-[10px] uppercase tracking-wider text-slate-600">{label}</p>

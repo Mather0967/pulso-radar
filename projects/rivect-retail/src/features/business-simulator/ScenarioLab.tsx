@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { SlidersHorizontal, Sparkles } from 'lucide-react'
 import type { Scenario, ScenarioKey } from '@/domain/models'
 import { NumberField } from '@/components/ui/Field'
@@ -19,6 +20,7 @@ export function ScenarioLab({
   automationPercentage: number
 }) {
   const { bind } = useFieldLimits()
+  const reduce = useReducedMotion()
   return (
     <div className="panel panel-pad">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -40,17 +42,21 @@ export function ScenarioLab({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        {scenarios.map((scenario) => {
+        {scenarios.map((scenario, index) => {
           const isActive = scenario.key === active
           return (
-            <button
+            <motion.button
               key={scenario.key}
               type="button"
               onClick={() => onApply(scenario.key)}
+              initial={reduce ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileTap={reduce ? undefined : { scale: 0.985 }}
+              transition={{ duration: 0.35, delay: reduce ? 0 : index * 0.06, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
-                'group rounded-xl border p-4 text-left transition-all',
+                'group relative overflow-hidden rounded-xl border p-4 text-left transition-colors',
                 isActive
-                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(255, 118, 46,0.25)]'
+                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(255,118,46,0.25)]'
                   : 'border-line bg-ink-900/50 hover:border-brand-500/30',
               )}
             >
@@ -80,7 +86,15 @@ export function ScenarioLab({
                   {num(scenario.assumptions.averageMinutesPerQuery, 1)}
                 </span>
               </div>
-            </button>
+              {isActive ? (
+                <motion.span
+                  layoutId="scenario-active-indicator"
+                  aria-hidden
+                  className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-brand-400"
+                  transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 34 }}
+                />
+              ) : null}
+            </motion.button>
           )
         })}
       </div>

@@ -171,3 +171,37 @@
     break-inside: avoid;
   }
 }
+
+/* Utilidades de movimiento sutil (se desactivan con reducir movimiento). */
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(255, 118, 46, 0.55); }
+  70% { box-shadow: 0 0 0 6px rgba(255, 118, 46, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 118, 46, 0); }
+}
+
+.pulse-dot {
+  animation: pulseDot 2s ease-out infinite;
+}
+
+@keyframes shimmerSweep {
+  0% { background-position: 150% 0; }
+  100% { background-position: -150% 0; }
+}
+
+.shimmer {
+  background-image: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.07) 50%, transparent 65%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 2.4s linear infinite;
+}
+
+/* Red de seguridad: sin animaciones ni transiciones largas si el usuario lo pide. */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot,
+  .shimmer {
+    animation: none !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import type { InventoryItem } from '@/domain/models'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
@@ -13,6 +14,7 @@ export function StockProductModal({
   item: InventoryItem | null
   onClose: () => void
 }) {
+  const reduce = useReducedMotion()
   return (
     <Modal
       open={Boolean(item)}
@@ -22,7 +24,13 @@ export function StockProductModal({
       width="md"
     >
       {item ? (
-        <div className="space-y-5">
+        <motion.div
+          key={item.product.id}
+          className="space-y-5"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
           <div className="flex flex-wrap items-center gap-4">
             <ProductThumb category={item.product.category} name={item.product.name} size="lg" />
             <div className="grid flex-1 grid-cols-2 gap-2 text-xs">
@@ -55,21 +63,25 @@ export function StockProductModal({
 
           <div className="grid gap-2 sm:grid-cols-2">
             <Insight
+              index={0}
               label="Ventas diarias estimadas"
               value={`${num(item.dailySales, 1)} u./día`}
               hint={`${num(item.product.monthlyUnitsSold)} u. por mes ÷ 30`}
             />
             <Insight
+              index={1}
               label="Cobertura estimada"
               value={item.coverageDays === null ? 'Sin ventas registradas' : `${num(item.coverageDays, 1)} días`}
               hint="Stock ÷ ventas diarias"
             />
             <Insight
+              index={2}
               label="Capital inmovilizado"
               value={money(item.inventoryCapital)}
               hint="Stock × costo unitario"
             />
             <Insight
+              index={3}
               label="Desde la última venta"
               value={`${num(item.daysSinceLastSale)} días`}
               hint={`Última venta: ${item.product.lastSaleAt}`}
@@ -129,18 +141,34 @@ export function StockProductModal({
               ))}
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : null}
     </Modal>
   )
 }
 
-function Insight({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Insight({
+  label,
+  value,
+  hint,
+  index = 0,
+}: {
+  label: string
+  value: string
+  hint: string
+  index?: number
+}) {
+  const reduce = useReducedMotion()
   return (
-    <div className="rounded-xl border border-line bg-ink-900/60 p-3">
+    <motion.div
+      className="rounded-xl border border-line bg-ink-900/60 p-3"
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: reduce ? 0 : 0.1 + index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+    >
       <p className="text-[10px] uppercase tracking-wider text-slate-600">{label}</p>
       <p className="mt-1 font-display text-sm font-semibold text-white">{value}</p>
       <p className="mt-0.5 text-[10px] text-slate-600">{hint}</p>
-    </div>
+    </motion.div>
   )
 }

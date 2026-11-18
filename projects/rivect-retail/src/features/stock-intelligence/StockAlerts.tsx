@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, ArrowUpRight } from 'lucide-react'
 import type { InventoryReport } from '@/domain/models'
 import { cn } from '@/utils/format'
@@ -15,6 +16,7 @@ export function StockAlerts({
   report: InventoryReport
   onOpenProduct: (productId: string) => void
 }) {
+  const reduce = useReducedMotion()
   const alerts = report.alerts.slice(0, 8)
 
   return (
@@ -25,14 +27,35 @@ export function StockAlerts({
         </p>
       ) : (
         alerts.map((alert, index) => (
-          <button
+          <motion.button
             key={`${alert.productId}-${alert.kind}-${index}`}
             onClick={() => onOpenProduct(alert.productId)}
+            initial={reduce ? false : { opacity: 0, x: 16, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{
+              type: 'spring',
+              stiffness: 340,
+              damping: 28,
+              delay: reduce ? 0 : index * 0.07,
+            }}
             className={cn(
-              'group flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition hover:border-brand-500/40',
+              'group relative flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition hover:border-brand-500/40',
               severityStyles[alert.severity],
             )}
           >
+            {alert.severity === 'alta' && !reduce ? (
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-coral-400/50"
+                animate={{ opacity: [0.15, 0.9, 0.15] }}
+                transition={{
+                  duration: 2.6,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: 0.8 + index * 0.07,
+                }}
+              />
+            ) : null}
             <AlertTriangle
               className={cn(
                 'mt-0.5 h-3.5 w-3.5 shrink-0',
@@ -50,7 +73,7 @@ export function StockAlerts({
               </p>
             </div>
             <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 text-slate-600 transition group-hover:text-brand-300" />
-          </button>
+          </motion.button>
         ))
       )}
       {report.alerts.length > 8 ? (

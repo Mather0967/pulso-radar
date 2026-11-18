@@ -1,8 +1,11 @@
 import { NavLink } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, Info, Presentation, Sparkles, X } from 'lucide-react'
 import { NAV_ITEMS } from './nav'
 import { useSimulationStore } from '@/store/useSimulationStore'
 import { cn } from '@/utils/format'
+
+const SPRING = { type: 'spring', stiffness: 420, damping: 34 } as const
 
 export function Sidebar({
   open,
@@ -12,8 +15,11 @@ export function Sidebar({
   onClose: () => void
 }) {
   const storeName = useSimulationStore((s) => s.storeProfile.name)
+  const reduce = useReducedMotion()
+  const spring = reduce ? { duration: 0 } : SPRING
 
-  const content = (
+  // Dos copias (escritorio y cajón móvil) conviven en el DOM: cada una necesita su propio layoutId.
+  const renderContent = (variant: 'desktop' | 'mobile') => (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-5 pb-5 pt-5">
         <div className="flex items-center gap-3">
@@ -28,7 +34,7 @@ export function Sidebar({
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-500 hover:bg-ink-800 hover:text-white lg:hidden"
+          className="rounded-lg p-1.5 text-slate-500 transition hover:bg-ink-800 hover:text-white lg:hidden"
           aria-label="Cerrar menú"
         >
           <X className="h-4 w-4" />
@@ -42,7 +48,7 @@ export function Sidebar({
           title="Regresar al portal principal de proyectos"
         >
           <span className="flex items-center gap-2">
-            <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5 text-brand-400" />
+            <ArrowLeft className="h-3.5 w-3.5 text-brand-400 transition-transform group-hover:-translate-x-0.5" />
             <span>Mis proyectos</span>
           </span>
           <span className="text-[10px] uppercase tracking-wider text-slate-600 group-hover:text-slate-400">Portal</span>
@@ -58,9 +64,9 @@ export function Sidebar({
         <NavLink
           to="/escena/1"
           onClick={onClose}
-          className="animate-glowPulse group relative mb-3 flex items-center gap-3 rounded-xl border border-brand-500/50 bg-gradient-to-r from-brand-500/25 to-brand-500/5 px-3 py-2.5 text-sm font-semibold text-white transition-all hover:border-brand-400 hover:from-brand-500/35"
+          className="animate-glowPulse group relative mb-3 flex items-center gap-3 rounded-xl border border-brand-500/50 bg-gradient-to-r from-brand-500/25 to-brand-500/5 px-3 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-px hover:border-brand-400 hover:from-brand-500/35"
         >
-          <Presentation className="h-4 w-4 shrink-0 text-brand-300" />
+          <Presentation className="h-4 w-4 shrink-0 text-brand-300 transition-transform group-hover:scale-110" />
           <span className="flex-1 truncate">Modo presentación</span>
           <span className="text-[9px] uppercase tracking-wider text-brand-300/80">Demo</span>
         </NavLink>
@@ -72,9 +78,9 @@ export function Sidebar({
             onClick={onClose}
             className={({ isActive }) =>
               cn(
-                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
+                'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-200',
                 isActive
-                  ? 'border border-brand-500/25 bg-gradient-to-r from-brand-500/15 to-brand-500/5 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+                  ? 'font-semibold text-white'
                   : 'text-slate-400 hover:bg-ink-800/70 hover:text-slate-200',
               )
             }
@@ -82,16 +88,38 @@ export function Sidebar({
             {({ isActive }) => (
               <>
                 {isActive ? (
-                  <span className="absolute left-0 top-1/2 h-6 w-[2px] -translate-y-1/2 rounded-r bg-gradient-to-b from-brand-300 to-brand-500 shadow-[0_0_8px_rgba(255, 118, 46,0.8)]" />
+                  <>
+                    <motion.span
+                      layoutId={`sidebar-pill-${variant}`}
+                      transition={spring}
+                      className="absolute inset-0 rounded-xl border border-brand-500/25 bg-gradient-to-r from-brand-500/15 to-brand-500/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    />
+                    <motion.span
+                      layoutId={`sidebar-bar-${variant}`}
+                      transition={spring}
+                      className="absolute left-0 w-[2px] rounded-r bg-gradient-to-b from-brand-300 to-brand-500"
+                      style={{
+                        top: '50%',
+                        height: 24,
+                        marginTop: -12,
+                        boxShadow: '0 0 8px rgba(255,118,46,0.8)',
+                      }}
+                    />
+                  </>
                 ) : null}
-                <item.icon
-                  className={cn(
-                    'h-4 w-4 shrink-0 transition-colors',
-                    isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300',
-                  )}
-                />
-                <span className="flex-1 truncate font-medium" title={item.description}>
-                  {item.label}
+                <span className="relative flex min-w-0 flex-1 items-center gap-3">
+                  <item.icon
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-all duration-200 group-hover:scale-110',
+                      isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300',
+                    )}
+                  />
+                  <span
+                    className="flex-1 truncate font-medium transition-transform duration-200 group-hover:translate-x-0.5"
+                    title={item.description}
+                  >
+                    {item.label}
+                  </span>
                 </span>
               </>
             )}
@@ -117,7 +145,7 @@ export function Sidebar({
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] border-r border-line/80 bg-ink-950/80 backdrop-blur-xl lg:block">
-        {content}
+        {renderContent('desktop')}
       </aside>
 
       <div
@@ -140,7 +168,7 @@ export function Sidebar({
             open ? 'translate-x-0' : '-translate-x-full',
           )}
         >
-          {content}
+          {renderContent('mobile')}
         </aside>
       </div>
     </>

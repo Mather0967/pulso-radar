@@ -1,6 +1,8 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { Banknote, Clock, Gauge, Timer, Users } from 'lucide-react'
 import type { SimulatorMetrics, StoreProfile } from '@/domain/models'
 import { CompareBars } from '@/components/charts/CompareBars'
+import { CountUp } from '@/components/reactbits/CountUp'
 import { Panel, PanelHeader } from '@/components/ui/Card'
 import { StatTile } from '@/components/ui/Metric'
 import { Badge } from '@/components/ui/Badge'
@@ -22,9 +24,15 @@ export function SimulatorResults({
     { name: 'Proyectado', margen: metrics.projectedContribution },
   ]
   const remainingHours = Math.max(0, metrics.manualHours - metrics.recoverableHours)
+  const reduce = useReducedMotion()
 
   return (
-    <div className="space-y-4">
+    <motion.div
+      className="space-y-4"
+      initial={reduce ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         <StatTile
           label="Horas mensuales en atención"
@@ -116,22 +124,22 @@ export function SimulatorResults({
           <Formula
             label="Consultas mensuales"
             expression={`${num(profile.dailyQueries)} consultas/día × ${num(profile.workingDays)} días`}
-            result={`${num(metrics.monthlyQueries)}`}
+            result={{ value: metrics.monthlyQueries }}
           />
           <Formula
             label="Horas manuales"
             expression={`(${num(metrics.monthlyQueries)} × ${num(profile.averageMinutesPerQuery, 1)} min) ÷ 60`}
-            result={`${num(metrics.manualHours, 1)} h`}
+            result={{ value: metrics.manualHours, decimals: 1, suffix: ' h' }}
           />
           <Formula
             label="Horas recuperables"
             expression={`${num(metrics.manualHours, 1)} h × ${pct(profile.automationPercentage)}`}
-            result={`${num(metrics.recoverableHours, 1)} h`}
+            result={{ value: metrics.recoverableHours, decimals: 1, suffix: ' h' }}
           />
           <Formula
             label="Capacidad adicional"
             expression={`(${num(metrics.recoverableHours, 1)} h × 60) ÷ ${num(profile.averageMinutesPerQuery, 1)} min`}
-            result={`${num(metrics.additionalCapacity)} consultas`}
+            result={{ value: metrics.additionalCapacity, suffix: ' consultas' }}
           />
           <Formula
             label="Facturación adicional"
@@ -150,9 +158,12 @@ export function SimulatorResults({
           independiente de ventas recuperadas, editable en el panel de información comercial.
         </div>
       </Panel>
-    </div>
+    </motion.div>
   )
 }
+
+/** Resultado de fórmula: texto fijo o número animado con CountUp (mismo formato que num()). */
+type FormulaResult = string | { value: number; decimals?: number; suffix?: string }
 
 function Formula({
   label,
@@ -161,7 +172,7 @@ function Formula({
 }: {
   label: string
   expression: string
-  result: string
+  result: FormulaResult
 }) {
   return (
     <div className="flex flex-col gap-1 border-b border-line/60 pb-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
@@ -169,7 +180,17 @@ function Formula({
         <p className="font-sans text-[11px] font-medium text-slate-300">{label}</p>
         <p className="text-[11px] text-slate-600">{expression}</p>
       </div>
-      <p className="font-sans text-sm font-semibold text-white">{result}</p>
+      <p className="font-sans text-sm font-semibold text-white">
+        {typeof result === 'string' ? (
+          result
+        ) : (
+          <CountUp
+            value={Number.isFinite(result.value) ? result.value : 0}
+            decimals={result.decimals}
+            suffix={result.suffix}
+          />
+        )}
+      </p>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { tooltipProps } from './chartTheme'
+import { tooltipProps, useChartMotion } from './chartTheme'
 
 export function Donut({
   data,
@@ -14,6 +14,8 @@ export function Donut({
   centerValue?: string
   formatter?: (value: number) => string
 }) {
+  const motionProps = useChartMotion()
+
   return (
     <div className="relative" style={{ height }}>
       <ResponsiveContainer>
@@ -26,6 +28,7 @@ export function Donut({
             outerRadius="88%"
             paddingAngle={2}
             stroke="none"
+            {...motionProps}
           >
             {data.map((entry) => (
               <Cell key={entry.name} fill={entry.color} fillOpacity={0.92} />

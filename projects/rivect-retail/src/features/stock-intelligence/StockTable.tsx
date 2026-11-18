@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { InventoryItem } from '@/domain/models'
 import type { InventorySortKey } from '@/services/inventory/inventoryService'
@@ -26,6 +27,7 @@ export function StockTable({
   onSort: (key: InventorySortKey) => void
   onOpen: (item: InventoryItem) => void
 }) {
+  const reduce = useReducedMotion()
   if (items.length === 0) {
     return (
       <div className="px-6 py-14 text-center">
@@ -66,10 +68,18 @@ export function StockTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-line/60">
-          {items.map((item) => (
-            <tr
+          {items.map((item, index) => (
+            <motion.tr
               key={item.product.id}
               onClick={() => onOpen(item)}
+              layout={reduce ? false : 'position'}
+              initial={reduce ? false : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                duration: 0.35,
+                delay: reduce ? 0 : Math.min(index, 14) * 0.03,
+                ease: [0.22, 1, 0.36, 1],
+              }}
               className="cursor-pointer transition hover:bg-ink-800/50"
             >
               <td className="px-4 py-2.5">
@@ -119,7 +129,7 @@ export function StockTable({
                   </span>
                 )}
               </td>
-            </tr>
+            </motion.tr>
           ))}
         </tbody>
       </table>

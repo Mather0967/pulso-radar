@@ -17,5 +17,7 @@ export default defineConfig({
   build: {
     outDir: 'dist-portal',
     emptyOutDir: true,
+    // La CSP del portal permite fuentes solo desde 'self': nada se incrusta como data: URI.
+    assetsInlineLimit: 0,
   },
 })

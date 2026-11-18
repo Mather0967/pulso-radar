@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import type { Product, RecoveryLead } from '@/domain/models'
 import { RECOVERY_STATUS_META } from '@/domain/calculations/recovery'
@@ -14,6 +15,7 @@ export function LeadTable({
   products: Product[]
   onOpen: (lead: RecoveryLead) => void
 }) {
+  const reduce = useReducedMotion()
   if (leads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
@@ -34,10 +36,20 @@ export function LeadTable({
         <span className="text-right">Acción</span>
       </div>
       <ul className="divide-y divide-line/60">
-        {leads.map((lead) => {
+        {leads.map((lead, index) => {
           const product = products.find((p) => p.id === lead.productId)
           return (
-            <li key={lead.id}>
+            <motion.li
+              key={lead.id}
+              layout={reduce ? false : 'position'}
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.35,
+                delay: reduce ? 0 : Math.min(index, 12) * 0.035,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
               <button
                 onClick={() => onOpen(lead)}
                 className="grid w-full grid-cols-1 gap-2 px-4 py-3 text-left transition hover:bg-ink-800/50 lg:grid-cols-[1.4fr_1.3fr_0.8fr_0.6fr_0.9fr_auto] lg:items-center lg:gap-3"
@@ -104,7 +116,7 @@ export function LeadTable({
                   </span>
                 </div>
               </button>
-            </li>
+            </motion.li>
           )
         })}
       </ul>
