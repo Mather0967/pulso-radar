@@ -16,7 +16,7 @@ export function ShinyText({
       className={cn('inline-block bg-clip-text text-transparent', className)}
       style={{
         backgroundImage:
-          'linear-gradient(100deg, #8ab5ff 0%, #ffffff 42%, #5b95ff 58%, #8ab5ff 100%)',
+          'linear-gradient(100deg, #ffb88a 0%, #ffffff 42%, #ff9a5c 58%, #ffb88a 100%)',
         backgroundSize: '200% 100%',
         animation: `shinyText ${speed}s linear infinite`,
       }}
@@ -37,7 +37,7 @@ export function GradientText({ children, className }: { children: ReactNode; cla
   return (
     <span
       className={cn('bg-clip-text text-transparent', className)}
-      style={{ backgroundImage: 'linear-gradient(92deg, #ffffff 0%, #8ab5ff 55%, #2f74ff 100%)' }}
+      style={{ backgroundImage: 'linear-gradient(92deg, #ffffff 0%, #ffb88a 55%, #ff762e 100%)' }}
     >
       {children}
     </span>

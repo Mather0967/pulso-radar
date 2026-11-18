@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { DEFAULT_THRESHOLDS } from '@/domain/calculations/inventory'
 import { DEFAULT_CAMPAIGN_SETTINGS } from '@/domain/calculations/campaigns'
 import { suggestedConversion, RECOVERY_STATUS_META } from '@/domain/calculations/recovery'
+import { sanitizeProfile } from '@/domain/calculations/simulator'
 import type {
   AssistantMessage,
   AssistantReply,
@@ -166,7 +167,7 @@ export const useSimulationStore = create<SimulationState>()(
           ASSUMPTION_KEYS.includes(key as keyof ScenarioAssumptions),
         )
         set({
-          storeProfile: { ...current, ...patch, updatedAt: new Date().toISOString() },
+          storeProfile: sanitizeProfile({ ...current, ...patch, updatedAt: new Date().toISOString() }),
           scenario: touchesAssumptions ? 'custom' : get().scenario,
         })
       },
@@ -176,11 +177,11 @@ export const useSimulationStore = create<SimulationState>()(
         if (!scenario) return
         set({
           scenario: key,
-          storeProfile: {
+          storeProfile: sanitizeProfile({
             ...get().storeProfile,
             ...scenario.assumptions,
             updatedAt: new Date().toISOString(),
-          },
+          }),
         })
       },
 
@@ -195,11 +196,11 @@ export const useSimulationStore = create<SimulationState>()(
           scenarios: scenariosUpdated,
           ...(active
             ? {
-                storeProfile: {
+                storeProfile: sanitizeProfile({
                   ...get().storeProfile,
                   ...assumptions,
                   updatedAt: new Date().toISOString(),
-                },
+                }),
               }
             : {}),
         })
@@ -234,7 +235,7 @@ export const useSimulationStore = create<SimulationState>()(
           at: new Date().toISOString(),
           products: reply.products,
           quickReplies: reply.quickReplies,
-          meta: { intent: reply.intent, detected: reply.detected },
+          meta: { intent: reply.intent, detected: reply.detected, handoff: reply.handoff },
         }
         const known = new Set(
           state.assistant.messages.flatMap((m) => m.products?.map((p) => p.productId) ?? []),
@@ -249,7 +250,8 @@ export const useSimulationStore = create<SimulationState>()(
             messages: [...state.assistant.messages, assistantMessage],
             metrics: {
               ...state.assistant.metrics,
-              queriesResolved: state.assistant.metrics.queriesResolved + 1,
+              queriesResolved: state.assistant.metrics.queriesResolved + (reply.resolved ? 1 : 0),
+              handoffs: (state.assistant.metrics.handoffs ?? 0) + (reply.handoff ? 1 : 0),
               productsConsulted: state.assistant.metrics.productsConsulted + freshConsulted,
               productsRecommended: state.assistant.metrics.productsRecommended + recommended,
               reservations: state.assistant.metrics.reservations + (reply.reserved ? 1 : 0),
@@ -338,7 +340,17 @@ export const useSimulationStore = create<SimulationState>()(
     }),
     {
       name: 'rivect-retail-intelligence-v1',
-      version: 1,
+      version: 2,
+      // v1 podía guardar datos fuera de rango (0 minutos, ticket 0, 999.999.999 consultas).
+      migrate: (persisted) => persisted as SimulationState,
+      // Al restaurar desde el navegador, el perfil vuelve a pasar por los límites.
+      merge: (persisted, current) => {
+        const stored = (persisted ?? {}) as Partial<SimulationState>
+        const merged = { ...current, ...stored }
+        return stored.seeded && stored.storeProfile
+          ? { ...merged, storeProfile: sanitizeProfile(stored.storeProfile) }
+          : merged
+      },
       partialize: (state) => ({
         seeded: state.seeded,
         storeProfile: state.storeProfile,

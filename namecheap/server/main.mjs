@@ -8,6 +8,7 @@ import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
 import {projectMethodAllowed} from './access.mjs';
 import {projectAccess,availableProjects,mergeProjectGrants,renderProjectsPage} from './projects.mjs';
+import {adminMessagesAPI} from './messages.mjs';
 import {createLandurPortal} from './landur.mjs';
 import {createStudio,createProjectSite} from './studio.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -35,7 +36,7 @@ async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  // El aviso de la planilla no es un navegador: no manda `Origin`. Se autentica con su token en landur.mjs.
  if(!['GET','HEAD'].includes(method)&&p!=='/landur/api/hooks/sync'&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
- if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
+ if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg','/fonts/pjs-400.woff2','/fonts/pjs-600.woff2','/fonts/pjs-700.woff2','/fonts/pjs-800.woff2','/fonts/jbm-500.woff2','/fonts/jbm-600.woff2'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});
  if(p==='/'&&method==='GET')return html('index.html');
@@ -64,6 +65,7 @@ async function route(req,ip){
  if(p.startsWith('/api/admin/')){
   if(u.role!=='admin')return json({error:'Sólo administradores.'},403);
   if(['/api/admin/settings','/api/admin/inquiries'].includes(p))return adminSiteAPI(req,{store:siteStore});
+  if(p.startsWith('/api/admin/messages')){const r=await adminMessagesAPI(req,{store,user:u,path:p,method});if(r)return r;}
   if(p==='/api/admin/project-access'&&method==='PUT'){
    const b=await req.json();
    return store.transact(db=>{

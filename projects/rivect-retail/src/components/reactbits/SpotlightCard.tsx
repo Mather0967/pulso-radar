@@ -14,7 +14,7 @@ interface SpotlightCardProps {
 export function SpotlightCard({
   children,
   className,
-  color = 'rgba(47,116,255,0.18)',
+  color = 'rgba(255, 118, 46,0.18)',
   hoverElevation = true,
 }: SpotlightCardProps) {
   const ref = useRef<HTMLDivElement>(null)

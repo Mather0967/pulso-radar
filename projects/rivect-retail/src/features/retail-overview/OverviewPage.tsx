@@ -14,6 +14,8 @@ import {
 import { Aurora } from '@/components/reactbits/Aurora'
 import { AnimatedContent } from '@/components/reactbits/AnimatedContent'
 import { ShinyText, GradientText } from '@/components/reactbits/ShinyText'
+import { Stagger, StaggerItem } from '@/components/reactbits/Stagger'
+import { RevealText } from '@/components/reactbits/RevealText'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Panel, PanelHeader, SectionHeading } from '@/components/ui/Card'
@@ -56,7 +58,7 @@ export function OverviewPage() {
     {
       to: '/recovery',
       stat: num(recovery.withoutFollowUp),
-      statLabel: 'sin seguimiento',
+      statLabel: 'sin seguimiento (CRM de ejemplo)',
     },
     {
       to: '/stock',
@@ -71,7 +73,7 @@ export function OverviewPage() {
     {
       to: '/report',
       stat: money(simulator.additionalContribution),
-      statLabel: 'margen potencial',
+      statLabel: 'margen potencial/mes (proyección)',
     },
   ]
 
@@ -98,9 +100,11 @@ export function OverviewPage() {
                 </span>
               </div>
               <h1 className="mt-5 font-display text-3xl font-semibold leading-[1.1] tracking-tight text-white sm:text-[42px]">
-                Recuperá el tiempo de tu tienda.
+                <RevealText text="Recuperá el tiempo de tu tienda." />
                 <br />
-                <GradientText>Capturá las ventas que hoy se pierden.</GradientText>
+                <GradientText>
+                  <RevealText text="Capturá las ventas que hoy se pierden." delay={0.35} />
+                </GradientText>
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-400">
                 Este entorno calcula, con los datos de{' '}
@@ -110,7 +114,7 @@ export function OverviewPage() {
               <div className="mt-6 flex flex-wrap items-center gap-2">
                 <Link to="/simulator">
                   <Button size="lg">
-                    Abrir Business Simulator
+                    Abrir Simulador de negocio
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -120,7 +124,7 @@ export function OverviewPage() {
                   </Button>
                 </Link>
               </div>
-              <p className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <p className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-400">
                 <Info className="h-3.5 w-3.5" />
                 <span>
                   <ShinyText>Datos simulados</ShinyText> · no se conecta a WhatsApp ni a sistemas
@@ -135,7 +139,7 @@ export function OverviewPage() {
                 <p className="mt-2 font-display text-lg font-semibold capitalize text-white">
                   {scenario === 'custom' ? 'Personalizado' : scenario}
                 </p>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-[11px] text-slate-400">
                   {pct(profile.automationPercentage)} de automatización
                 </p>
               </div>
@@ -144,7 +148,9 @@ export function OverviewPage() {
                 <p className="mt-2 font-display text-lg font-semibold text-white">
                   {money(simulator.additionalContribution)}
                 </p>
-                <p className="mt-1 text-[11px] text-brand-200/70">estimado por mes</p>
+                <p className="mt-1 text-[11px] text-brand-200/70">
+                  proyección mensual · {num(profile.recoveredSales)} ventas/mes
+                </p>
               </div>
               <div className="col-span-2 rounded-2xl border border-line/80 bg-ink-950/60 p-4 backdrop-blur">
                 <div className="flex items-center justify-between">
@@ -159,7 +165,7 @@ export function OverviewPage() {
                     }}
                   />
                 </div>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-2 text-[11px] text-slate-400">
                   {num(simulator.manualHours, 1)} h mensuales · {num(profile.employeesInService)} personas
                 </p>
               </div>
@@ -169,40 +175,50 @@ export function OverviewPage() {
       </AnimatedContent>
 
       <AnimatedContent delay={0.05}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatTile
-            label="Horas mensuales repetitivas"
-            value={simulator.manualHours}
-            decimals={1}
-            suffix=" h"
-            icon={<Clock className="h-4 w-4" />}
-            hint={`${num(simulator.monthlyQueries)} consultas/mes`}
-          />
-          <StatTile
-            label="Horas potencialmente recuperables"
-            value={simulator.recoverableHours}
-            decimals={1}
-            suffix=" h"
-            icon={<Timer className="h-4 w-4" />}
-            tone="mint"
-            hint={`${num(simulator.fullWorkdaysRecovered, 1)} jornadas equivalentes`}
-          />
-          <StatTile
-            label="Margen adicional potencial"
-            value={simulator.additionalContribution}
-            prefix="$ "
-            icon={<Banknote className="h-4 w-4" />}
-            tone="amber"
-            hint={`${num(profile.recoveredSales)} ventas recuperadas/mes`}
-          />
-          <StatTile
-            label="Oportunidades abiertas"
-            value={recovery.open}
-            icon={<HeartHandshake className="h-4 w-4" />}
-            tone="coral"
-            hint={`${money(recovery.pipelineValue)} en pipeline`}
-          />
-        </div>
+        <Stagger>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StaggerItem>
+              <StatTile
+                label="Horas mensuales repetitivas"
+                value={simulator.manualHours}
+                decimals={1}
+                suffix=" h"
+                icon={<Clock className="h-4 w-4" />}
+                hint={`${num(simulator.monthlyQueries)} consultas/mes`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Horas potencialmente recuperables"
+                value={simulator.recoverableHours}
+                decimals={1}
+                suffix=" h"
+                icon={<Timer className="h-4 w-4" />}
+                tone="mint"
+                hint={`${num(simulator.fullWorkdaysRecovered, 1)} jornadas equivalentes`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Margen potencial mensual (proyección)"
+                value={simulator.additionalContribution}
+                prefix="$ "
+                icon={<Banknote className="h-4 w-4" />}
+                tone="amber"
+                hint={`Supuesto: ${num(profile.recoveredSales)} ventas recuperadas/mes × ticket`}
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatTile
+                label="Oportunidades abiertas"
+                value={recovery.open}
+                icon={<HeartHandshake className="h-4 w-4" />}
+                tone="coral"
+                hint={`${money(recovery.pipelineValue)} en pipeline`}
+              />
+            </StaggerItem>
+          </div>
+        </Stagger>
       </AnimatedContent>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
@@ -217,8 +233,8 @@ export function OverviewPage() {
             <div className="mt-5">
               <CompareBars
                 data={comparison}
-                series={[{ key: 'horas', label: 'Horas de atención', color: '#5b95ff' }]}
-                colors={['#5b95ff', '#4ade9f']}
+                series={[{ key: 'horas', label: 'Horas de atención', color: '#ff9a5c' }]}
+                colors={['#ff9a5c', '#4ade9f']}
                 height={200}
                 formatter={(value) => `${num(value, 0)} h`}
               />
@@ -272,12 +288,12 @@ export function OverviewPage() {
                 hint={`${num(assistant.metrics.conversationsStarted)} conversaciones iniciadas`}
               />
               <MetricRow
-                label="Recuperación de clientes"
+                label="Recuperación (muestra del CRM de ejemplo)"
                 value={`${num(recovery.won)} compras`}
-                hint={`${money(recovery.recoveredRevenue)} recuperados`}
+                hint={`${money(recovery.recoveredRevenue)} en ${num(recovery.total)} oportunidades de ejemplo`}
               />
             </div>
-            <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">
+            <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-400">
               <span className="font-medium text-slate-300">Cómo leer los datos:</span> los valores
               ingresados por el visitante, el catálogo simulado y las estimaciones se muestran por
               separado. Ninguna cifra representa una promesa de resultado.

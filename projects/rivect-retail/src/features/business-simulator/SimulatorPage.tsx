@@ -25,14 +25,14 @@ export function SimulatorPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 01 · Núcleo económico"
-          title="Business Simulator"
+          title="Simulador de negocio"
           description="Ingresá los datos del comercio y observá en tiempo real cuánto tiempo consume la atención manual y qué margen adicional podría generar la automatización."
           action={
             <div className="flex items-center gap-2">
               <Badge tone="amber" dot>
                 Datos ingresados + estimaciones
               </Badge>
-              <span className="hidden items-center gap-1.5 text-[11px] text-slate-500 sm:flex">
+              <span className="hidden items-center gap-1.5 text-[11px] text-slate-400 sm:flex">
                 <Info className="h-3.5 w-3.5" />
                 {num(metrics.monthlyQueries)} consultas/mes
               </span>

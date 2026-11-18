@@ -135,7 +135,7 @@ export function CampaignsPage() {
       <AnimatedContent>
         <SectionHeading
           eyebrow="Módulo 05 · Marketing"
-          title="Smart Campaigns"
+          title="Campañas inteligentes"
           description="Detectá productos con exceso de stock, construí segmentos sobre el CRM simulado y proyectá el rendimiento de una campaña antes de invertir en ella."
           action={<Badge tone="amber" dot>Sin envíos reales</Badge>}
         />
@@ -218,7 +218,7 @@ export function CampaignsPage() {
             />
           </div>
           {campaigns.length === 0 ? (
-            <p className="px-4 py-10 text-center text-xs text-slate-500">
+            <p className="px-4 py-10 text-center text-xs text-slate-400">
               Todavía no hay campañas. Configurá una y guardala para verla acá.
             </p>
           ) : (
@@ -234,19 +234,19 @@ export function CampaignsPage() {
                       <Badge tone={campaign.status === 'simulada' ? 'mint' : 'neutral'}>
                         {campaign.status}
                       </Badge>
-                      <span className="text-[10px] text-slate-600">
+                      <span className="text-[11px] text-slate-400/75">
                         {campaign.segmentLabel} · {formatDate(campaign.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-1 text-[11px] text-slate-500">{campaign.message}</p>
-                    <p className="mt-1 text-[10px] text-slate-600">
+                    <p className="mt-1 line-clamp-1 text-[11px] text-slate-400">{campaign.message}</p>
+                    <p className="mt-1 text-[11px] text-slate-400/75">
                       {campaign.recipients} destinatarios · {num(campaign.discountPct)}% off ·{' '}
                       {campaign.productIds.length} productos
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-[10px] uppercase tracking-wider text-slate-600">
+                      <p className="text-[11px] uppercase tracking-wider text-slate-400/75">
                         Margen estimado
                       </p>
                       <p className="font-display text-sm font-semibold text-white">

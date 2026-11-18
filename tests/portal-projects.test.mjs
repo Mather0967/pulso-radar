@@ -360,3 +360,40 @@ test('Rivect Retail Intelligence: solo administradores, con fallback de SPA',asy
     assert.equal((await f.request('/retail/',{...admin,method:'POST',body:{}})).status,405);
   }finally{await f.close();}
 });
+
+test('panel de administración: pestañas, escape del nombre y ausencia para miembros',()=>{
+  const admin=renderProjectsPage({active:true,role:'admin',name:'<b>"Zoe"</b>'});
+  assert.match(admin,/id="admin-panel"/);
+  for(const tab of ['tab-users','tab-invite','tab-grants'])assert.match(admin,new RegExp('id="'+tab+'"'));
+  assert.doesNotMatch(admin,/<b>"Zoe"<\/b>/);
+  assert.match(admin,/&lt;b&gt;&quot;Zoe&quot;&lt;\/b&gt;/);
+  const member=renderProjectsPage({active:true,role:'member',name:'Ana',projects:{pulso:'viewer'}});
+  assert.doesNotMatch(member,/admin-panel/);
+});
+
+test('Retail publicado no incrusta fuentes data: que la CSP (font-src self) bloquea',()=>{
+  const dir=path.join('projects','rivect-retail','public','assets');
+  const css=fs.readdirSync(dir).filter(f=>f.endsWith('.css'));
+  const html=fs.readFileSync(path.join('projects','rivect-retail','public','index.html'),'utf8');
+  const used=css.filter(f=>html.includes(f));
+  assert.ok(used.length>0,'el index publicado referencia su CSS');
+  for(const f of used)assert.doesNotMatch(fs.readFileSync(path.join(dir,f),'utf8'),/url\(\s*["']?data:font/,`${f} trae fuentes incrustadas`);
+});
+
+test('invitar desde el panel: el cuerpo que arma el cliente asigna los permisos de Pulso y LANDUR',async()=>{
+  const source=fs.readFileSync('namecheap/public/projects.mjs','utf8');
+  const expr=source.match(/request\('\/api\/admin\/invite','POST',(\{[^;]*?\})\);/)?.[1];
+  assert.ok(expr,'el cliente envía la invitación a /api/admin/invite');
+  const fields={role:{value:'member'},pulso:{value:'editor'},landur:{value:'viewer'}};
+  const body=new Function('email','fields',`return ${expr};`)('invitado@example.test',fields);
+  const f=await portalFixture();
+  try{
+    const admin=await f.login('admin');
+    const invite=await f.request('/api/admin/invite',{...admin,method:'POST',body});
+    assert.equal(invite.status,200);
+    const token=(await invite.json()).url.split('#')[1];
+    assert.equal((await f.request('/auth/activate',{method:'POST',body:{token,name:'Invitado',password:'otra-clave-sintetica-larga'}})).status,200);
+    const user=(await f.store.transact(db=>db.users.find(u=>u.email==='invitado@example.test')));
+    assert.deepEqual(user.projects,{pulso:'editor',landur:'viewer'});
+  }finally{await f.close();}
+});

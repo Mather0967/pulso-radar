@@ -530,3 +530,21 @@ planilla del 24/10).
   Apps Script opcional hay que reinstalarlo (`instalar()`), porque sus disparadores son de quien los instaló.
 - Corregido: tres notas del Resumen empezaban con «=» y Google las leía como fórmulas (`#ERROR!`).
 
+
+## Dictado: coma dicha, muletillas, correcciones y montos ambiguos (18/11/2026)
+
+- Pedido del usuario (audio de WhatsApp del 17/11): al dictar «3.143 coma 70» se guardaba 70 y «3.143 coma» quedaba en la descripción de la compra. Pidió arreglar todos los casos de error posibles y ampliar el diccionario de muletillas.
+- Decisiones aprobadas el 18/11: dos importes distintos → importe vacío + aviso; «con» entre cifras = decimales («500 con 50» = 500,50); importe aproximado («como», «tipo», «y pico», «más o menos») → se toma y se avisa.
+- Coma, «con» y «y … centavos» como decimales: «4.567 pesos y 89 centavos» = 4.567,89; «5 centésimos» = 0,05.
+- Muletillas en cualquier lugar (eh, eeeh, mmm, o sea, a ver, viste, sabés, che, digamos, como que, por ejemplo) sin cortar cifras: «tres mil eh ciento…» = 3.143.
+- Muletillas solo en los bordes (bueno, gracias, no sé, «este» + verbo, «nada» al cierre, mirá/escuchá/fijate al inicio) sin truncar marcas: «Mira Digital» y «Nada Bar» se conservan.
+- Correcciones (perdón, digo, mejor dicho, corrijo, en realidad, «no 300») se quedan con la última cifra.
+- Quedan vacíos con aviso: dos importes («300 de nafta y 200 de peaje», «300 pesos, total 1500»), comas dudosas («3.143,00 coma 70», «1 coma 5 coma 6», «3 143 coma 70»), cifras pegadas («60 200», «1 eh 500»), porcentajes y fracciones («15% de 800», «la mitad de 800»).
+- Avisos sin vaciar: aproximado, precio por unidad («10 lápices de 50 pesos») y «no» al inicio.
+- Moneda larga («pesos uruguayos») y moneda en medio de la frase ya no quedan en el concepto.
+- Archivos: `public/voice.mjs`; `public/sw.js` caché v38.
+- Proceso: sub-agentes Haiku con un archivo cada uno (tests, voice.mjs, sw.js/backlog) y dos revisores adversariales de solo lectura; los hallazgos críticos se corrigieron con test RED→GREEN.
+- Sin cambio (decisiones previas que se mantienen): «60,000» y «3,500 pesos» se leen como miles; «1500 mil» es 1.500.000.
+
+**Pruebas:** `npm test` en projects/landur 198/198; `tests/voice.test.mjs` 37 pruebas; `npm run test:voz` (navegador con reconocedor simulado) 3/3: dos-dictados-seguidos, ochenta-mil-guarda-80000, sin-respuesta-sale-de-escuchando.
+**Pendiente / no probado:** dictado real en iPhone/Safari y PWA instalada; en el campo de importe, un dígito suelto dictado después de un valor viejo («12,5 3») conserva el viejo; el artículo inicial de una marca se recorta como cualquier artículo («La Nada Bar» → «Nada Bar»).

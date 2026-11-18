@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { cn } from '@/utils/format'
 
 interface BaseProps {
@@ -21,6 +21,7 @@ export function NumberField({
   error,
   className,
   disabled,
+  clamp = true,
 }: BaseProps & {
   value: number
   onChange: (value: number) => void
@@ -30,33 +31,44 @@ export function NumberField({
   suffix?: string
   prefix?: string
   disabled?: boolean
+  /**
+   * true: ajusta en silencio a [min, max]. false: entrega el número tal cual,
+   * para que quien lo usa lo ajuste y muestre un mensaje.
+   */
+  clamp?: boolean
 }) {
+  // Mientras se escribe se conserva el texto (permite borrar y reescribir);
+  // al salir del campo se vuelve a mostrar el valor guardado.
+  const [draft, setDraft] = useState<string | null>(null)
   return (
     <label className={cn('block', className)}>
       <span className="field-label">{label}</span>
       <div className="relative">
         {prefix ? (
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-slate-500">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-slate-400">
             {prefix}
           </span>
         ) : null}
         <input
           type="number"
           className={cn('input', prefix ? 'pl-7' : '', suffix ? 'pr-12' : '', error && 'input-error')}
-          value={Number.isFinite(value) ? value : ''}
+          value={draft ?? (Number.isFinite(value) ? value : '')}
           min={min}
           max={max}
           step={step}
           disabled={disabled}
           onChange={(event) => {
-            const next = event.target.value === '' ? 0 : Number(event.target.value)
+            const text = event.target.value
+            setDraft(text)
+            if (text.trim() === '') return
+            const next = Number(text)
             if (Number.isNaN(next)) return
-            const clamped = Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.max(min, next))
-            onChange(clamped)
+            onChange(clamp ? Math.min(max ?? Number.MAX_SAFE_INTEGER, Math.max(min, next)) : next)
           }}
+          onBlur={() => setDraft(null)}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-medium text-slate-500">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-medium text-slate-400">
             {suffix}
           </span>
         ) : null}
@@ -64,7 +76,7 @@ export function NumberField({
       {error ? (
         <span className="mt-1 block text-[11px] text-coral-400">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-[11px] text-slate-600">{hint}</span>
+        <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span>
       ) : null}
     </label>
   )
@@ -95,7 +107,7 @@ export function TextField({
       {error ? (
         <span className="mt-1 block text-[11px] text-coral-400">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-[11px] text-slate-600">{hint}</span>
+        <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span>
       ) : null}
     </label>
   )
@@ -123,7 +135,7 @@ export function SelectField({
           </option>
         ))}
       </select>
-      {hint ? <span className="mt-1 block text-[11px] text-slate-600">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span> : null}
     </label>
   )
 }
@@ -159,14 +171,14 @@ export function RangeField({
         type="range"
         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-500"
         style={{
-          background: `linear-gradient(90deg, #2f74ff ${progress}%, #111a2e ${progress}%)`,
+          background: `linear-gradient(90deg, #ff762e ${progress}%, #111a2e ${progress}%)`,
         }}
         min={min}
         max={max}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400/75">{hint}</p> : null}
     </div>
   )
 }

@@ -251,3 +251,221 @@ test('si el campo traía un valor viejo, vale la última cifra dictada y nunca u
   assert.equal(amountFromText('20 mil 500'), '20500.00', 'una sola frase con escala suma sus partes');
   assert.equal(amountFromText('3500 25 mil'), '25000.00');
 });
+
+test('la coma dicha como palabra separa los decimales y no parte el importe', () => {
+  // Regresión (audio del 17/11): «3.143 coma 70» guardaba 70 y dejaba «3.143 coma» en el concepto.
+  const cases = [
+    ['compré papelería 3.143 coma 70', '3143.70'],
+    ['compré papelería 3143 coma 70', '3143.70'],
+    ['papelería 3.143 coma 70 pesos', '3143.70'],
+    ['papelería $3.143 coma 70', '3143.70'],
+    ['papelería 3.143 coma setenta', '3143.70'],
+    ['papelería tres mil ciento cuarenta y tres coma setenta', '3143.70'],
+    ['papelería 3 mil 143 coma 70', '3143.70'],
+    ['papelería 12 coma 5', '12.50'],
+    ['papelería doce coma cinco', '12.50'],
+    ['papelería 12 coma 05', '12.05'],
+    ['papelería doce coma cero cinco', '12.05'],
+    ['papelería 980 coma setenta y cinco', '980.75']
+  ];
+  for (const [said, amount] of cases) {
+    const result = say(said);
+    assert.equal(result.amountText, amount, said);
+    assert.equal(result.concept, 'Papelería', `concepto de «${said}»`);
+    assert.equal(amountFromText(said.replace(/^(compré )?papelería /, '')), amount, `campo: ${said}`);
+  }
+});
+
+test('una coma que no está entre una cifra y sus decimales no inventa importe', () => {
+  assert.equal(amountFromText('coma 70'), '70.00', 'sin parte entera queda la cifra suelta, como antes');
+  // Tres decimales no son centavos: antes se guardaba 123 descartando 3.143. Mejor vacío y aviso.
+  const odd = say('papelería 3.143 coma 123');
+  assert.equal(odd.amountText, '');
+  assert.ok(odd.warnings.some(w => w.includes('importe')));
+  assert.equal(amountFromText('3.143 coma 123'), '');
+  assert.equal(amountFromText('doce coma ciento veinte'), '');
+  assert.equal(amountFromText('0 coma 0'), '');
+});
+
+test('una muletilla dentro de la cifra no la corta', () => {
+  const papeleria = say('eh compré papelería tres mil eh ciento cuarenta y tres pesos');
+  assert.equal(papeleria.amountText, '3143.00');
+  assert.equal(papeleria.concept, 'Papelería');
+  const nafta = say('pagué eeeh 500 pesos de nafta');
+  assert.equal(nafta.amountText, '500.00');
+  assert.equal(nafta.concept, 'Nafta');
+  assert.equal(amountFromText('tres mil mmm quinientos'), '3500.00');
+});
+
+test('«con» entre cifras son los decimales', () => {
+  const dicho = say('pagué quinientos con cincuenta pesos de nafta');
+  assert.equal(dicho.amountText, '500.50');
+  assert.equal(dicho.concept, 'Nafta');
+  const cifras = say('pagué 500 con 50 de nafta');
+  assert.equal(cifras.amountText, '500.50');
+  assert.equal(cifras.concept, 'Nafta');
+  const centesimos = say('pagué 500 pesos con 50 centésimos de nafta');
+  assert.equal(centesimos.amountText, '500.50');
+  assert.equal(centesimos.concept, 'Nafta');
+  // «con» que no está entre dos números es parte de la frase, no decimales.
+  const deuda = say('cargá una deuda con el proveedor de embalaje por 3.400 pesos');
+  assert.equal(deuda.amountText, '3400.00');
+  assert.equal(deuda.concept, 'Proveedor de embalaje');
+  assert.equal(amountFromText('500 con 50'), '500.50');
+});
+
+test('dos importes distintos dejan el importe vacío y avisan', () => {
+  const dosImportes = [
+    'pagué 1.500 pesos y 300 pesos de luz',
+    'pagué 2 coma 5 y 3 coma 10 de papelería',
+    'pagué 1 coma 5 coma 6 de papelería',
+    'pagué 3.143,00 coma 70 de papelería',
+    'pagué 1.234,56 coma 7 de papelería',
+    'papelería 3 143 coma 70'
+  ];
+  for (const said of dosImportes) {
+    const result = say(said);
+    assert.equal(result.amountText, '', said);
+    assert.equal(result.cents, null, said);
+    assert.ok(result.warnings.some(w => w.includes('importe')), `aviso de «${said}»`);
+  }
+  const primero = say(dosImportes[0]);
+  assert.ok(primero.warnings.some(w => w.includes('más de un importe')));
+});
+
+test('una cifra con moneda gana sobre cantidades sueltas', () => {
+  assert.equal(say('80 mil pesos por 2 rollos de filamento').amountText, '80000.00');
+  assert.equal(say('compré 12 cajas por 3.000 pesos').amountText, '3000.00');
+  assert.equal(say('3 rollos de filamento por 1500 pesos').amountText, '1500.00');
+});
+
+test('una corrección dicha vale la última cifra y no ensucia el concepto', () => {
+  const correcciones = [
+    'compré papelería 3.143 perdón 3.144 pesos',
+    'compré papelería 3.143 digo 3.144',
+    'compré papelería 3.143 no 3.144',
+    'compré papelería 3.143 mejor dicho 3.144'
+  ];
+  for (const said of correcciones) {
+    const result = say(said);
+    assert.equal(result.amountText, '3144.00', said);
+    assert.equal(result.concept, 'Papelería', `concepto de «${said}»`);
+    assert.ok(!result.warnings.some(w => w.includes('más de un importe')), `sin aviso de dos importes en «${said}»`);
+  }
+});
+
+test('un importe aproximado se toma y se avisa', () => {
+  const tipo = say('a ver pagué tipo 500 pesos de nafta');
+  assert.equal(tipo.amountText, '500.00');
+  assert.equal(tipo.concept, 'Nafta');
+  assert.ok(tipo.warnings.some(w => w.includes('aproximado')));
+
+  const pico = say('pagué mil quinientos pesos y pico de luz');
+  assert.equal(pico.amountText, '1500.00');
+  assert.equal(pico.concept, 'Luz');
+  assert.ok(pico.warnings.some(w => w.includes('aproximado')));
+
+  const comoAlgo = say('pagué como 500 pesos de nafta o algo así');
+  assert.equal(comoAlgo.amountText, '500.00');
+  assert.equal(comoAlgo.concept, 'Nafta');
+  assert.ok(comoAlgo.warnings.some(w => w.includes('aproximado')));
+
+  const masMenos = say('pagué más o menos 800 pesos de nafta');
+  assert.equal(masMenos.amountText, '800.00');
+  assert.equal(masMenos.concept, 'Nafta');
+  assert.ok(masMenos.warnings.some(w => w.includes('aproximado')));
+
+  const exacto = say('pagué 500 pesos de nafta');
+  assert.ok(!exacto.warnings.some(w => w.includes('aproximado')));
+});
+
+test('las muletillas no quedan en el concepto', () => {
+  const casos = [
+    ['o sea compré papelería por 500 pesos viste', 'Papelería', '500.00'],
+    ['che anotá que pagué 800 de internet', 'Internet', '800.00'],
+    ['este pagué el flete 500 pesos', 'Flete', '500.00'],
+    ['mmm pagué la luz por 2.300 pesos', 'Luz', '2300.00'],
+    ['pagué 500 pesos de nafta y nada', 'Nafta', '500.00'],
+    ['pagué 500 pesos de nafta digamos', 'Nafta', '500.00'],
+    ['pagué 500 pesos de nafta, ¿sabés?', 'Nafta', '500.00'],
+    ['pagué 500 pesos de nafta no sé', 'Nafta', '500.00'],
+    ['pagué 1500 pesos uruguayos de luz', 'Luz', '1500.00'],
+    ['pagué 2300 pesos de UTE bueno', 'UTE', '2300.00'],
+    ['bueno, anotame que gastamos 900 pesos en café, gracias', 'Café', '900.00']
+  ];
+  for (const [said, concept, amount] of casos) {
+    const result = say(said);
+    assert.equal(result.concept, concept, `concepto de «${said}»`);
+    assert.equal(result.amountText, amount, `importe de «${said}»`);
+  }
+});
+
+test('las palabras que parecen muletillas en el medio del nombre se conservan', () => {
+  const result = say('gasto de este mes 500 pesos');
+  assert.equal(result.concept, 'Este mes');
+  assert.equal(result.amountText, '500.00');
+});
+
+test('el campo de importe mantiene la última cifra dictada', () => {
+  assert.equal(amountFromText('20500.00 25 mil'), '25000.00');
+});
+
+test('la revisión final: corrección lejos del marcador, nombres con «mira» y moneda en medio del concepto', () => {
+  // Corrección: solo salen el importe corregido y el marcador; el concepto se conserva.
+  const corregido = say('pagué 500 pesos de nafta no 300');
+  assert.equal(corregido.amountText, '300.00');
+  assert.equal(corregido.concept, 'Nafta');
+  // «mira» es muletilla al principio, no dentro de un nombre propio.
+  assert.equal(say('pagué 500 pesos a Mira Digital').concept, 'Mira Digital');
+  assert.equal(say('mirá, pagué 500 pesos de nafta').concept, 'Nafta');
+  // La palabra de moneda sale junto con su cifra aunque quede en medio de la frase.
+  assert.equal(say('vendí a unos clientes 2.000 pesos de remeras').concept, 'Clientes de remeras');
+  assert.equal(say('vendí a unos clientes 2.000 pesos uruguayos de remeras').concept, 'Clientes de remeras');
+});
+
+test('las marcas con palabras de muletilla no se truncan', () => {
+  // El artículo del borde se recorta como siempre («la luz» → «Luz»); lo que no se pierde es el nombre.
+  assert.equal(say('gasto de La Nada Bar por 620 pesos').concept, 'Nada Bar');
+  assert.equal(say('bueno pagué la Nada 500 pesos').concept, 'Nada');
+  assert.equal(say('Mira Digital 4500 pesos').concept, 'Mira Digital');
+  assert.equal(say('Mirá Digital 4500 pesos').concept, 'Mirá Digital');
+  assert.equal(say('mirá pagué 500 pesos de nafta').concept, 'Nafta');
+  assert.equal(say('pagué 500 pesos de nafta y nada').concept, 'Nafta');
+  assert.equal(say('pagué 500 pesos de nafta, nada más').concept, 'Nafta');
+});
+
+test('revisión adversarial: centavos con «y», porcentajes, total y segundo importe', () => {
+  // «pesos y 89 centavos»: los centavos dichos con su palabra valen tal cual.
+  assert.equal(say('pagué 4.567 pesos y 89 centavos de luz').amountText, '4567.89');
+  assert.equal(say('pagué 4.567 pesos y 89 centavos de luz').concept, 'Luz');
+  assert.equal(say('pagué 500 pesos con 5 centésimos de nafta').amountText, '500.05');
+  assert.equal(say('pagué 500 pesos con 50 centésimos de nafta').amountText, '500.50');
+  assert.equal(say('pagué treinta y cinco pesos de pan').amountText, '35.00');
+  // Lo que hay que calcular no se adivina.
+  for (const said of ['me deben la mitad de 800 pesos', 'pagué el 15% de 800 pesos de comisión', 'pagué el 15 por ciento de 800 pesos']) {
+    const result = say(said);
+    assert.equal(result.amountText, '', said);
+    assert.ok(result.warnings.some(w => w.includes('importe')), said);
+  }
+  // Dos importes: precio unitario y total, o dos gastos en la misma frase.
+  for (const said of ['5 cajas a 300 pesos, total 1500', 'pagué 500 pesos, total 1.500', 'gasté 300 pesos de nafta y 200 de peaje',
+    'pagué 500 pesos de hielo y 300 de carbón', 'pagué 60 200 pesos de luz', 'pagué 1 eh 500 pesos de luz']) {
+    const result = say(said);
+    assert.equal(result.amountText, '', said);
+    assert.ok(result.warnings.some(w => w.includes('más de un importe')), said);
+  }
+  // Las cantidades sin «de» siguen sin competir con el importe.
+  assert.equal(say('compré 12 cajas por 3.000 pesos').amountText, '3000.00');
+  assert.equal(say('factura 1234 por 500 pesos de flete').amountText, '500.00');
+  // Una negación al principio se avisa.
+  assert.ok(say('no pagué 500 pesos de luz').warnings.some(w => w.includes('«no»')));
+});
+
+test('un precio por unidad se toma y se avisa que puede no ser el total', () => {
+  for (const said of ['compré 10 lápices de 50 pesos', 'compré 5 cajas a 300 pesos', 'compré 5 cajas a 300 pesos cada una']) {
+    const result = say(said);
+    assert.ok(result.warnings.some(w => w.includes('por unidad')), said);
+  }
+  for (const said of ['compré 3 kilos de yerba por 450 pesos', 'gasté 80 pesos en 2 cafés', 'pagué 300 pesos de nafta'])
+    assert.ok(!say(said).warnings.some(w => w.includes('por unidad')), said);
+});

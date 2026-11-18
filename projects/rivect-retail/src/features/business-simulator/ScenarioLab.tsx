@@ -1,8 +1,11 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { SlidersHorizontal, Sparkles } from 'lucide-react'
 import type { Scenario, ScenarioKey } from '@/domain/models'
 import { NumberField } from '@/components/ui/Field'
 import { Badge } from '@/components/ui/Badge'
 import { cn, num, pct } from '@/utils/format'
+import { useFieldLimits } from './useFieldLimits'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 export function ScenarioLab({
   scenarios,
@@ -17,6 +20,8 @@ export function ScenarioLab({
   onUpdate: (key: ScenarioKey, assumptions: Partial<Scenario['assumptions']>) => void
   automationPercentage: number
 }) {
+  const { bind } = useFieldLimits()
+  const reduce = useReducedMotion()
   return (
     <div className="panel panel-pad">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -26,29 +31,33 @@ export function ScenarioLab({
             <h2 className="font-display text-sm font-semibold text-white">Escenarios de simulación</h2>
             {active === 'custom' ? <Badge tone="violet">Personalizado</Badge> : null}
           </div>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">
             Los escenarios cambian supuestos declarados de automatización y recuperación de ventas.
             El motor recalcula todo al instante: no son proyecciones garantizadas.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-500">
+        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[11px] text-slate-400">
           <Sparkles className="h-3 w-3 text-brand-300" />
           Supuestos editables
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        {scenarios.map((scenario) => {
+        {scenarios.map((scenario, index) => {
           const isActive = scenario.key === active
           return (
-            <button
+            <motion.button
               key={scenario.key}
               type="button"
               onClick={() => onApply(scenario.key)}
+              initial={reduce ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileTap={reduce ? undefined : { scale: 0.985 }}
+              transition={{ duration: DUR.slow, delay: reduce ? 0 : index * 0.06, ease: EASE_OUT }}
               className={cn(
-                'group rounded-xl border p-4 text-left transition-all',
+                'group relative overflow-hidden rounded-xl border p-4 text-left transition-colors',
                 isActive
-                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(47,116,255,0.25)]'
+                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(255,118,46,0.25)]'
                   : 'border-line bg-ink-900/50 hover:border-brand-500/30',
               )}
             >
@@ -63,22 +72,30 @@ export function ScenarioLab({
                   )}
                 />
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{scenario.summary}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{scenario.summary}</p>
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-line/70 pt-3 text-[11px]">
-                <span className="text-slate-600">Automatización</span>
+                <span className="text-slate-400/75">Automatización</span>
                 <span className="text-right font-medium text-slate-300">
                   {pct(scenario.assumptions.automationPercentage)}
                 </span>
-                <span className="text-slate-600">Ventas recuperadas</span>
+                <span className="text-slate-400/75">Ventas recuperadas</span>
                 <span className="text-right font-medium text-slate-300">
                   {num(scenario.assumptions.recoveredSales)} u.
                 </span>
-                <span className="text-slate-600">Minutos/consulta</span>
+                <span className="text-slate-400/75">Minutos/consulta</span>
                 <span className="text-right font-medium text-slate-300">
                   {num(scenario.assumptions.averageMinutesPerQuery, 1)}
                 </span>
               </div>
-            </button>
+              {isActive ? (
+                <motion.span
+                  layoutId="scenario-active-indicator"
+                  aria-hidden
+                  className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-brand-400"
+                  transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 34 }}
+                />
+              ) : null}
+            </motion.button>
           )
         })}
       </div>
@@ -91,7 +108,7 @@ export function ScenarioLab({
               {scenarios.find((s) => s.key === active)?.label ?? 'personalizado'}
             </span>
           </p>
-          <span className="text-[11px] text-slate-600">
+          <span className="text-[11px] text-slate-400/75">
             Automatización activa: {pct(automationPercentage)}
           </span>
         </div>
@@ -116,14 +133,22 @@ export function ScenarioLab({
                 <NumberField
                   label="Ventas recuperadas"
                   value={target.assumptions.recoveredSales}
-                  onChange={(value) => onUpdate(target.key, { recoveredSales: value })}
+                  {...bind(
+                    'recoveredSales',
+                    (value) => onUpdate(target.key, { recoveredSales: value }),
+                    `${target.key}-recoveredSales`,
+                  )}
                   suffix="u."
                   disabled={disabled}
                 />
                 <NumberField
                   label="Minutos por consulta"
                   value={target.assumptions.averageMinutesPerQuery}
-                  onChange={(value) => onUpdate(target.key, { averageMinutesPerQuery: value })}
+                  {...bind(
+                    'averageMinutesPerQuery',
+                    (value) => onUpdate(target.key, { averageMinutesPerQuery: value }),
+                    `${target.key}-averageMinutesPerQuery`,
+                  )}
                   suffix="min"
                   step={0.5}
                   disabled={disabled}
@@ -145,11 +170,11 @@ export function ScenarioLab({
           })()}
         </div>
         {active === 'custom' ? (
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-slate-400">
             Estás usando valores personalizados. Elegí un escenario para volver a sus supuestos.
           </p>
         ) : (
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-slate-400">
             Al editar un supuesto, el escenario activo pasa a modo personalizado para no mezclar
             valores de la plantilla con los tuyos.
           </p>

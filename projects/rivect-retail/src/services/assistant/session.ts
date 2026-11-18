@@ -19,6 +19,7 @@ export function buildWelcomeSession(businessName: string): AssistantSession {
       productsRecommended: 0,
       reservations: 0,
       purchaseOpportunities: 0,
+      handoffs: 0,
     },
   }
 }
