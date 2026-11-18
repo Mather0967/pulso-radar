@@ -68,7 +68,8 @@ test('editor y administrador crean y listan; el servidor fija createdBy, version
     const pulsoList=await(await list(f,pulso)).json();
     assert.equal(pulsoList.me.write,true);
     assert.equal(pulsoList.me.admin,false);
-    assert.equal(pulsoList.jobs.length,2);
+    // Adaptado al modelo por proyecto: el trabajo de Retail (solo admin) no es visible para Pulso.
+    assert.equal(pulsoList.jobs.length,1);
     const adminList=await(await list(f,admin)).json();
     assert.equal(adminList.me.admin,true);
     assert.equal(adminList.jobs.length,2);
@@ -150,8 +151,12 @@ test('borrar: el editor que no creó el trabajo recibe 403; el creador y el admi
   const f=await portalFixture();try{
     const pulso=await f.login('pulso'),landur=await f.login('landur'),admin=await f.login('admin');
     const mine=(await(await create(f,pulso,job({title:'Mío'}))).json()).job;
+    // Adaptado al modelo por proyecto: landur no ve un trabajo de Pulso, así que responde 404 (no 403).
     const other=await f.request('/api/calendar/jobs/'+mine.id,{...landur,method:'DELETE'});
-    assert.equal(other.status,403,'otro editor no borra lo ajeno');
+    assert.equal(other.status,404,'un trabajo ajeno al proyecto no se revela');
+    // Un editor de Pulso que no creó el trabajo sí recibe 403.
+    const byAdmin=(await(await create(f,admin,job({title:'Creado por admin'}))).json()).job;
+    assert.equal((await f.request('/api/calendar/jobs/'+byAdmin.id,{...pulso,method:'DELETE'})).status,403,'editor que no creó no borra');
     assert.equal((await f.request('/api/calendar/jobs/'+mine.id,{...pulso,method:'DELETE'})).status,200);
     assert.equal((await f.request('/api/calendar/jobs/'+mine.id,{...pulso,method:'DELETE'})).status,404);
 
@@ -234,5 +239,109 @@ test('GET /api/calendar/people devuelve solo id y nombre de usuarios activos',as
     await f.store.transact(db=>{db.users.find(u=>u.id==='reader').active=false;});
     const after=await(await f.request('/api/calendar/people',{...pulso})).json();
     assert.equal(after.people.some(p=>p.id==='reader'),false,'un usuario desactivado no aparece');
+  }finally{await f.close();}
+});
+
+// Permisos por proyecto (contrato «Permisos POR PROYECTO»).
+const put=(f,user,id,version,over={})=>f.request('/api/calendar/jobs/'+id,{...user,method:'PUT',body:{...job(over),version}});
+const del=(f,user,id)=>f.request('/api/calendar/jobs/'+id,{...user,method:'DELETE'});
+const titlesOf=async(res)=>(await res.json()).jobs.map(j=>j.title);
+
+test('(a) editor de landur no ve ni escribe trabajos de pulso: PUT/DELETE 404, POST a pulso 403',async()=>{
+  const f=await portalFixture();try{
+    const admin=await f.login('admin'),landur=await f.login('landur');
+    const {job:theirs}=await(await create(f,admin,job({title:'De Pulso',project:'pulso'}))).json();
+    assert.equal((await put(f,landur,theirs.id,1,{title:'Cambio',project:'pulso'})).status,404);
+    assert.equal((await del(f,landur,theirs.id)).status,404);
+    const post=await create(f,landur,job({title:'Intento',project:'pulso'}));
+    assert.equal(post.status,403);
+    assert.equal((await post.json()).error,'No tenés permiso de edición en ese proyecto.');
+    const unchanged=(await(await list(f,admin)).json()).jobs.find(j=>j.id===theirs.id);
+    assert.equal(unchanged?.title,'De Pulso','el intento de landur no cambió nada');
+  }finally{await f.close();}
+});
+
+test('(b) lector de landur no ve pulso, sí ve landur y general, y no escribe',async()=>{
+  const f=await portalFixture();try{
+    const admin=await f.login('admin'),reader=await f.login('reader');
+    await create(f,admin,job({title:'Pulso X',project:'pulso'}));
+    const {job:lj}=await(await create(f,admin,job({title:'Landur X',project:'landur'}))).json();
+    await create(f,admin,job({title:'General X',project:'general'}));
+    const got=(await(await list(f,reader)).json()).jobs.map(j=>j.title).sort();
+    assert.deepEqual(got,['General X','Landur X']);
+    assert.equal((await create(f,reader,job({title:'Nuevo',project:'general'}))).status,403);
+    const ro=await put(f,reader,lj.id,1,{title:'Editado',project:'landur'});
+    assert.equal(ro.status,403);
+    assert.equal((await ro.json()).error,'Tu acceso al calendario es de solo lectura.');
+  }finally{await f.close();}
+});
+
+test('(c) editor de pulso escribe en pulso y en general',async()=>{
+  const f=await portalFixture();try{
+    const pulso=await f.login('pulso');
+    assert.equal((await create(f,pulso,job({title:'P',project:'pulso'}))).status,201);
+    const g=await create(f,pulso,job({title:'G',project:'general'}));
+    assert.equal(g.status,201);
+    const {job:gj}=await g.json();
+    assert.equal((await put(f,pulso,gj.id,1,{title:'G2',project:'general'})).status,200);
+  }finally{await f.close();}
+});
+
+test('(d) administrador ve y escribe los cinco proyectos y me.writeProjects tiene 5 entradas',async()=>{
+  const f=await portalFixture();try{
+    const admin=await f.login('admin');
+    const projects=['pulso','landur','studio','retail','general'];
+    for(const project of projects)assert.equal((await create(f,admin,job({title:'Trabajo '+project,project}))).status,201,project);
+    const body=await(await list(f,admin)).json();
+    assert.deepEqual(body.jobs.map(j=>j.project).sort(),[...projects].sort());
+    assert.equal(body.me.writeProjects.length,5);
+    assert.deepEqual([...body.me.writeProjects].sort(),[...projects].sort());
+    assert.equal(body.me.write,true);
+    assert.equal(body.me.admin,true);
+    assert.equal(body.me.id,'admin');
+  }finally{await f.close();}
+});
+
+test('(e) mover un trabajo a un proyecto que el usuario no puede escribir da 403 y no cambia nada',async()=>{
+  const f=await portalFixture();try{
+    const pulso=await f.login('pulso');
+    const {job:mine}=await(await create(f,pulso,job({title:'Mover',project:'pulso'}))).json();
+    const res=await put(f,pulso,mine.id,1,{title:'Mover',project:'landur'});
+    assert.equal(res.status,403);
+    const after=(await(await list(f,pulso)).json()).jobs.find(j=>j.id===mine.id);
+    assert.equal(after.project,'pulso');
+    assert.equal(after.version,1);
+  }finally{await f.close();}
+});
+
+test('(f) quien no es admin nunca ve ni escribe trabajos de studio o retail',async()=>{
+  const f=await portalFixture();try{
+    const admin=await f.login('admin'),pulso=await f.login('pulso'),reader=await f.login('reader');
+    const {job:st}=await(await create(f,admin,job({title:'Studio',project:'studio'}))).json();
+    await create(f,admin,job({title:'Retail',project:'retail'}));
+    for(const user of [pulso,reader]){
+      const titles=await titlesOf(await list(f,user));
+      assert.equal(titles.includes('Studio')||titles.includes('Retail'),false);
+    }
+    assert.equal((await put(f,pulso,st.id,1,{title:'Studio',project:'studio'})).status,404);
+    assert.equal((await del(f,pulso,st.id)).status,404);
+  }finally{await f.close();}
+});
+
+test('(g) GET /api/calendar/people nunca expone correo: nombre vacío o con @ se muestra como «Sin nombre»',async()=>{
+  const f=await portalFixture();try{
+    await f.store.transact(db=>{
+      db.users.push({id:'sin-nombre',name:'',email:'sin-nombre@example.test',role:'member',projects:{pulso:'viewer'},active:true});
+      db.users.push({id:'correo-como-nombre',name:'ana@example.test',email:'ana@example.test',role:'member',projects:{pulso:'viewer'},active:true});
+    });
+    const pulso=await f.login('pulso');
+    const res=await f.request('/api/calendar/people',{...pulso});
+    const text=await res.text();
+    assert.equal(res.status,200);
+    assert.doesNotMatch(text,/@/,'ningún dato contiene @');
+    const {people}=JSON.parse(text);
+    assert.equal(people.find(p=>p.id==='sin-nombre').name,'Sin nombre');
+    assert.equal(people.find(p=>p.id==='correo-como-nombre').name,'Sin nombre');
+    assert.equal(people.find(p=>p.id==='pulso').name,'Usuario Pulso');
   }finally{await f.close();}
 });

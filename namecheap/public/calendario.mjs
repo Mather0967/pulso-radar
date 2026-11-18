@@ -190,8 +190,18 @@ function canWrite() {
   return !!(state.me && state.me.write);
 }
 
+// Projects (in PROJECTS order) where this user may create and edit jobs.
+function writable() {
+  const wp = Array.isArray(state.me?.writeProjects) ? state.me.writeProjects : [];
+  return Object.keys(PROJECTS).filter((p) => wp.includes(p));
+}
+
+function canEditJob(job) {
+  return !!(state.me && state.me.write && (state.me.admin || writable().includes(job.project)));
+}
+
 function canDelete(job) {
-  return !!(state.me && (state.me.admin || (state.me.write && job.createdBy === state.me.id)));
+  return !!(state.me && (state.me.admin || (canEditJob(job) && job.createdBy === state.me.id)));
 }
 
 function findJob(id) {
@@ -284,7 +294,7 @@ function renderMonth(jobs, animate) {
     cell.append(node('span', 'cal-day-num', String(date.getDate())));
     const list = byDate.get(key) || [];
     const holder = node('div', 'cal-day-jobs');
-    list.slice(0, MAX_CHIPS).forEach((job) => holder.append(makeChip(job, { draggable: canWrite() })));
+    list.slice(0, MAX_CHIPS).forEach((job) => holder.append(makeChip(job, { draggable: canEditJob(job) })));
     if (list.length > MAX_CHIPS) {
       const more = node('button', 'cal-more', `+${list.length - MAX_CHIPS} más`);
       more.type = 'button';
@@ -314,7 +324,7 @@ function renderWeek(jobs, animate) {
     const head = node('div', 'cal-week-head');
     head.append(node('span', 'cal-dow', SHORT_DAYS[i]), node('span', 'cal-day-num', String(date.getDate())));
     const slots = node('div', 'cal-slot-list');
-    (byDate.get(key) || []).forEach((job) => slots.append(makeChip(job, { draggable: canWrite() })));
+    (byDate.get(key) || []).forEach((job) => slots.append(makeChip(job, { draggable: canEditJob(job) })));
     col.append(head, slots);
     if (animate && !reduced()) {
       col.classList.add('enter');
@@ -518,7 +528,7 @@ function draft(date) {
     allDay: true,
     start: '',
     end: '',
-    project: state.filters.project || 'general',
+    project: writable()[0] || 'general',
     kind: 'otro',
     assignee: '',
     status: 'pendiente',
@@ -532,12 +542,19 @@ function fillForm(v) {
   field('allDay').checked = !!v.allDay;
   field('start').value = v.allDay ? '' : v.start || '';
   field('end').value = v.allDay ? '' : v.end || '';
-  field('project').value = known(v.project, PROJECTS, 'general');
+  fillProjectOptions(known(v.project, PROJECTS, 'general'), state.dialogReadonly);
   field('kind').value = known(v.kind, KINDS, 'otro');
   field('status').value = known(v.status, STATUSES, 'pendiente');
   fillAssigneeOptions(field('assignee'), 'Sin responsable', v.assignee || '');
   field('notes').value = v.notes || '';
   syncTimeFields();
+}
+
+// Offers only the projects this user can write to; a read-only job shows just its own project.
+function fillProjectOptions(selected, readonly) {
+  const ids = readonly ? [selected] : writable();
+  field('project').replaceChildren(...ids.map((id) => new Option(PROJECTS[id] || id, id)));
+  field('project').value = selected;
 }
 
 function syncTimeFields() {
@@ -593,7 +610,7 @@ function validatePayload(p) {
 
 function openDialog({ job = null, date = null, opener = null } = {}) {
   if (els.dialog.open) return;
-  const ro = !canWrite();
+  const ro = job ? !canEditJob(job) : !canWrite();
   state.editing = job;
   state.dialogReadonly = ro;
   state.returnTo = {
@@ -606,6 +623,7 @@ function openDialog({ job = null, date = null, opener = null } = {}) {
   fillForm(job ? { ...job } : draft(date));
   setDialogReadonly(ro);
   els.save.hidden = ro;
+  if (job && ro) setFormError('Solo lectura: no tenés permiso de edición en este proyecto.');
   els.delete.hidden = ro || !job || !canDelete(job);
   els.cancel.textContent = ro ? 'Cerrar' : 'Cancelar';
   els.dialog.showModal();
@@ -660,7 +678,7 @@ function refocusKeyMove(id) {
 
 async function moveJob(id, date) {
   const job = findJob(id);
-  if (!canWrite() || !job || job.date === date) return;
+  if (!job || !canEditJob(job) || job.date === date) return;
   const previous = { ...job };
   replaceJob({ ...job, date });
   render({ droppedId: id });
@@ -674,6 +692,11 @@ async function moveJob(id, date) {
     refocusKeyMove(id);
     toast('Trabajo movido.');
   } catch (err) {
+    if (err.status === 404) {
+      toast('Ese trabajo ya no existe o no lo podés ver.', true);
+      loadJobs({ animate: false });
+      return;
+    }
     replaceJob(err.status === 409 && err.job ? err.job : previous);
     render();
     refocusKeyMove(id);
@@ -768,8 +791,12 @@ function wire() {
   // Dialog.
   els.form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!canWrite()) return;
+    if (state.editing ? !canEditJob(state.editing) : !canWrite()) return;
     const payload = readForm();
+    if (!writable().includes(payload.project)) {
+      setFormError('No tenés permiso de edición en ese proyecto.');
+      return;
+    }
     const problem = validatePayload(payload);
     if (problem) {
       setFormError(problem[1]);
@@ -799,6 +826,10 @@ function wire() {
         fillForm(err.job);
         setFormError(err.message);
         loadJobs({ animate: false });
+      } else if (err.status === 404) {
+        toast('Ese trabajo ya no existe o no lo podés ver.', true);
+        await loadJobs({ animate: false });
+        els.dialog.close();
       } else {
         setFormError(err.message);
       }
@@ -827,10 +858,12 @@ function wire() {
       els.dialog.close();
       toast('Trabajo eliminado.');
     } catch (err) {
-      setFormError(err.message);
       if (err.status === 404) {
+        toast('Ese trabajo ya no existe o no lo podés ver.', true);
         await loadJobs({ animate: false });
         els.dialog.close();
+      } else {
+        setFormError(err.message);
       }
     } finally {
       els.delete.disabled = false;
@@ -854,7 +887,7 @@ function wire() {
     // Keyboard alternative to drag: Shift+←/→ on a focused chip moves it one day.
     if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && target instanceof HTMLElement && target.matches('.cal-chip')) {
       const job = findJob(target.dataset.jobId);
-      if (job && canWrite()) {
+      if (job && canEditJob(job)) {
         e.preventDefault();
         const base = parseIso(job.date);
         const moved = addDays(base, e.key === 'ArrowLeft' ? -1 : 1);
@@ -919,7 +952,6 @@ async function init() {
   }
   ensureOptions(els.fProject, PROJECTS, true);
   ensureOptions(els.fStatus, STATUSES, true);
-  ensureOptions(field('project'), PROJECTS, false);
   ensureOptions(field('kind'), KINDS, false);
   ensureOptions(field('status'), STATUSES, false);
   const people = api('/api/calendar/people')

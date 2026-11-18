@@ -4,6 +4,7 @@
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {diskBucket} from '../scripts/storage.mjs';
+import {projectAccess} from './projects.mjs';
 
 const KEY='jobs.json';
 const MAX_JOBS=2000;
@@ -30,12 +31,25 @@ const minutesOf=value=>{
   const [h,min]=value.split(':').map(Number);
   return h*60+min;
 };
-const access=user=>{
-  const levels=Object.values(user?.projects??{});
-  const admin=user?.role==='admin';
-  const view=Boolean(user?.active)&&(admin||levels.some(v=>v==='viewer'||v==='editor'));
-  const write=view&&(admin||levels.includes('editor'));
-  return {view,write,admin};
+// Permisos POR PROYECTO. 'general' lo ve cualquiera con algún proyecto y lo escribe quien sea editor de alguno.
+const ACCESS_PROJECTS=['pulso','landur','studio','retail'];
+const permissionsFor=user=>{
+  const access=Object.fromEntries(ACCESS_PROJECTS.map(id=>[id,projectAccess(user,id)]));
+  const admin=user?.role==='admin'&&user?.active===true;
+  const anyAccess=Object.values(access).some(Boolean);
+  const editorSomewhere=Object.values(access).includes('editor');
+  const see=project=>project==='general'?anyAccess:Boolean(access[project]);
+  const write=project=>project==='general'?editorSomewhere:access[project]==='editor';
+  const writeProjects=PROJECTS.filter(write);
+  return {admin,anyAccess,see,write,writeProjects};
+};
+const forbiddenWrite=perms=>new Fail(403,perms.writeProjects.length===0
+  ?'Tu acceso al calendario es de solo lectura.'
+  :'No tenés permiso de edición en ese proyecto.');
+// Un nombre vacío o con '@' parece un correo: nunca se muestra.
+const displayName=user=>{
+  const name=String(user?.name??'').trim();
+  return name&&!name.includes('@')?name:'Sin nombre';
 };
 const publicJob=job=>Object.fromEntries(FIELDS.map(key=>[key,job[key]]));
 const compareJobs=(a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start)||a.title.localeCompare(b.title,'es');
@@ -132,12 +146,12 @@ export function createCalendar({dataDir,listUsers}){
     const allowed={collection:['GET','POST'],item:['PUT','DELETE'],people:['GET']}[target];
     if(!allowed.includes(method))throw new Fail(405,'Método no admitido.');
 
-    const perms=access(user);
-    if(!perms.view)throw new Fail(403,'No tenés permiso para el calendario.');
-    if(method!=='GET'&&!perms.write)throw new Fail(403,'Tu acceso al calendario es de solo lectura.');
+    const perms=permissionsFor(user);
+    if(!perms.anyAccess)throw new Fail(403,'No tenés permiso para el calendario.');
+    if(target==='collection'&&method==='POST'&&perms.writeProjects.length===0)throw forbiddenWrite(perms);
 
     if(target==='people'){
-      const people=(await listUsers()).filter(u=>u?.active!==false).map(u=>({id:String(u.id),name:String(u.name||u.email||'')}));
+      const people=(await listUsers()).filter(u=>u?.active!==false).map(u=>({id:String(u.id),name:displayName(u)}));
       return json({people});
     }
 
@@ -149,15 +163,18 @@ export function createCalendar({dataDir,listUsers}){
       if(from&&to&&from>to)throw new Fail(400,'El rango de fechas no es válido.');
       const {doc}=await load();
       const jobs=doc.jobs
+        .filter(j=>perms.see(j.project))
         .filter(j=>(!from||j.date>=from)&&(!to||j.date<=to))
         .sort(compareJobs)
         .map(publicJob);
-      return json({jobs,me:{id:user.id,write:perms.write,admin:perms.admin}});
+      const writeProjects=perms.writeProjects;
+      return json({jobs,me:{id:user.id,write:writeProjects.length>0,admin:perms.admin,writeProjects}});
     }
 
     if(target==='collection'){
       const body=await readBody(req);
       const fields=await validFields(body,listUsers);
+      if(!perms.write(fields.project))throw forbiddenWrite(perms);
       const now=new Date().toISOString();
       const id=randomUUID();
       const job=await mutate(doc=>{
@@ -180,6 +197,9 @@ export function createCalendar({dataDir,listUsers}){
         const index=doc.jobs.findIndex(j=>j.id===id);
         if(index===-1)throw new Fail(404,'No se encontró el trabajo.');
         const current=doc.jobs[index];
+        if(!perms.see(current.project))throw new Fail(404,'No se encontró el trabajo.');
+        if(!perms.write(current.project))throw forbiddenWrite(perms);
+        if(!perms.write(fields.project))throw new Fail(403,'No tenés permiso de edición en ese proyecto.');
         if(current.version!==version)throw new Fail(409,{error:'Otra persona modificó este trabajo. Se cargó la versión actual.',job:publicJob(current)});
         const updated={...fields,id:current.id,createdBy:current.createdBy,createdAt:current.createdAt,
           updatedBy:user.id,updatedAt:now,version:current.version+1};
@@ -194,7 +214,8 @@ export function createCalendar({dataDir,listUsers}){
       const index=doc.jobs.findIndex(j=>j.id===id);
       if(index===-1)throw new Fail(404,'No se encontró el trabajo.');
       const current=doc.jobs[index];
-      if(!(perms.admin||(perms.write&&current.createdBy===user.id)))
+      if(!perms.see(current.project))throw new Fail(404,'No se encontró el trabajo.');
+      if(!(perms.admin||(perms.write(current.project)&&current.createdBy===user.id)))
         throw new Fail(403,'Solo un administrador o quien creó el trabajo puede borrarlo.');
       doc.jobs.splice(index,1);
       return true;
