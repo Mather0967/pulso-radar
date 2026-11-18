@@ -72,8 +72,8 @@ export function SimulatorResults({
           <div className="mt-4">
             <CompareBars
               data={hoursData}
-              series={[{ key: 'horas', label: 'Horas', color: '#5b95ff' }]}
-              colors={['#5b95ff', '#4ade9f']}
+              series={[{ key: 'horas', label: 'Horas', color: '#ff9a5c' }]}
+              colors={['#ff9a5c', '#4ade9f']}
               height={190}
               formatter={(value) => `${num(value, 0)} h`}
             />
@@ -95,7 +95,7 @@ export function SimulatorResults({
             <CompareBars
               data={marginData}
               series={[{ key: 'margen', label: 'Margen', color: '#f7bd54' }]}
-              colors={['#5b95ff', '#f7bd54']}
+              colors={['#ff9a5c', '#f7bd54']}
               height={190}
               formatter={(value) => money(value)}
             />

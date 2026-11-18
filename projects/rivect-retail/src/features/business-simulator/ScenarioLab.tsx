@@ -48,7 +48,7 @@ export function ScenarioLab({
               className={cn(
                 'group rounded-xl border p-4 text-left transition-all',
                 isActive
-                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(47,116,255,0.25)]'
+                  ? 'border-brand-500/50 bg-brand-500/[0.08] shadow-[inset_0_0_0_1px_rgba(255, 118, 46,0.25)]'
                   : 'border-line bg-ink-900/50 hover:border-brand-500/30',
               )}
             >

@@ -8,7 +8,7 @@ export function Aurora({ className }: { className?: string }) {
         className="absolute -left-24 -top-40 h-[420px] w-[420px] rounded-full opacity-60 blur-[110px]"
         style={{
           background:
-            'radial-gradient(circle at 30% 30%, rgba(91,149,255,0.65), rgba(47,116,255,0.05) 70%)',
+            'radial-gradient(circle at 30% 30%, rgba(91,149,255,0.65), rgba(255, 118, 46,0.05) 70%)',
           animation: 'auroraDrift 18s ease-in-out infinite alternate',
         }}
       />
@@ -24,7 +24,7 @@ export function Aurora({ className }: { className?: string }) {
         className="absolute bottom-[-160px] left-1/3 h-[360px] w-[360px] rounded-full opacity-40 blur-[110px]"
         style={{
           background:
-            'radial-gradient(circle at 50% 50%, rgba(138,181,255,0.4), rgba(47,116,255,0) 70%)',
+            'radial-gradient(circle at 50% 50%, rgba(138,181,255,0.4), rgba(255, 118, 46,0) 70%)',
           animation: 'auroraDrift 26s ease-in-out infinite alternate',
         }}
       />

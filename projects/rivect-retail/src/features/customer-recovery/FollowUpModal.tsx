@@ -48,7 +48,7 @@ export function FollowUpModal({
         </>
       }
     >
-      <div className="rounded-2xl border border-line bg-[linear-gradient(180deg,rgba(47,116,255,0.06),transparent)] p-4">
+      <div className="rounded-2xl border border-line bg-[linear-gradient(180deg,rgba(255, 118, 46,0.06),transparent)] p-4">
         <div className="flex items-center gap-2 border-b border-line/70 pb-2">
           <span className="h-2 w-2 rounded-full bg-mint-400" />
           <p className="text-[11px] text-slate-400">

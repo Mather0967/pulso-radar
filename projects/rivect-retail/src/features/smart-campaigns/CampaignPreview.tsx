@@ -38,7 +38,7 @@ export function CampaignPreview({
           </div>
           <Badge tone="amber">No se envía</Badge>
         </div>
-        <div className="bg-[radial-gradient(circle_at_top,rgba(47,116,255,0.08),transparent_60%)] p-4">
+        <div className="bg-[radial-gradient(circle_at_top,rgba(255, 118, 46,0.08),transparent_60%)] p-4">
           <div className="rounded-2xl rounded-tl-md border border-line bg-ink-800 p-3">
             <p className="whitespace-pre-line text-[12px] leading-relaxed text-slate-200">{rendered}</p>
             {products.length > 0 ? (

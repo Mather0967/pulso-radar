@@ -89,7 +89,7 @@ export function ChatPanel({
 
       <div
         ref={scrollRef}
-        className="flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(47,116,255,0.06),transparent_55%)] px-4 py-4"
+        className="flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(255, 118, 46,0.06),transparent_55%)] px-4 py-4"
       >
         {messages.map((message) => {
           const isCustomer = message.role === 'customer'
@@ -106,7 +106,7 @@ export function ChatPanel({
                 <div
                   className={
                     isCustomer
-                      ? 'rounded-2xl rounded-br-sm bg-gradient-to-r from-brand-600 to-brand-500 px-4 py-2.5 text-[13px] leading-relaxed text-white shadow-[0_10px_26px_-10px_rgba(47,116,255,0.7),inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      ? 'rounded-2xl rounded-br-sm bg-gradient-to-r from-brand-600 to-brand-500 px-4 py-2.5 text-[13px] leading-relaxed text-white shadow-[0_10px_26px_-10px_rgba(255, 118, 46,0.7),inset_0_1px_0_rgba(255,255,255,0.2)]'
                       : 'rounded-2xl rounded-bl-sm border border-line/80 bg-gradient-to-b from-ink-800/95 to-ink-850/95 px-4 py-2.5 text-[13px] leading-relaxed text-slate-200 shadow-sm'
                   }
                 >
@@ -202,7 +202,7 @@ export function ChatPanel({
           <button
             type="submit"
             disabled={disabled || input.trim().length === 0}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_4px_16px_rgba(47,116,255,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:from-brand-500 hover:to-brand-400 active:scale-95 disabled:opacity-40"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 text-white shadow-[0_4px_16px_rgba(255, 118, 46,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] transition-all hover:from-brand-500 hover:to-brand-400 active:scale-95 disabled:opacity-40"
             aria-label="Enviar mensaje"
           >
             <Send className="h-4 w-4" />

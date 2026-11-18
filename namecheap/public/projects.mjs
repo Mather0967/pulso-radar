@@ -58,3 +58,20 @@ setupSpotlights();
 
 // Never restore personalized project/permission HTML from back-forward cache.
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
+
+// Spotlight por puntero: expone --mx/--my relativos a cada tarjeta.
+function setupPointerSpotlight() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || matchMedia('(pointer: coarse)').matches) return;
+  document.querySelectorAll('article.project, [data-spotlight="true"]').forEach(card => {
+    card.addEventListener('pointermove', e => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--my', `${e.clientY - rect.top}px`);
+    });
+    card.addEventListener('pointerleave', () => {
+      card.style.removeProperty('--mx');
+      card.style.removeProperty('--my');
+    });
+  });
+}
+setupPointerSpotlight();

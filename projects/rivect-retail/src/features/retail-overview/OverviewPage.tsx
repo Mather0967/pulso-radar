@@ -217,8 +217,8 @@ export function OverviewPage() {
             <div className="mt-5">
               <CompareBars
                 data={comparison}
-                series={[{ key: 'horas', label: 'Horas de atención', color: '#5b95ff' }]}
-                colors={['#5b95ff', '#4ade9f']}
+                series={[{ key: 'horas', label: 'Horas de atención', color: '#ff9a5c' }]}
+                colors={['#ff9a5c', '#4ade9f']}
                 height={200}
                 formatter={(value) => `${num(value, 0)} h`}
               />
