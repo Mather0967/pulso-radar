@@ -1,43 +1,110 @@
 /*
-  Mis proyectos · RIVECT Portal
-  Diseño editorial de alta fidelidad inspirado en React Bits & Motion UI.
-  - Cero IA slop: tipografía precisa, proporciones equilibradas, paleta editorial deliberada.
-  - Micro-interacciones: SpotlightCard dinámico con cursor, brillo GlareHover, pulso de estado y cinemática elástica.
-  - Zonas diferenciadas: "Para trabajar" (superficie blanca, iluminación cálida) y "Para mostrar" (escenario oscuro cinematográfico).
+  Mis proyectos · RIVECT Portal (modo oscuro)
+  Identidad RIVECT: Medianoche como base, Pizarra como secundario y Mandarín como acento.
+  - Tipografía propia (Plus Jakarta Sans / JetBrains Mono) servida desde /fonts.
+  - Movimiento con transform y opacity: fondo ambiental, entradas escalonadas, spotlight que sigue el cursor,
+    borde cónico en mandarín, barrido de brillo en tarjetas y botones.
+  - prefers-reduced-motion desactiva animaciones y transiciones.
 */
 
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/pjs-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/pjs-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/pjs-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/pjs-800.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/jbm-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/jbm-600.woff2') format('woff2');
+}
+
 :root {
+  color-scheme: dark;
+
   --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Colores de marca y superficie clara */
-  --ink: #0c151c;
-  --ink-2: #3e4f5a;
-  --ink-3: #6b7e8a;
-  --ink-4: #9baab3;
-  --line: rgba(12, 21, 28, 0.08);
-  --line-strong: rgba(12, 21, 28, 0.14);
-  --bg: #f8faf9;
-  --surface: #ffffff;
+  /* Marca RIVECT */
+  --medianoche: #0a151c;
+  --medianoche-2: #11222c;
+  --pizarra: #405c6b;
+  --pizarra-hi: #5b7d8f;
+  --mandarin: #ff762e;
+  --mandarin-hover: #e6621b;
+  --cream: #f7f5ef;
+
+  /* Texto (contraste AA sobre superficies) */
+  --ink: #f7f5ef;
+  --ink-2: #c4d0d7;
+  --ink-3: #8aa2b0;
+  --ink-on-accent: #0a151c;
+
+  /* Superficies y bordes */
+  --bg: #0a151c;
+  --surface: #11222c;
+  --surface-2: #172d39;
+  --field: #0a151c;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Acentos */
   --accent: #ff762e;
   --accent-hover: #e6621b;
-  --accent-light: #fff3eb;
-  --accent-glow: rgba(255, 118, 46, 0.22);
+  --accent-soft: rgba(255, 118, 46, 0.12);
+  --accent-glow: rgba(255, 118, 46, 0.35);
+  --focus: #ff762e;
 
   /* Escenario para demos ("Para mostrar") */
-  --stage: #0c1419;
-  --stage-2: #14222b;
-  --stage-card: #101c24;
+  --stage: #0a151c;
+  --stage-2: #172d39;
+  --stage-card: #11222c;
   --stage-border: rgba(255, 255, 255, 0.09);
   --stage-border-hover: rgba(255, 118, 46, 0.4);
   --stage-ink: #e6eef2;
-  --stage-muted: #82949f;
+  --stage-muted: #8aa2b0;
 
-  /* Sombras y elevaciones físicas */
-  --shadow-sm: 0 1px 3px rgba(12, 21, 28, 0.04), 0 1px 2px rgba(12, 21, 28, 0.02);
-  --shadow-card: 0 4px 16px -2px rgba(12, 21, 28, 0.04), 0 1px 4px rgba(12, 21, 28, 0.02);
-  --shadow-hover: 0 20px 40px -10px rgba(12, 21, 28, 0.1), 0 8px 18px -4px rgba(12, 21, 28, 0.04);
-  --shadow-stage: 0 12px 36px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* Sombras y elevaciones */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 14px 34px -16px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-hover: 0 26px 50px -16px rgba(0, 0, 0, 0.75), 0 12px 32px -12px rgba(255, 118, 46, 0.22);
+  --shadow-stage: 0 16px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   /* Curvas cinemáticas */
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
@@ -49,15 +116,21 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--medianoche);
+  background-image: linear-gradient(180deg, #0a151c 0%, #11222c 55%, #0a151c 100%);
+  background-repeat: no-repeat;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   font-family: var(--font-main);
   color: var(--ink);
-  background-color: var(--bg);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
-  color-scheme: only light;
   overflow-x: hidden;
 }
 
@@ -74,6 +147,7 @@ button {
   cursor: pointer;
   background: none;
   border: none;
+  color: inherit;
 }
 
 button:disabled {
@@ -86,14 +160,19 @@ a {
   text-decoration: none;
 }
 
+::selection {
+  background: rgba(255, 118, 46, 0.35);
+  color: var(--cream);
+}
+
 a:focus-visible, button:focus-visible, select:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
   border-radius: 8px;
 }
 
 /* ==========================================================================
-   Fondo ambiental con malla viva (React Bits Aurora + Pattern Grid)
+   Fondo ambiental: orbes derivando + malla que respira
    ========================================================================== */
 .ambient-canvas {
   position: fixed;
@@ -107,24 +186,25 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   position: absolute;
   border-radius: 50%;
   filter: blur(110px);
-  opacity: 0.5;
+  opacity: 0.6;
+  will-change: transform;
   animation: orbFloat 22s ease-in-out infinite alternate;
 }
 
 .orb-1 {
   width: 580px;
   height: 580px;
-  background: radial-gradient(circle, rgba(255, 118, 46, 0.11), transparent 70%);
+  background: radial-gradient(circle, rgba(255, 118, 46, 0.2), transparent 70%);
   top: -140px;
   right: -80px;
 }
 
 .orb-2 {
-  width: 660px;
-  height: 660px;
-  background: radial-gradient(circle, rgba(47, 116, 255, 0.08), transparent 70%);
-  bottom: -180px;
-  left: -120px;
+  width: 680px;
+  height: 680px;
+  background: radial-gradient(circle, rgba(64, 92, 107, 0.55), transparent 70%);
+  bottom: -200px;
+  left: -140px;
   animation-duration: 28s;
   animation-direction: alternate-reverse;
 }
@@ -132,16 +212,22 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 .grid-pattern {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(12, 21, 28, 0.065) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(247, 245, 239, 0.085) 1px, transparent 1px);
   background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse at 50% 25%, black 45%, transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 25%, black 45%, transparent 85%);
+  mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
+  animation: gridBreath 9s ease-in-out infinite;
 }
 
 @keyframes orbFloat {
   0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-30px, 45px) scale(1.06); }
-  100% { transform: translate(25px, -35px) scale(0.96); }
+  50% { transform: translate(-36px, 52px) scale(1.07); }
+  100% { transform: translate(30px, -40px) scale(0.95); }
+}
+
+@keyframes gridBreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 /* ==========================================================================
@@ -152,9 +238,9 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(10, 21, 28, 0.78);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -162,6 +248,18 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   padding: 0 max(24px, calc((100% - 1140px) / 2));
   gap: 20px;
   transition: border-color 0.25s ease;
+  animation: topSlide 0.75s var(--ease-spring) backwards;
+}
+
+@keyframes topSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .brand {
@@ -172,7 +270,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .brand:hover {
   transform: translateY(-1px);
-  opacity: 0.92;
+  opacity: 0.9;
 }
 
 .brand img {
@@ -190,9 +288,9 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .top-actions .who {
   color: var(--ink-2);
-  font-weight: 550;
-  background: rgba(12, 21, 28, 0.04);
-  border: 1px solid rgba(12, 21, 28, 0.06);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
   padding: 6px 14px;
   border-radius: 9999px;
   display: inline-flex;
@@ -207,7 +305,7 @@ a:focus-visible, button:focus-visible, select:focus-visible {
   height: 7px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
 }
 
 .top-actions a {
@@ -220,26 +318,27 @@ a:focus-visible, button:focus-visible, select:focus-visible {
 
 .top-actions a:hover {
   color: var(--ink);
-  background: rgba(12, 21, 28, 0.05);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .top-actions button {
   border: 1px solid var(--line-strong);
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 9px;
   min-height: 36px;
   padding: 6px 14px;
   color: var(--ink-2);
   font-weight: 600;
   box-shadow: var(--shadow-sm);
-  transition: all 0.2s var(--ease-spring);
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
 }
 
 .top-actions button:hover:not(:disabled) {
-  border-color: rgba(12, 21, 28, 0.25);
+  border-color: rgba(255, 118, 46, 0.45);
   color: var(--ink);
+  background: rgba(255, 118, 46, 0.08);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(12, 21, 28, 0.08);
+  box-shadow: 0 6px 16px -6px rgba(255, 118, 46, 0.35);
 }
 
 .top-actions button:active:not(:disabled) {
@@ -255,34 +354,58 @@ main {
   padding: 52px 24px 36px;
 }
 
-.intro {
-  animation: introEnter 0.6s var(--ease-spring) both;
-}
-
 .intro h1 {
+  position: relative;
+  display: inline-block;
   font-size: 40px;
-  font-weight: 750;
+  font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--ink);
   line-height: 1.12;
+  padding-bottom: 12px;
+  animation: titleUp 0.8s var(--ease-spring) backwards;
+}
+
+/* Subrayado mandarín que se dibuja al cargar */
+.intro h1::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 96px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--mandarin), rgba(255, 118, 46, 0.2));
+  transform-origin: left center;
+  animation: underlineDraw 1s var(--ease-spring) 0.45s backwards;
 }
 
 .intro p {
   font-size: 16px;
   color: var(--ink-3);
-  margin-top: 8px;
-  font-weight: 450;
+  margin-top: 10px;
+  font-weight: 400;
   letter-spacing: -0.01em;
+  animation: titleUp 0.8s var(--ease-spring) 0.22s backwards;
 }
 
-@keyframes introEnter {
+@keyframes titleUp {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes underlineDraw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 
@@ -291,15 +414,15 @@ main {
    ========================================================================== */
 .group {
   margin-top: 48px;
-  animation: groupEnter 0.7s var(--ease-spring) both;
+  animation: groupEnter 0.8s var(--ease-spring) backwards;
 }
 
 .group.operacion {
-  animation-delay: 0.08s;
+  animation-delay: 0.3s;
 }
 
 .group.ventas {
-  animation-delay: 0.18s;
+  animation-delay: 0.42s;
 }
 
 @keyframes groupEnter {
@@ -340,12 +463,12 @@ main {
   height: 7px;
   border-radius: 2px;
   background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
 .ventas > header h2::before {
-  background: #60a5fa;
-  box-shadow: 0 0 8px rgba(96, 165, 250, 0.4);
+  background: var(--pizarra-hi);
+  box-shadow: 0 0 10px rgba(91, 125, 143, 0.5);
 }
 
 .group > header p {
@@ -362,10 +485,13 @@ main {
 }
 
 /* ==========================================================================
-   Tarjetas de Proyecto (React Bits · SpotlightCard + GlareHover)
+   Tarjetas de Proyecto (SpotlightCard + GlareHover + borde cónico)
    ========================================================================== */
 .project {
+  --mx: 50%;
+  --my: 50%;
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) 140px 240px;
@@ -376,24 +502,84 @@ main {
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
-  transition: border-color 0.25s ease, box-shadow 0.35s var(--ease-spring), transform 0.35s var(--ease-spring), background-color 0.2s ease;
-  contain: paint;
+  transition: border-color 0.3s ease, box-shadow 0.4s var(--ease-spring), transform 0.4s var(--ease-spring);
+  animation: cardIn 0.75s var(--ease-spring) backwards;
+}
+
+/* Entrada escalonada */
+.rows > .project:nth-child(1) { animation-delay: 0.5s; }
+.rows > .project:nth-child(2) { animation-delay: 0.6s; }
+.rows > .project:nth-child(3) { animation-delay: 0.7s; }
+.rows > .project:nth-child(4) { animation-delay: 0.8s; }
+.rows > .project:nth-child(5) { animation-delay: 0.9s; }
+.rows > .project:nth-child(6) { animation-delay: 1s; }
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Borde cónico mandarín: capa rotatoria visible sólo como anillo de 1px */
+.project::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: conic-gradient(
+    transparent 0deg,
+    transparent 230deg,
+    rgba(255, 118, 46, 0.5) 290deg,
+    #ff762e 330deg,
+    #ffb08a 345deg,
+    #ff762e 355deg,
+    transparent 360deg
+  );
+}
+
+/* Superficie interior: deja visible sólo el anillo del borde cónico */
+.project::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: 15px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #152b38 0%, #11222c 100%);
 }
 
 .project:hover {
-  transform: translateY(-3px);
-  border-color: rgba(255, 118, 46, 0.35);
+  transform: translateY(-4px);
+  border-color: transparent;
   box-shadow: var(--shadow-hover);
 }
 
-/* React Bits: Foco interactivo que sigue el mouse */
+.project:hover::before {
+  opacity: 1;
+  animation: borderSpin 5s linear infinite;
+}
+
+@keyframes borderSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* SpotlightCard: foco que sigue el cursor (variables --mx / --my fijadas por el script) */
 .spotlight-glow {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s ease;
-  background: radial-gradient(400px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 118, 46, 0.08), transparent 65%);
+  transition: opacity 0.35s ease;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 118, 46, 0.16), transparent 70%);
   z-index: 1;
 }
 
@@ -401,14 +587,14 @@ main {
   opacity: 1;
 }
 
-/* React Bits: Reflejo de luz en barrido diagonal */
+/* GlareHover: reflejo de luz en barrido diagonal */
 .card-glare {
   position: absolute;
   inset: 0;
   pointer-events: none;
   transform: translateX(-100%) rotate(25deg);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
-  transition: transform 0.85s var(--ease-spring);
+  background: linear-gradient(90deg, transparent, rgba(247, 245, 239, 0.1), transparent);
+  transition: transform 1s var(--ease-spring);
   z-index: 2;
 }
 
@@ -444,7 +630,7 @@ main {
   margin-top: 3px;
 }
 
-/* Símbolo / Escudo visual del proyecto */
+/* Símbolo / escudo visual del proyecto */
 .project-symbol {
   width: 52px;
   height: 52px;
@@ -452,33 +638,33 @@ main {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #fff6f0 0%, #ffebd9 100%);
-  color: #d45618;
+  background: linear-gradient(135deg, rgba(255, 118, 46, 0.24) 0%, rgba(255, 118, 46, 0.07) 100%);
+  color: #ff9a62;
   font-size: 24px;
   font-weight: 800;
-  border: 1px solid rgba(255, 118, 46, 0.2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 12px rgba(255, 118, 46, 0.1);
-  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s ease;
+  border: 1px solid rgba(255, 118, 46, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px rgba(255, 118, 46, 0.14);
+  transition: transform 0.4s var(--ease-spring), box-shadow 0.3s ease;
   position: relative;
 }
 
 .project:hover .project-symbol {
   transform: scale(1.06) rotate(-2deg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 20px rgba(255, 118, 46, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 26px rgba(255, 118, 46, 0.28);
 }
 
 .project-symbol.pulso-symbol {
-  background: #11222c !important;
-  border-color: rgba(255, 118, 46, 0.35) !important;
-  box-shadow: 0 4px 16px rgba(17, 34, 44, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  background: var(--medianoche);
+  border-color: rgba(255, 118, 46, 0.4);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .pulso-symbol img {
   display: block;
   width: 30px;
   height: auto;
-  filter: drop-shadow(0 0 6px rgba(255, 118, 46, 0.25));
-  transition: transform 0.3s var(--ease-spring);
+  filter: drop-shadow(0 0 6px rgba(255, 118, 46, 0.35));
+  transition: transform 0.4s var(--ease-spring);
 }
 
 .project:hover .pulso-symbol img {
@@ -497,8 +683,8 @@ main {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  box-shadow: 0 4px 14px rgba(12, 21, 28, 0.08);
-  transition: transform 0.3s var(--ease-spring);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transition: transform 0.4s var(--ease-spring);
 }
 
 .project:hover .landur-logo img {
@@ -515,7 +701,7 @@ main {
   z-index: 3;
 }
 
-/* Metadatos: Permiso y Estado */
+/* Metadatos: permiso y estado */
 .project-meta {
   display: flex;
   flex-direction: column;
@@ -526,7 +712,7 @@ main {
 
 .access {
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ink);
   display: inline-flex;
   align-items: center;
@@ -534,26 +720,26 @@ main {
   letter-spacing: -0.01em;
 }
 
-/* Pulso vivo animado en el estado de acceso */
+/* Pulso vivo en el estado de acceso */
 .access::before {
   content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #10b981;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
   animation: livePulse 2.4s infinite;
 }
 
 .access.viewer::before {
-  background: #94a3b8;
+  background: var(--ink-3);
   box-shadow: none;
   animation: none;
 }
 
 @keyframes livePulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
   }
   70% {
     box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
@@ -569,41 +755,61 @@ main {
   font-weight: 500;
 }
 
-/* Botón de acción Abrir */
+/* Botón de acción "Abrir" con barrido de brillo */
 .open {
   justify-self: end;
+  position: relative;
+  z-index: 3;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: var(--ink);
-  color: #ffffff;
+  background: var(--mandarin);
+  color: var(--ink-on-accent);
   border-radius: 11px;
   padding: 12px 20px;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.01em;
   white-space: nowrap;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16), var(--shadow-sm);
-  transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  position: relative;
-  z-index: 3;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 8px 20px -10px rgba(255, 118, 46, 0.6);
+  transition: transform 0.25s var(--ease-spring), background-color 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+/* Barrido de brillo (shine) */
+.open::before,
+form button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
+  transform: translateX(-130%) skewX(-18deg);
+  transition: transform 0.75s var(--ease-spring);
+  pointer-events: none;
 }
 
 .open span {
-  color: var(--accent);
+  color: var(--ink-on-accent);
   font-size: 15px;
   font-weight: 700;
-  transition: transform 0.25s var(--ease-spring);
+  transition: transform 0.3s var(--ease-spring);
   display: inline-block;
 }
 
 .open:hover {
-  background: #1c2e39;
-  transform: translateY(-1px);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.24), 0 8px 20px rgba(12, 21, 28, 0.16);
-  border-color: rgba(255, 118, 46, 0.35);
+  background: var(--mandarin-hover);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.4), 0 14px 28px -10px rgba(255, 118, 46, 0.7);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.open:hover::before {
+  transform: translateX(340%) skewX(-18deg);
 }
 
 .open:hover span {
@@ -626,12 +832,12 @@ main {
 }
 
 .shortcuts a {
-  color: var(--stage-ink);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
   padding: 5px 12px;
-  transition: all 0.2s var(--ease-spring);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.25s var(--ease-spring);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -640,43 +846,41 @@ main {
 .shortcuts a::after {
   content: "→";
   font-size: 11px;
-  opacity: 0.6;
-  transition: transform 0.2s var(--ease-spring), opacity 0.2s ease;
+  color: var(--ink-3);
+  transition: transform 0.25s var(--ease-spring), color 0.2s ease;
 }
 
 .shortcuts a:hover {
-  color: #ffffff;
-  background: rgba(255, 118, 46, 0.15);
-  border-color: rgba(255, 118, 46, 0.4);
+  color: var(--ink);
+  background: var(--accent-soft);
+  border-color: rgba(255, 118, 46, 0.45);
   transform: translateY(-1px);
 }
 
 .shortcuts a:hover::after {
   transform: translateX(3px);
-  opacity: 1;
-  color: var(--accent);
+  color: var(--mandarin);
 }
 
 /* ==========================================================================
-   Zona "Para mostrar" (Escenario Oscuro de Demos Comerciales)
+   Zona "Para mostrar" (escenario de demos comerciales)
    ========================================================================== */
 .ventas .project {
-  background: linear-gradient(180deg, rgba(20, 33, 41, 0.88) 0%, rgba(13, 22, 28, 0.96) 100%);
-  border: 1px solid var(--stage-border);
+  color: var(--cream);
   box-shadow: var(--shadow-stage);
-  color: #ffffff;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+}
+
+.ventas .project::after {
+  background: linear-gradient(180deg, #172d39 0%, #0f1f28 100%);
 }
 
 .ventas .project:hover {
-  background: linear-gradient(180deg, rgba(24, 39, 49, 0.95) 0%, rgba(15, 26, 33, 0.98) 100%);
-  border-color: var(--stage-border-hover);
-  box-shadow: 0 16px 44px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  border-color: transparent;
+  box-shadow: 0 22px 48px -12px rgba(0, 0, 0, 0.75), 0 10px 30px -10px rgba(255, 118, 46, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .ventas .project h3 {
-  color: #ffffff;
+  color: var(--cream);
 }
 
 .ventas .kind {
@@ -688,7 +892,7 @@ main {
 }
 
 .ventas .access {
-  color: #ffffff;
+  color: var(--cream);
 }
 
 .ventas .status {
@@ -699,47 +903,48 @@ main {
   background: linear-gradient(135deg, rgba(255, 118, 46, 0.22) 0%, rgba(255, 118, 46, 0.08) 100%);
   color: #ff9a62;
   border-color: rgba(255, 118, 46, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 16px rgba(255, 118, 46, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 6px 18px rgba(255, 118, 46, 0.15);
 }
 
 .retail .project-symbol {
-  background: linear-gradient(135deg, rgba(47, 116, 255, 0.24) 0%, rgba(138, 181, 255, 0.08) 100%);
-  color: #9cc1ff;
-  border-color: rgba(138, 181, 255, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(47, 116, 255, 0.2);
+  background: linear-gradient(135deg, rgba(64, 92, 107, 0.7) 0%, rgba(91, 125, 143, 0.25) 100%);
+  color: #d7e6ec;
+  border-color: rgba(138, 162, 176, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 18px rgba(64, 92, 107, 0.35);
 }
 
-.ventas .retail:hover {
-  border-color: rgba(138, 181, 255, 0.5);
-}
-
+.ventas .project:hover .spotlight-glow,
 .ventas .spotlight-glow {
-  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 118, 46, 0.16), transparent 70%);
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 118, 46, 0.16), transparent 70%);
 }
 
 .ventas .retail .spotlight-glow {
-  background: radial-gradient(420px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(138, 181, 255, 0.16), transparent 70%);
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(139, 162, 176, 0.18), transparent 70%);
 }
 
 .ventas .open {
-  background: #ffffff;
-  color: var(--ink);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: inset 0 1px 0 0 #ffffff, 0 4px 16px rgba(0, 0, 0, 0.3);
+  background: var(--pizarra);
+  color: var(--cream);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 8px 20px -10px rgba(0, 0, 0, 0.7);
 }
 
 .ventas .open span {
-  color: #e05e19;
+  color: var(--mandarin);
 }
 
 .ventas .open:hover {
-  background: #f4f6f8;
-  border-color: #ffffff;
-  box-shadow: inset 0 1px 0 0 #ffffff, 0 8px 24px rgba(0, 0, 0, 0.4);
+  background: #4f7184;
+  border-color: rgba(255, 118, 46, 0.4);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), 0 14px 28px -10px rgba(0, 0, 0, 0.8);
+}
+
+.ventas .open:hover span {
+  color: #ff9a62;
 }
 
 /* ==========================================================================
-   Panel de Administración y Permisos
+   Panel de administración y permisos
    ========================================================================== */
 .permissions {
   margin-top: 54px;
@@ -753,6 +958,7 @@ main {
   gap: 36px;
   position: relative;
   overflow: hidden;
+  animation: groupEnter 0.8s var(--ease-spring) 0.55s backwards;
 }
 
 .permissions::before {
@@ -762,12 +968,12 @@ main {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--accent) 0%, #2f74ff 100%);
+  background: linear-gradient(90deg, var(--mandarin) 0%, var(--pizarra-hi) 100%);
 }
 
 .permissions h2 {
   font-size: 19px;
-  font-weight: 750;
+  font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--ink);
 }
@@ -791,7 +997,7 @@ label {
   flex-direction: column;
   gap: 6px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--ink-2);
   text-transform: uppercase;
@@ -806,37 +1012,53 @@ select {
   font-family: var(--font-main);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--field);
   color: var(--ink);
   min-height: 42px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
+  color-scheme: dark;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+select:hover {
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 select:focus {
-  background: #ffffff;
-  border-color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--mandarin);
   box-shadow: 0 0 0 3px var(--accent-glow);
   outline: none;
 }
 
 form button {
-  background: var(--ink);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  background: var(--mandarin);
+  color: var(--ink-on-accent);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   padding: 11px 18px;
   font-size: 13.5px;
-  font-weight: 650;
+  font-weight: 700;
   min-height: 42px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--shadow-sm);
-  transition: all 0.2s var(--ease-spring);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 20px -10px rgba(255, 118, 46, 0.6);
+  transition: transform 0.25s var(--ease-spring), background-color 0.2s ease, box-shadow 0.25s ease;
 }
 
 form button:hover:not(:disabled) {
-  background: #1c2e39;
+  background: var(--mandarin-hover);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 14px 28px -10px rgba(255, 118, 46, 0.7);
+}
+
+form button:hover:not(:disabled)::before {
+  transform: translateX(340%) skewX(-18deg);
 }
 
 form button:active:not(:disabled) {
@@ -847,12 +1069,28 @@ form button:active:not(:disabled) {
   grid-column: 1 / -1;
   margin: 4px 0 0;
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 600;
   color: var(--ink-2);
 }
 
+#grants-status:not(:empty),
+.error:not(:empty) {
+  animation: msgIn 0.45s var(--ease-spring) backwards;
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ==========================================================================
-   Estados Vacíos y Errores
+   Estados vacíos y errores
    ========================================================================== */
 .empty {
   background: var(--surface);
@@ -861,6 +1099,7 @@ form button:active:not(:disabled) {
   padding: 36px 32px;
   margin-top: 36px;
   box-shadow: var(--shadow-card);
+  animation: cardIn 0.75s var(--ease-spring) 0.5s backwards;
 }
 
 .empty h2 {
@@ -877,9 +1116,9 @@ form button:active:not(:disabled) {
 }
 
 .error {
-  color: #dc2626;
+  color: #fca5a5;
   font-size: 13.5px;
-  font-weight: 550;
+  font-weight: 600;
   margin-top: 20px;
 }
 
@@ -900,7 +1139,7 @@ footer {
 }
 
 /* ==========================================================================
-   Diseño Adaptativo (Responsive)
+   Diseño adaptativo (responsive)
    ========================================================================== */
 @media (max-width: 960px) {
   .project {
@@ -970,12 +1209,15 @@ footer {
   }
 }
 
-/* Reducción de movimiento para accesibilidad */
+/* ==========================================================================
+   Reducción de movimiento (accesibilidad): sin animaciones ni transiciones
+   ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
   }
   .card-glare, .spotlight-glow {
     display: none !important;
