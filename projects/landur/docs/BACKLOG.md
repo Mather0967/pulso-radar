@@ -546,5 +546,5 @@ planilla del 24/10).
 - Proceso: sub-agentes Haiku con un archivo cada uno (tests, voice.mjs, sw.js/backlog) y dos revisores adversariales de solo lectura; los hallazgos críticos se corrigieron con test RED→GREEN.
 - Sin cambio (decisiones previas que se mantienen): «60,000» y «3,500 pesos» se leen como miles; «1500 mil» es 1.500.000.
 
-**Pruebas:** `npm test` en projects/landur 198/198; `tests/voice.test.mjs` 38 pruebas; `npm run test:voz` (navegador con reconocedor simulado) 3/3: dos-dictados-seguidos, ochenta-mil-guarda-80000, sin-respuesta-sale-de-escuchando.
+**Pruebas:** `npm test` en projects/landur 198/198; `tests/voice.test.mjs` 37 pruebas; `npm run test:voz` (navegador con reconocedor simulado) 3/3: dos-dictados-seguidos, ochenta-mil-guarda-80000, sin-respuesta-sale-de-escuchando.
 **Pendiente / no probado:** dictado real en iPhone/Safari y PWA instalada; en el campo de importe, un dígito suelto dictado después de un valor viejo («12,5 3») conserva el viejo; el artículo inicial de una marca se recorta como cualquier artículo («La Nada Bar» → «Nada Bar»).
