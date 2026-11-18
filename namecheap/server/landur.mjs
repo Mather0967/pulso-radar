@@ -3,6 +3,8 @@ import { resolve, relative, sep, isAbsolute, dirname, basename } from 'node:path
 import { existsSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import { projectAccess } from './projects.mjs';
 import { originAllowed, rejectOrigin } from './auth.mjs';
 
@@ -29,6 +31,12 @@ export const portalApiRoutes=['GET /api/session','GET /api/state','GET /api/expo
 export const landurLoginPath='/landur/login';
 const actualPath=path=>existsSync(path)?realpathSync(path):resolve(actualPath(dirname(path)),basename(path));
 const within=(parent,child)=>{const rel=relative(parent,child);return rel===''||(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith(`..${sep}`));};
+const gzipAsync=promisify(gzip);
+// El estado completo pesa megabytes de JSON; comprimido baja ~10 veces y deja de tardar más que el tope de espera de la app.
+const jsonZip=async(req,data)=>{
+  if(!/\bgzip\b/.test(req.headers.get('accept-encoding')||''))return json(data);
+  return new Response(await gzipAsync(JSON.stringify(data)),{headers:{'Content-Type':'application/json; charset=utf-8','Content-Encoding':'gzip','Vary':'Accept-Encoding','Cache-Control':'no-store'}});
+};
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 // Los errores de almacenamiento llegan sin `status`, así que antes caían en un texto genérico
 // («revisá el runtime y la instalación») que no decía nada y obligaba a adivinar. Cada familia
@@ -269,7 +277,7 @@ export function createLandurPortal({dataDir,projectRoot=fileURLToPath(new URL('.
         }
         if(path==='/api/export.csv')return new Response(exportOperations(snapshot),{headers:{'Content-Type':'text/csv; charset=utf-8','Cache-Control':'no-store','Content-Disposition':'attachment; filename="landur-operaciones.csv"'}});
         if(path==='/api/connections')return json(connections.status(ledger,'landur'));
-        return json({...snapshot,demo:false,portal:true,actor:user.name,access});
+        return jsonZip(req,{...snapshot,demo:false,portal:true,actor:user.name,access});
       }
       if(method==='POST'&&['/api/commands','/api/import/preview','/api/import/commit','/api/evidence','/api/connections','/api/sync/shopify','/api/sync/meta','/api/sync/sheets'].includes(path)){
         if(!req.headers.get('content-type')?.startsWith('application/json')||req.headers.get('x-landur-request')!=='1')return json({error:'Se requiere una solicitud JSON de la aplicación.'},415);
