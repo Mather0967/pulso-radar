@@ -1,3 +1,5 @@
+import { useReducedMotion } from 'framer-motion'
+
 export const CHART = {
   brand: '#ff762e',
   brandLight: '#ffb88a',
@@ -35,7 +37,21 @@ export const tooltipProps = {
   },
   labelStyle: { color: '#94a3b8', fontSize: 11, marginBottom: 4 },
   itemStyle: { color: '#e2e8f0', fontSize: 12 },
-  cursor: { fill: 'rgba(255, 118, 46,0.06)' },
+  cursor: { fill: 'rgba(255,118,46,0.06)' },
+  animationDuration: 160,
 }
 
 export const SERIES_COLORS = [CHART.brand, CHART.mint, CHART.amber, CHART.violet, CHART.coral]
+
+/** Duración de la entrada de las series (ms). */
+export const CHART_ANIMATION_MS = 800
+
+/** Props de animación de Recharts; se apagan con "reducir movimiento". */
+export function useChartMotion() {
+  const reduce = useReducedMotion()
+  return {
+    isAnimationActive: !reduce,
+    animationDuration: CHART_ANIMATION_MS,
+    animationEasing: 'ease-out' as const,
+  }
+}

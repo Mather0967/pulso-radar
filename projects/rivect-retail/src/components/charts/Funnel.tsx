@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { money } from '@/utils/format'
 
 export interface FunnelStep {
@@ -8,6 +9,7 @@ export interface FunnelStep {
 }
 
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
+  const reduce = useReducedMotion()
   const max = Math.max(1, ...steps.map((s) => s.count))
 
   return (
@@ -26,9 +28,12 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-ink-800">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-300 transition-all duration-700"
-                style={{ width: `${width}%`, opacity }}
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-300"
+                initial={reduce ? false : { width: '0%' }}
+                animate={{ width: `${width}%` }}
+                transition={{ duration: 0.8, delay: reduce ? 0 : index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                style={{ opacity }}
               />
             </div>
           </div>

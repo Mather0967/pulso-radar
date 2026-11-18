@@ -5,6 +5,8 @@ import { ProductThumb } from '@/components/ui/ProductThumb'
 import { Badge } from '@/components/ui/Badge'
 import { money } from '@/utils/format'
 import { cn } from '@/utils/format'
+import { Stagger, StaggerItem } from '../../components/reactbits/Stagger'
+import { TiltCard } from '../../components/reactbits/TiltCard'
 
 export function CatalogPanel({
   products,
@@ -80,15 +82,18 @@ export function CatalogPanel({
             </p>
           </div>
         ) : (
+          <Stagger step={0.03}>
           <ul className="space-y-1">
             {filtered.map((product) => {
               const isHighlighted = highlighted.includes(product.id)
               return (
                 <li key={product.id}>
+                <StaggerItem>
+                <TiltCard className="rounded-xl">
                   <button
                     onClick={() => onSelect(product)}
                     className={cn(
-                      'flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition',
+                      'flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-12px_rgba(255,118,46,0.45)]',
                       isHighlighted
                         ? 'border border-brand-500/30 bg-brand-500/[0.08]'
                         : 'border border-transparent hover:bg-ink-800/70',
@@ -119,10 +124,13 @@ export function CatalogPanel({
                       }
                     />
                   </button>
+                </TiltCard>
+                </StaggerItem>
                 </li>
               )
             })}
           </ul>
+          </Stagger>
         )}
       </div>
 

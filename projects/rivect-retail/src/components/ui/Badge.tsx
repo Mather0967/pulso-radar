@@ -17,21 +17,24 @@ export function Badge({
   tone = 'neutral',
   className,
   dot = false,
+  pulse = false,
 }: {
   children: ReactNode
   tone?: Tone
   className?: string
   dot?: boolean
+  /** Latido sutil en el punto (estado en vivo). Se apaga con reducir movimiento. */
+  pulse?: boolean
 }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors duration-200 hover:brightness-110',
         tones[tone],
         className,
       )}
     >
-      {dot ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
+      {dot ? <span className={cn('h-1.5 w-1.5 rounded-full bg-current', pulse && 'pulse-dot')} /> : null}
       {children}
     </span>
   )

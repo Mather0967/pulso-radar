@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { Clock, MessageSquare, Send, Sparkles } from 'lucide-react'
 import type { Product, RecoveryLead, RecoveryStatus } from '@/domain/models'
 import { RECOVERY_STATUSES, RECOVERY_STATUS_META } from '@/domain/calculations/recovery'
@@ -20,6 +21,7 @@ export function LeadDrawer({
   onStatusChange: (status: RecoveryStatus) => void
   onFollowUp: () => void
 }) {
+  const reduce = useReducedMotion()
   return (
     <Modal
       open={Boolean(lead)}
@@ -42,7 +44,13 @@ export function LeadDrawer({
       }
     >
       {lead ? (
-        <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
+        <motion.div
+          key={lead.id}
+          className="grid gap-5 lg:grid-cols-[1.15fr_1fr]"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} label={RECOVERY_STATUS_META[lead.status].label} />
@@ -156,7 +164,7 @@ export function LeadDrawer({
               </Button>
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : null}
     </Modal>
   )

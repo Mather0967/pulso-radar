@@ -4,6 +4,8 @@ import { Modal } from '@/components/ui/Modal'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, num, pct } from '@/utils/format'
 import { daysSince } from '@/domain/calculations/inventory'
+import { Stagger, StaggerItem } from '../../components/reactbits/Stagger'
+import { TiltCard } from '../../components/reactbits/TiltCard'
 
 export function ProductDetailModal({
   product,
@@ -21,7 +23,10 @@ export function ProductDetailModal({
       width="md"
     >
       {product ? (
+        <Stagger step={0.07}>
         <div className="space-y-5">
+          <StaggerItem>
+          <TiltCard className="rounded-xl">
           <div className="flex flex-wrap items-center gap-4">
             <ProductThumb category={product.category} name={product.name} size="lg" />
             <div>
@@ -38,9 +43,14 @@ export function ProductDetailModal({
               </div>
             </div>
           </div>
+          </TiltCard>
+          </StaggerItem>
 
+          <StaggerItem>
           <p className="text-sm leading-relaxed text-slate-400">{product.description}</p>
+          </StaggerItem>
 
+          <StaggerItem>
           <div>
             <p className="kpi-label mb-2">Variantes y disponibilidad</p>
             <div className="overflow-hidden rounded-xl border border-line">
@@ -76,7 +86,9 @@ export function ProductDetailModal({
               </table>
             </div>
           </div>
+          </StaggerItem>
 
+          <StaggerItem>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl border border-line bg-ink-900/60 p-3">
               <p className="text-slate-500">Ventas mensuales</p>
@@ -91,7 +103,9 @@ export function ProductDetailModal({
               </p>
             </div>
           </div>
+          </StaggerItem>
 
+          <StaggerItem>
           <div className="flex flex-wrap gap-1.5">
             {product.tags.map((tag) => (
               <span key={tag} className="chip">
@@ -99,7 +113,9 @@ export function ProductDetailModal({
               </span>
             ))}
           </div>
+          </StaggerItem>
         </div>
+        </Stagger>
       ) : null}
     </Modal>
   )

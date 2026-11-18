@@ -115,7 +115,7 @@ export function AssistantPage() {
       </AnimatedContent>
 
       <AnimatedContent delay={0.05}>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 min-[1800px]:grid-cols-7">
           {metricsTiles.map((tile) => (
             <StatTile
               key={tile.label}

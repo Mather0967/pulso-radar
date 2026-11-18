@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { axisProps, CHART, gridProps, tooltipProps } from './chartTheme'
+import { axisProps, CHART, gridProps, tooltipProps, useChartMotion } from './chartTheme'
 
 export function CoverageBars({
   data,
@@ -20,6 +20,8 @@ export function CoverageBars({
   threshold: number
   height?: number
 }) {
+  const motionProps = useChartMotion()
+
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
@@ -42,7 +44,7 @@ export function CoverageBars({
             strokeDasharray="4 4"
             label={{ value: `Umbral ${threshold} d`, fill: CHART.amber, fontSize: 10, position: 'insideTopRight' }}
           />
-          <Bar dataKey="coverage" radius={[0, 6, 6, 0]} barSize={14}>
+          <Bar dataKey="coverage" radius={[0, 6, 6, 0]} barSize={14} {...motionProps}>
             {data.map((entry) => (
               <Cell key={entry.name} fill={entry.atRisk ? CHART.coral : CHART.brand} fillOpacity={0.85} />
             ))}

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Text } from '@mantine/core'
 import { HeartHandshake, MessageCircle, Megaphone, PackageX, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { CountUp } from '@/components/reactbits/CountUp'
+import { TiltCard } from '@/components/reactbits/TiltCard'
 import { liveEventAt, nextDelayMs, type LiveEvent } from '@/presentation/liveFeed'
 
 const MANDARIN = '#FF762E'
@@ -85,6 +86,7 @@ export function LiveDot({ color = '#4ADE80' }: { color?: string }) {
 
 function StatTile({ label, value, color }: { label: string; value: number; color: string }) {
   return (
+    <TiltCard className="min-w-0 flex-1">
     <div
       style={{
         flex: 1,
@@ -121,6 +123,7 @@ function StatTile({ label, value, color }: { label: string; value: number; color
         <CountUp value={value} separator={false} />
       </div>
     </div>
+    </TiltCard>
   )
 }
 
@@ -241,27 +244,32 @@ export function LivePanel({ open }: { open: boolean }) {
             minHeight: 0,
             margin: 0,
             padding: 0,
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             gap: 8,
             overflow: 'hidden',
           }}
         >
-          {items.map((item) => (
-            <FeedRow key={item.key} item={item} reduce={!!reduce} />
-          ))}
+          <AnimatePresence mode="popLayout" initial>
+            {items.map((item, index) => (
+              <FeedRow key={item.key} item={item} index={index} reduce={!!reduce} />
+            ))}
+          </AnimatePresence>
         </motion.ul>
       </div>
     </motion.aside>
   )
 }
 
-function FeedRow({ item, reduce }: { item: FeedItem; reduce: boolean }) {
+function FeedRow({ item, index, reduce }: { item: FeedItem; index: number; reduce: boolean }) {
   const { event, at, fresh } = item
   const meta = KIND_META[event.kind]
   const Icon = meta.icon
   const base = 'rgba(255,255,255,0.03)'
   const flash = `${MANDARIN}47`
+  // Escalonado al montar el feed inicial; las entradas nuevas entran sin demora.
+  const delay = reduce || fresh ? 0 : index * 0.08
 
   return (
     <motion.li
@@ -269,14 +277,16 @@ function FeedRow({ item, reduce }: { item: FeedItem; reduce: boolean }) {
       initial={
         reduce
           ? { opacity: 0 }
-          : { opacity: 0, x: 48, backgroundColor: fresh ? flash : base }
+          : { opacity: 0, x: 48, scale: 0.97, backgroundColor: fresh ? flash : base }
       }
-      animate={{ opacity: 1, x: 0, backgroundColor: base }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0, scale: 1, backgroundColor: base }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, x: -24, scale: 0.97 }}
       transition={{
-        x: { type: 'spring', stiffness: 380, damping: 30 },
-        opacity: { duration: 0.3 },
-        backgroundColor: { duration: 1.6, ease: 'easeOut' },
+        layout: { type: 'spring', stiffness: 400, damping: 35 },
+        x: { type: 'spring', stiffness: 380, damping: 30, delay },
+        scale: { type: 'spring', stiffness: 380, damping: 30, delay },
+        opacity: { duration: 0.35, delay },
+        backgroundColor: { duration: 1.6, ease: 'easeOut', delay },
       }}
       style={{
         display: 'flex',
