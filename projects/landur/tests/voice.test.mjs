@@ -251,3 +251,33 @@ test('si el campo traía un valor viejo, vale la última cifra dictada y nunca u
   assert.equal(amountFromText('20 mil 500'), '20500.00', 'una sola frase con escala suma sus partes');
   assert.equal(amountFromText('3500 25 mil'), '25000.00');
 });
+
+test('la coma dicha como palabra separa los decimales y no parte el importe', () => {
+  // Regresión (audio del 17/11): «3.143 coma 70» guardaba 70 y dejaba «3.143 coma» en el concepto.
+  const cases = [
+    ['compré papelería 3.143 coma 70', '3143.70'],
+    ['compré papelería 3143 coma 70', '3143.70'],
+    ['papelería 3.143 coma 70 pesos', '3143.70'],
+    ['papelería $3.143 coma 70', '3143.70'],
+    ['papelería 3.143 coma setenta', '3143.70'],
+    ['papelería tres mil ciento cuarenta y tres coma setenta', '3143.70'],
+    ['papelería 3 mil 143 coma 70', '3143.70'],
+    ['papelería 12 coma 5', '12.50'],
+    ['papelería doce coma cinco', '12.50'],
+    ['papelería 12 coma 05', '12.05'],
+    ['papelería doce coma cero cinco', '12.05'],
+    ['papelería 980 coma setenta y cinco', '980.75']
+  ];
+  for (const [said, amount] of cases) {
+    const result = say(said);
+    assert.equal(result.amountText, amount, said);
+    assert.equal(result.concept, 'Papelería', `concepto de «${said}»`);
+    assert.equal(amountFromText(said.replace(/^(compré )?papelería /, '')), amount, `campo: ${said}`);
+  }
+});
+
+test('una coma que no está entre una cifra y sus decimales no inventa importe', () => {
+  assert.equal(amountFromText('coma 70'), '70.00', 'sin parte entera queda la cifra suelta, como antes');
+  assert.equal(say('papelería 3.143 coma 123').amountText, '123.00', 'tres decimales no son centavos');
+  assert.equal(amountFromText('0 coma 0'), '');
+});

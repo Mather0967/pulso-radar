@@ -244,6 +244,74 @@ function expandScaledDigits(text) {
   return { text: out, regions };
 }
 
+// «3.143 coma 70», «doce coma cinco», «12 coma cero cinco»: el dictado escribe la coma decimal
+// como palabra. Sin esto la parte entera quedaba en el concepto y el importe era solo «70».
+// Se reescribe como «3143,70» rellenando con espacios para conservar los índices, y se devuelve
+// la zona para que el importe la consuma entera. Los decimales son uno o dos dígitos (o palabras
+// hasta noventa y nueve): «coma 123» no son centavos y se deja como estaba.
+function expandSpokenComma(text) {
+  const list = tokenize(text);
+  const regions = [];
+  let out = text;
+  for (let c = 1; c + 1 < list.length; c++) {
+    if (bare(list[c].value) !== 'coma') continue;
+    // Parte entera: una cifra («3.143», «3143») o una corrida de palabras numéricas.
+    let wholeCents = null, from = c;
+    const before = bare(list[c - 1].value);
+    if (/^\d[\d.,]*$/.test(before)) {
+      const cents = digitsToCents(before);
+      if (cents && cents % 100 === 0 && !/[.,]\d{1,2}$/.test(before)) { wholeCents = cents; from = c - 1; }
+    } else {
+      let k = c - 1;
+      while (k >= 0 && (isNumberWord(bare(list[k].value)) || (isConnector(bare(list[k].value)) && k > 0 && isNumberWord(bare(list[k - 1].value))))) k--;
+      if (k + 1 < c && !isConnector(bare(list[k + 1].value))) {
+        const value = wordsToNumber(list.slice(k + 1, c).map(token => bare(token.value)));
+        if (value) { wholeCents = value * 100; from = k + 1; }
+      }
+    }
+    if (wholeCents === null) continue;
+    // Decimales.
+    let fraction = null, to = c + 1;
+    const after = bare(list[c + 1].value);
+    if (/^\d{1,2}$/.test(after)) {
+      fraction = after.length === 1 ? Number(after) * 10 : Number(after);
+    } else if (after === 'cero' && c + 2 < list.length && /^(?:\d|uno|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)$/.test(bare(list[c + 2].value))) {
+      const unit = bare(list[c + 2].value);
+      fraction = /^\d$/.test(unit) ? Number(unit) : SMALL[unit];
+      to = c + 2;
+    } else if (Object.hasOwn(SMALL, after) && SMALL[after] < 100) {
+      let end = c + 1;
+      if (SMALL[after] >= 30 && SMALL[after] % 10 === 0 && c + 3 < list.length && isConnector(bare(list[c + 2].value))
+        && Object.hasOwn(SMALL, bare(list[c + 3].value)) && SMALL[bare(list[c + 3].value)] < 10) end = c + 3;
+      const value = wordsToNumber(list.slice(c + 1, end + 1).map(token => bare(token.value)));
+      fraction = end === c + 1 && value < 10 ? value * 10 : value;
+      to = end;
+    }
+    if (fraction === null || fraction > 99) continue;
+    const cents = wholeCents + fraction;
+    if (!cents || !Number.isSafeInteger(cents) || cents > MAX_CENTS) continue;
+    const digits = `${Math.floor(cents / 100)},${String(cents % 100).padStart(2, '0')}`;
+    const start = list[from].start, end = list[to].end;
+    if (digits.length > end - start) continue;
+    out = out.slice(0, start) + digits.padStart(end - start) + out.slice(end);
+    regions.push({ start, end });
+    c = to;
+  }
+  return { text: out, regions };
+}
+
+// Expande primero las escalas con cifras («3 mil 143») y después la coma dicha.
+function expandSpoken(text) {
+  const scaled = expandScaledDigits(text);
+  const comma = expandSpokenComma(scaled.text);
+  // «3 mil 143 coma 70»: la parte entera ya venía de una escala; la zona de la coma la incluye
+  // para que «3 mil» no quede suelto en el concepto.
+  const overlaps = (a, b) => a.start < b.end && a.end > b.start;
+  const regions = comma.regions.map(region => scaled.regions.filter(other => overlaps(region, other))
+    .reduce((acc, other) => ({ start: Math.min(acc.start, other.start), end: Math.max(acc.end, other.end) }), region));
+  return { text: comma.text, regions: [...scaled.regions.filter(other => !regions.some(region => overlaps(region, other))), ...regions] };
+}
+
 function findAmount(text, list) {
   const patterns = [
     /\$\s*([\d.,]+)/,
@@ -290,7 +358,7 @@ export function amountFromText(raw) {
   // Un número con cuatro o más decimales no es un importe: el texto viene mezclado (un valor
   // viejo pegado a lo dictado). En vez de adivinar con la parte legible, no se toma nada.
   if (/\d[.,]\d{4,}/.test(text)) return '';
-  const scaled = expandScaledDigits(text);
+  const scaled = expandSpoken(text);
   const found = findAmount(scaled.text, tokenize(scaled.text));
   return found.cents ? (found.cents / 100).toFixed(2) : '';
 }
@@ -324,7 +392,7 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   const dated = findDate(working, today);
   if (dated.span) { removed.push(dated.span); working = mask(working, dated.span); }
 
-  const scaled = expandScaledDigits(working);
+  const scaled = expandSpoken(working);
   const amountMatch = findAmount(scaled.text, tokenize(scaled.text));
   if (amountMatch.span) for (const region of scaled.regions) {
     if (region.start < amountMatch.span.end && region.end > amountMatch.span.start)
