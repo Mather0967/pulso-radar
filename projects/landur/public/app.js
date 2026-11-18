@@ -1354,7 +1354,7 @@ function commandDialog({title,subtitle,body,confirm,retryLabel,success,input,ref
 // cuenta existente, crear una cuenta nueva con esa información, o borrarlos también.
 function accountDeleteDialog(id){
   const account=state.accounts.find(a=>a.id===id);if(!account||state.access==='viewer')return;
-  const movements=state.entries.filter(e=>e.account===id).length;
+  const movements=account.movements??state.entries.filter(e=>e.account===id).length;
   if(!movements){
     commandDialog({title:'Eliminar cuenta',subtitle:'Sin movimientos: no se pierde historial.',body:`<p class="form-note">Se eliminará la cuenta «${escape(account.name)}» y su saldo inicial de ${fmt(account.opening,account.currency)}. Esta acción no se puede deshacer.</p>`,confirm:'Eliminar cuenta',retryLabel:'Reintentar eliminación',success:'Cuenta eliminada.',refreshMessage:'La cuenta se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'account.delete',accountId:account.id})});
     return;
