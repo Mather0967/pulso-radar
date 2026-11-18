@@ -278,6 +278,11 @@ test('la coma dicha como palabra separa los decimales y no parte el importe', ()
 
 test('una coma que no está entre una cifra y sus decimales no inventa importe', () => {
   assert.equal(amountFromText('coma 70'), '70.00', 'sin parte entera queda la cifra suelta, como antes');
-  assert.equal(say('papelería 3.143 coma 123').amountText, '123.00', 'tres decimales no son centavos');
+  // Tres decimales no son centavos: antes se guardaba 123 descartando 3.143. Mejor vacío y aviso.
+  const odd = say('papelería 3.143 coma 123');
+  assert.equal(odd.amountText, '');
+  assert.ok(odd.warnings.some(w => w.includes('importe')));
+  assert.equal(amountFromText('3.143 coma 123'), '');
+  assert.equal(amountFromText('doce coma ciento veinte'), '');
   assert.equal(amountFromText('0 coma 0'), '');
 });

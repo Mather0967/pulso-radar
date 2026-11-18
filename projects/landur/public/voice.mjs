@@ -252,7 +252,7 @@ function expandScaledDigits(text) {
 function expandSpokenComma(text) {
   const list = tokenize(text);
   const regions = [];
-  let out = text;
+  let out = text, ambiguous = false;
   for (let c = 1; c + 1 < list.length; c++) {
     if (bare(list[c].value) !== 'coma') continue;
     // Parte entera: una cifra («3.143», «3143») o una corrida de palabras numéricas.
@@ -287,7 +287,11 @@ function expandSpokenComma(text) {
       fraction = end === c + 1 && value < 10 ? value * 10 : value;
       to = end;
     }
-    if (fraction === null || fraction > 99) continue;
+    if (fraction === null || fraction > 99) {
+      // Hubo «<cifra> coma <número>» pero los decimales no son centavos («coma 123»): no se adivina.
+      if (/^\d+$/.test(after) || isNumberWord(after)) ambiguous = true;
+      continue;
+    }
     const cents = wholeCents + fraction;
     if (!cents || !Number.isSafeInteger(cents) || cents > MAX_CENTS) continue;
     const digits = `${Math.floor(cents / 100)},${String(cents % 100).padStart(2, '0')}`;
@@ -297,7 +301,7 @@ function expandSpokenComma(text) {
     regions.push({ start, end });
     c = to;
   }
-  return { text: out, regions };
+  return { text: out, regions, ambiguous };
 }
 
 // Expande primero las escalas con cifras («3 mil 143») y después la coma dicha.
@@ -309,7 +313,7 @@ function expandSpoken(text) {
   const overlaps = (a, b) => a.start < b.end && a.end > b.start;
   const regions = comma.regions.map(region => scaled.regions.filter(other => overlaps(region, other))
     .reduce((acc, other) => ({ start: Math.min(acc.start, other.start), end: Math.max(acc.end, other.end) }), region));
-  return { text: comma.text, regions: [...scaled.regions.filter(other => !regions.some(region => overlaps(region, other))), ...regions] };
+  return { text: comma.text, ambiguous: comma.ambiguous, regions: [...scaled.regions.filter(other => !regions.some(region => overlaps(region, other))), ...regions] };
 }
 
 function findAmount(text, list) {
@@ -359,6 +363,7 @@ export function amountFromText(raw) {
   // viejo pegado a lo dictado). En vez de adivinar con la parte legible, no se toma nada.
   if (/\d[.,]\d{4,}/.test(text)) return '';
   const scaled = expandSpoken(text);
+  if (scaled.ambiguous) return '';
   const found = findAmount(scaled.text, tokenize(scaled.text));
   return found.cents ? (found.cents / 100).toFixed(2) : '';
 }
@@ -393,7 +398,7 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   if (dated.span) { removed.push(dated.span); working = mask(working, dated.span); }
 
   const scaled = expandSpoken(working);
-  const amountMatch = findAmount(scaled.text, tokenize(scaled.text));
+  const amountMatch = scaled.ambiguous ? { cents: null, span: null } : findAmount(scaled.text, tokenize(scaled.text));
   if (amountMatch.span) for (const region of scaled.regions) {
     if (region.start < amountMatch.span.end && region.end > amountMatch.span.start)
       amountMatch.span = { start: Math.min(region.start, amountMatch.span.start), end: Math.max(region.end, amountMatch.span.end) };
