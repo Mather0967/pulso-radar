@@ -1,3 +1,4 @@
+import { useMediaQuery } from '@mantine/hooks'
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -187,6 +188,7 @@ function StatusBadge() {
 }
 
 export function PresentationShell() {
+  const wide = useMediaQuery('(min-width: 900px)', true)
   const reduce = useReducedMotion()
   const r = !!reduce
   const {
@@ -490,7 +492,8 @@ export function PresentationShell() {
             </AnimatePresence>
           </Paper>
 
-          <LivePanel open={feedOpen} />
+          {/* En pantallas angostas el panel taparía la escena. */}
+          {wide && <LivePanel open={feedOpen} />}
         </Box>
 
         {/* Barra inferior */}

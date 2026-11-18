@@ -107,7 +107,7 @@ export const scenes: Scene[] = [
         caption: 'Se propone un mensaje de reactivación para cada grupo.',
         notify: {
           title: 'Campaña lista',
-          message: '12 clientes inactivos listos para reactivar (ejemplo)',
+          message: 'Los clientes sin seguimiento ya tienen su mensaje listo',
         },
       },
     ],
@@ -130,7 +130,7 @@ export const scenes: Scene[] = [
         caption: 'Alerta: un producto está por debajo del mínimo.',
         notify: {
           title: 'Stock bajo',
-          message: 'Yerba 1 kg: quedan 6 unidades (ejemplo)',
+          message: 'Zapatillas Running Nova Negra: quedan 3 pares',
         },
       },
       { caption: 'Sugerencia de reposición según la venta de las últimas semanas.' },
@@ -155,7 +155,7 @@ export const scenes: Scene[] = [
         caption: 'Proyección de alcance y conversión (ejemplo).',
         notify: {
           title: 'Campaña programada',
-          message: 'Envío a 100 clientes, en este ejemplo',
+          message: 'Se envía a los clientes de la lista, a la hora elegida',
         },
       },
     ],

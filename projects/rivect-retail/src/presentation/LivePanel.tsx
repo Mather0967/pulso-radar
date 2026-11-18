@@ -21,7 +21,7 @@ const KIND_META: Record<Kind, { icon: LucideIcon; color: string }> = {
   campana: { icon: Megaphone, color: '#C4B5FD' },
 }
 
-const timeFmt = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute: '2-digit' })
+const timeFmt = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false })
 const amountFmt = new Intl.NumberFormat('es-UY', { maximumFractionDigits: 0 })
 
 const GLASS: CSSProperties = {
@@ -231,7 +231,7 @@ export function LivePanel({ open }: { open: boolean }) {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <StatTile label="Pedidos hoy" value={counts.pedidos} color={MANDARIN} />
-          <StatTile label="Mensajes respondidos" value={counts.mensajes} color="#7DD3FC" />
+          <StatTile label="Respuestas" value={counts.mensajes} color="#7DD3FC" />
         </div>
 
         <motion.ul
