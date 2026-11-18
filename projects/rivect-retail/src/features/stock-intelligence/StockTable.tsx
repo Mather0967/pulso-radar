@@ -32,7 +32,7 @@ export function StockTable({
     return (
       <div className="px-6 py-14 text-center">
         <p className="text-sm text-slate-300">No hay productos con estos filtros.</p>
-        <p className="mt-1 text-xs text-slate-500">Probá otra categoría o desactivá el filtro de alertas.</p>
+        <p className="mt-1 text-xs text-slate-400">Probá otra categoría o desactivá el filtro de alertas.</p>
       </div>
     )
   }
@@ -41,7 +41,7 @@ export function StockTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] text-left text-xs">
         <thead>
-          <tr className="border-b border-line text-[10px] uppercase tracking-[0.12em] text-slate-600">
+          <tr className="border-b border-line text-[10px] uppercase tracking-[0.12em] text-slate-400/75">
             {COLUMNS.map((column) => (
               <th key={column.label} className={`px-4 py-2.5 font-medium ${column.align ?? ''}`}>
                 {column.key ? (
@@ -89,7 +89,7 @@ export function StockTable({
                     <p className="truncate text-[11px] font-medium text-slate-200">
                       {item.product.name}
                     </p>
-                    <p className="text-[10px] text-slate-600">
+                    <p className="text-[10px] text-slate-400/75">
                       {item.product.sku} · {item.product.category}
                     </p>
                   </div>
@@ -113,7 +113,7 @@ export function StockTable({
               </td>
               <td className="px-4 py-2.5 text-right text-slate-300">
                 {item.coverageDays === null ? (
-                  <span className="text-slate-600">sin ventas</span>
+                  <span className="text-slate-400/75">sin ventas</span>
                 ) : (
                   `${num(item.coverageDays, 0)} d`
                 )}

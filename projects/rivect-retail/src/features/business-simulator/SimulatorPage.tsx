@@ -32,7 +32,7 @@ export function SimulatorPage() {
               <Badge tone="amber" dot>
                 Datos ingresados + estimaciones
               </Badge>
-              <span className="hidden items-center gap-1.5 text-[11px] text-slate-500 sm:flex">
+              <span className="hidden items-center gap-1.5 text-[11px] text-slate-400 sm:flex">
                 <Info className="h-3.5 w-3.5" />
                 {num(metrics.monthlyQueries)} consultas/mes
               </span>

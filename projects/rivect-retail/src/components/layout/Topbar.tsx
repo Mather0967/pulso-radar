@@ -44,7 +44,7 @@ export function Topbar({ onMenu, onReset }: { onMenu: () => void; onReset: () =>
             <Menu className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <p className="hidden text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:block">
+            <p className="hidden text-[10px] uppercase tracking-[0.2em] text-slate-400 sm:block">
               <motion.span
                 className="inline-block"
                 style={{

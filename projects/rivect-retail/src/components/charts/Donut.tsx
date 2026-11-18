@@ -47,7 +47,7 @@ export function Donut({
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="font-display text-lg font-semibold text-white">{centerValue}</span>
           {centerLabel ? (
-            <span className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+            <span className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-400">
               {centerLabel}
             </span>
           ) : null}

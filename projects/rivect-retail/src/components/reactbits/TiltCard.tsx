@@ -2,7 +2,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } fro
 import { useState, type PointerEvent, type ReactNode } from 'react'
 import { cn } from '@/utils/format'
 
-const MAX_TILT = 6
+const MAX_TILT = 3
 
 function useCoarsePointer() {
   const [coarse] = useState(() =>

@@ -88,7 +88,7 @@ export function CampaignBuilder({
           />
         </div>
 
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
           {SEGMENTS.find((segment) => segment.key === draft.segment)?.description} ·{' '}
           {money(recipientsValue)} de valor histórico en el segmento.
         </p>
@@ -96,7 +96,7 @@ export function CampaignBuilder({
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between">
             <p className="field-label mb-0">Productos incluidos</p>
-            <span className="text-[10px] text-slate-600">{draft.productIds.length} seleccionados</span>
+            <span className="text-[10px] text-slate-400/75">{draft.productIds.length} seleccionados</span>
           </div>
           <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-line bg-ink-900/50 p-2">
             <AnimatePresence initial={false}>
@@ -116,7 +116,7 @@ export function CampaignBuilder({
                     className={`rounded-full border px-2 py-1 text-[10px] transition-colors ${
                       active
                         ? 'border-brand-500/50 bg-brand-500/15 text-brand-200'
-                        : 'border-line text-slate-500 hover:text-slate-300'
+                        : 'border-line text-slate-400 hover:text-slate-300'
                     }`}
                   >
                     {product.name} · {money(product.price)}
@@ -125,7 +125,7 @@ export function CampaignBuilder({
               })}
             </AnimatePresence>
             {visibleProducts.length === 0 ? (
-              <p className="p-2 text-[11px] text-slate-600">No hay productos en esta categoría.</p>
+              <p className="p-2 text-[11px] text-slate-400/75">No hay productos en esta categoría.</p>
             ) : null}
           </div>
         </div>
@@ -139,7 +139,7 @@ export function CampaignBuilder({
             className="input resize-none text-[13px] leading-relaxed"
             placeholder="Usá {{nombre}} y {{descuento}} como variables."
           />
-          <span className="mt-1 block text-[10px] text-slate-600">
+          <span className="mt-1 block text-[10px] text-slate-400/75">
             Variables disponibles: {'{{nombre}}'} y {'{{descuento}}'}.
           </span>
         </label>

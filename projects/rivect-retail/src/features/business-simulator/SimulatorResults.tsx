@@ -86,7 +86,7 @@ export function SimulatorResults({
               formatter={(value) => `${num(value, 0)} h`}
             />
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">
+          <p className="mt-2 text-[11px] text-slate-400">
             {num(metrics.manualHours, 1)} h → {num(remainingHours, 1)} h ·{' '}
             {num(metrics.fullWorkdaysRecovered, 1)} jornadas de 8 h liberadas por mes.
           </p>
@@ -108,7 +108,7 @@ export function SimulatorResults({
               formatter={(value) => money(value)}
             />
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">
+          <p className="mt-2 text-[11px] text-slate-400">
             El margen adicional proviene de las ventas recuperadas, no del ahorro de horas.
           </p>
         </Panel>
@@ -152,7 +152,7 @@ export function SimulatorResults({
             result={money(metrics.additionalContribution)}
           />
         </div>
-        <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">
+        <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-400">
           <span className="font-medium text-slate-300">Nota metodológica:</span> reducir horas no
           genera ingresos por sí solo. La facturación adicional se calcula con un escenario
           independiente de ventas recuperadas, editable en el panel de información comercial.
@@ -178,7 +178,7 @@ function Formula({
     <div className="flex flex-col gap-1 border-b border-line/60 pb-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="font-sans text-[11px] font-medium text-slate-300">{label}</p>
-        <p className="text-[11px] text-slate-600">{expression}</p>
+        <p className="text-[11px] text-slate-400/75">{expression}</p>
       </div>
       <p className="font-sans text-sm font-semibold text-white">
         {typeof result === 'string' ? (

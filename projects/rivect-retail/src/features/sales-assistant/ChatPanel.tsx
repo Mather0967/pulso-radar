@@ -207,12 +207,12 @@ export function ChatPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-line px-2 py-0.5 text-[10px] text-slate-500 sm:inline">
+          <span className="hidden rounded-full border border-line px-2 py-0.5 text-[10px] text-slate-400 sm:inline">
             WhatsApp demo
           </span>
           <button
             onClick={onReset}
-            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-ink-800 hover:text-white"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-ink-800 hover:text-white"
             title="Reiniciar conversación"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -270,7 +270,7 @@ export function ChatPanel({
                     {ready ? (
                       <p
                         className={`mt-1 text-right text-[9px] ${
-                          isCustomer ? 'text-white/70' : 'text-slate-500'
+                          isCustomer ? 'text-white/70' : 'text-slate-400'
                         }`}
                       >
                         {formatTime(message.at)}
@@ -313,7 +313,7 @@ export function ChatPanel({
                   ) : null}
 
                   {ready && !isCustomer && message.meta?.detected?.length ? (
-                    <p className="mt-1 pl-1 text-[9px] text-slate-500">
+                    <p className="mt-1 pl-1 text-[9px] text-slate-400">
                       {message.meta.detected.join(' · ')}
                     </p>
                   ) : null}
@@ -384,7 +384,7 @@ export function ChatPanel({
             <Send className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-2 flex items-center gap-1 text-[10px] text-slate-600">
+        <p className="mt-2 flex items-center gap-1 text-[10px] text-slate-400/75">
           <ShieldCheck className="h-3 w-3" />
           Conversación simulada: no se envía ningún mensaje real ni se reserva stock.
         </p>

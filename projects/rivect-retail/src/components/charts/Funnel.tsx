@@ -21,9 +21,9 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
           <div key={step.label} className="group">
             <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
               <span className="text-slate-400">{step.label}</span>
-              <span className="flex items-center gap-2 text-slate-500">
+              <span className="flex items-center gap-2 text-slate-400">
                 <span className="font-semibold text-slate-200">{step.count}</span>
-                <span className="text-slate-600">·</span>
+                <span className="text-slate-400/75">·</span>
                 <span>{money(step.value)}</span>
               </span>
             </div>

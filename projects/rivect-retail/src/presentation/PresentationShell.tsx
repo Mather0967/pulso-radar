@@ -26,7 +26,6 @@ import {
   StickyNote,
 } from 'lucide-react'
 import { Aurora } from '@/components/reactbits/Aurora'
-import { ShinyText } from '@/components/reactbits/ShinyText'
 import { RevealText } from '@/components/reactbits/RevealText'
 import { OverviewPage } from '@/features/retail-overview/OverviewPage'
 import { SimulatorPage } from '@/features/business-simulator/SimulatorPage'
@@ -347,7 +346,7 @@ export function PresentationShell() {
               style={{
                 height: '100%',
                 background: `linear-gradient(90deg, ${MANDARIN}, #ffb88a)`,
-                boxShadow: `0 0 12px ${MANDARIN}99`,
+                boxShadow: 'none',
               }}
             />
           </div>
@@ -458,7 +457,7 @@ export function PresentationShell() {
         </Paper>
 
         {/* Encabezado de escena */}
-        <Box px="md" pt="sm" pb={6} style={{ minWidth: 0 }}>
+        <Box px="md" pt={10} pb={6} style={{ minWidth: 0 }}>
           <AnimatePresence mode="wait" initial={false} custom={dir}>
             <motion.div
               key={scene.n}
@@ -468,28 +467,30 @@ export function PresentationShell() {
               animate="center"
               exit="exit"
             >
-              <Text
-                size="xs"
-                fw={600}
-                style={{ letterSpacing: '0.18em', textTransform: 'uppercase', color: MANDARIN }}
-              >
-                {`Escena ${scene.n} de ${scenes.length} · ${scene.label}`}
-              </Text>
-              <Text
-                component="h1"
-                style={{
-                  fontFamily: 'Sora, Inter, sans-serif',
-                  fontSize: 'clamp(1.5rem, 2.8vw, 2.25rem)',
-                  fontWeight: 700,
-                  lineHeight: 1.15,
-                  margin: '4px 0',
-                }}
-              >
-                <ShinyText speed={6}>
+              {/* Encabezado compacto: el contenido de la escena es el protagonista. */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                <Text
+                  size="xs"
+                  fw={600}
+                  style={{ letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(247,245,239,0.62)', whiteSpace: 'nowrap' }}
+                >
+                  {`${scene.n}/${scenes.length} · ${scene.label}`}
+                </Text>
+                <Text
+                  component="h1"
+                  style={{
+                    fontFamily: 'Sora, Inter, sans-serif',
+                    fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    margin: 0,
+                    color: '#F7F5EF',
+                  }}
+                >
                   <RevealText key={scene.n} text={scene.title} />
-                </ShinyText>
-              </Text>
-              <Text size="md" style={{ color: 'rgba(247,245,239,0.7)', maxWidth: 820 }}>
+                </Text>
+              </div>
+              <Text size="sm" style={{ color: 'rgba(247,245,239,0.72)', maxWidth: 900, marginTop: 2 }}>
                 <Typewriter text={scene.tagline} />
               </Text>
             </motion.div>
@@ -503,12 +504,12 @@ export function PresentationShell() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: r ? 0 : -10 }}
                 transition={{ duration: r ? 0 : 0.25, ease: EASE }}
-                style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}
+                style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                <Badge size="sm" variant="light" radius="sm">
-                  {`Paso ${step + 1} de ${scene.steps.length}`}
+                <Badge size="xs" variant="outline" radius="sm" color="gray">
+                  {`Paso ${step + 1}/${scene.steps.length}`}
                 </Badge>
-                <Text size="sm" fw={500}>
+                <Text size="sm" fw={500} style={{ color: 'rgba(247,245,239,0.9)' }}>
                   {caption}
                 </Text>
               </motion.div>
@@ -609,7 +610,7 @@ export function PresentationShell() {
                             inset: 0,
                             borderRadius: 999,
                             background: MANDARIN,
-                            boxShadow: `0 0 18px ${MANDARIN}88`,
+                            boxShadow: 'none',
                           }}
                         />
                       )}

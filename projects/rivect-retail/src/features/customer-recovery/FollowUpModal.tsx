@@ -77,7 +77,7 @@ export function FollowUpModal({
         />
       </label>
 
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-400">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-400" />
         En la demo ningún mensaje sale del navegador. El envío simulado queda registrado en el
         historial de la oportunidad y actualiza su estado.

@@ -86,7 +86,7 @@ export function SimulatorForm({
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     active
                       ? 'border-brand-500/50 bg-brand-500/15 text-brand-200'
-                      : 'border-line bg-ink-900/60 text-slate-500 hover:text-slate-300'
+                      : 'border-line bg-ink-900/60 text-slate-400 hover:text-slate-300'
                   }`}
                 >
                   {channel}

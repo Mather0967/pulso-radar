@@ -30,12 +30,12 @@ export function ScenarioLab({
             <h2 className="font-display text-sm font-semibold text-white">Escenarios de simulación</h2>
             {active === 'custom' ? <Badge tone="violet">Personalizado</Badge> : null}
           </div>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">
             Los escenarios cambian supuestos declarados de automatización y recuperación de ventas.
             El motor recalcula todo al instante: no son proyecciones garantizadas.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-500">
+        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-400">
           <Sparkles className="h-3 w-3 text-brand-300" />
           Supuestos editables
         </div>
@@ -71,17 +71,17 @@ export function ScenarioLab({
                   )}
                 />
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{scenario.summary}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{scenario.summary}</p>
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-line/70 pt-3 text-[11px]">
-                <span className="text-slate-600">Automatización</span>
+                <span className="text-slate-400/75">Automatización</span>
                 <span className="text-right font-medium text-slate-300">
                   {pct(scenario.assumptions.automationPercentage)}
                 </span>
-                <span className="text-slate-600">Ventas recuperadas</span>
+                <span className="text-slate-400/75">Ventas recuperadas</span>
                 <span className="text-right font-medium text-slate-300">
                   {num(scenario.assumptions.recoveredSales)} u.
                 </span>
-                <span className="text-slate-600">Minutos/consulta</span>
+                <span className="text-slate-400/75">Minutos/consulta</span>
                 <span className="text-right font-medium text-slate-300">
                   {num(scenario.assumptions.averageMinutesPerQuery, 1)}
                 </span>
@@ -107,7 +107,7 @@ export function ScenarioLab({
               {scenarios.find((s) => s.key === active)?.label ?? 'personalizado'}
             </span>
           </p>
-          <span className="text-[11px] text-slate-600">
+          <span className="text-[11px] text-slate-400/75">
             Automatización activa: {pct(automationPercentage)}
           </span>
         </div>
@@ -169,11 +169,11 @@ export function ScenarioLab({
           })()}
         </div>
         {active === 'custom' ? (
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-slate-400">
             Estás usando valores personalizados. Elegí un escenario para volver a sus supuestos.
           </p>
         ) : (
-          <p className="mt-3 text-[11px] text-slate-500">
+          <p className="mt-3 text-[11px] text-slate-400">
             Al editar un supuesto, el escenario activo pasa a modo personalizado para no mezclar
             valores de la plantilla con los tuyos.
           </p>

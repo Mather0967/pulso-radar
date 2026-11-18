@@ -68,16 +68,16 @@ export function StockAlerts({
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] font-medium text-slate-200">{alert.productName}</p>
-              <p className="text-[10px] text-slate-500">
+              <p className="text-[10px] text-slate-400">
                 {alert.title} · {alert.detail}
               </p>
             </div>
-            <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 text-slate-600 transition group-hover:text-brand-300" />
+            <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 text-slate-400/75 transition group-hover:text-brand-300" />
           </motion.button>
         ))
       )}
       {report.alerts.length > 8 ? (
-        <p className="text-center text-[10px] text-slate-600">
+        <p className="text-center text-[10px] text-slate-400/75">
           +{report.alerts.length - 8} alertas adicionales en la tabla
         </p>
       ) : null}

@@ -83,7 +83,7 @@ export function CampaignPreview({
                         <ProductThumb category={product.category} name={product.name} size="sm" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[10px] text-slate-300">{product.name}</p>
-                          <p className="text-[9px] text-slate-500">
+                          <p className="text-[9px] text-slate-400">
                             {money(product.price)} ·{' '}
                             <motion.span
                               key={discountPct}
@@ -102,7 +102,7 @@ export function CampaignPreview({
                 </motion.div>
               ) : null}
             </AnimatePresence>
-            <p className="mt-2 text-right text-[9px] text-slate-600">10:24 ✓✓</p>
+            <p className="mt-2 text-right text-[9px] text-slate-400/75">10:24 ✓✓</p>
           </motion.div>
         </div>
       </Panel>
@@ -132,7 +132,7 @@ export function CampaignPreview({
           />
         </div>
 
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-2.5 text-[10px] leading-relaxed text-slate-500">
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-2.5 text-[10px] leading-relaxed text-slate-400">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
           Resultados estimados a partir de supuestos, no de campañas reales. No se publica nada ni
           se envían mensajes.

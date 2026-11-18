@@ -54,7 +54,7 @@ export function PanelHeader({
         ) : null}
         <div>
           <h2 className="font-display text-[15px] font-semibold tracking-tight text-white">{title}</h2>
-          {subtitle ? <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{subtitle}</p> : null}
         </div>
       </div>
       {action}

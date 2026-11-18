@@ -30,7 +30,7 @@ function LoadingScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.6 }}
-          className="text-xs uppercase tracking-[0.3em] text-slate-500"
+          className="text-xs uppercase tracking-[0.3em] text-slate-400"
         >
           Preparando la demo
         </motion.p>
