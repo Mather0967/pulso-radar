@@ -159,7 +159,7 @@ export function RangeField({
         type="range"
         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-ink-700 accent-brand-500"
         style={{
-          background: `linear-gradient(90deg, #2f74ff ${progress}%, #111a2e ${progress}%)`,
+          background: `linear-gradient(90deg, #ff762e ${progress}%, #111a2e ${progress}%)`,
         }}
         min={min}
         max={max}

@@ -1,6 +1,6 @@
 export const CHART = {
-  brand: '#2f74ff',
-  brandLight: '#8ab5ff',
+  brand: '#ff762e',
+  brandLight: '#ffb88a',
   mint: '#4ade9f',
   amber: '#f7bd54',
   coral: '#ff7a7a',
@@ -35,7 +35,7 @@ export const tooltipProps = {
   },
   labelStyle: { color: '#94a3b8', fontSize: 11, marginBottom: 4 },
   itemStyle: { color: '#e2e8f0', fontSize: 12 },
-  cursor: { fill: 'rgba(47,116,255,0.06)' },
+  cursor: { fill: 'rgba(255, 118, 46,0.06)' },
 }
 
 export const SERIES_COLORS = [CHART.brand, CHART.mint, CHART.amber, CHART.violet, CHART.coral]

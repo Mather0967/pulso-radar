@@ -138,8 +138,8 @@ export function ReportPage() {
             <div className="mt-3">
               <CompareBars
                 data={comparison}
-                series={[{ key: 'valor', label: 'Margen', color: '#5b95ff' }]}
-                colors={['#5b95ff', '#4ade9b']}
+                series={[{ key: 'valor', label: 'Margen', color: '#ff9a5c' }]}
+                colors={['#ff9a5c', '#4ade9b']}
                 height={200}
                 formatter={(value) => money(value)}
               />

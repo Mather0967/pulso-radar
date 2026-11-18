@@ -30,7 +30,7 @@ export function StatTile({
   separator?: boolean
 }) {
   const toneRing: Record<string, string> = {
-    brand: 'text-brand-300 border-brand-500/30 bg-brand-500/10 shadow-[0_0_12px_rgba(47,116,255,0.15)]',
+    brand: 'text-brand-300 border-brand-500/30 bg-brand-500/10 shadow-[0_0_12px_rgba(255, 118, 46,0.15)]',
     mint: 'text-mint-400 border-mint-500/30 bg-mint-500/10 shadow-[0_0_12px_rgba(74,222,159,0.15)]',
     amber: 'text-amber-400 border-amber-500/30 bg-amber-500/10 shadow-[0_0_12px_rgba(247,189,84,0.15)]',
     coral: 'text-coral-400 border-coral-500/30 bg-coral-500/10 shadow-[0_0_12px_rgba(255,122,122,0.15)]',
@@ -39,7 +39,7 @@ export function StatTile({
   }
 
   const toneSpotlight: Record<string, string> = {
-    brand: 'rgba(47,116,255,0.18)',
+    brand: 'rgba(255, 118, 46,0.18)',
     mint: 'rgba(74,222,159,0.18)',
     amber: 'rgba(247,189,84,0.18)',
     coral: 'rgba(255,122,122,0.18)',

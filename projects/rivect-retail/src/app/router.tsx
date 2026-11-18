@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { OverviewPage } from '@/features/retail-overview/OverviewPage'
 import { SimulatorPage } from '@/features/business-simulator/SimulatorPage'
@@ -7,6 +7,7 @@ import { RecoveryPage } from '@/features/customer-recovery/RecoveryPage'
 import { StockPage } from '@/features/stock-intelligence/StockPage'
 import { CampaignsPage } from '@/features/smart-campaigns/CampaignsPage'
 import { ReportPage } from '@/features/impact-report/ReportPage'
+import { PresentationShell } from '@/presentation/PresentationShell'
 import { Button } from '@/components/ui/Button'
 
 function NotFound() {
@@ -18,9 +19,12 @@ function NotFound() {
       <p className="mt-2 text-sm text-slate-400">
         La ruta que buscás no forma parte de la demostración de Retail Intelligence.
       </p>
-      <Button className="mt-6" onClick={() => navigate('/overview')}>
-        Volver al overview
-      </Button>
+      <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <Button onClick={() => navigate('/escena/1')}>Volver a la presentación</Button>
+        <Button variant="secondary" onClick={() => navigate('/overview')}>
+          Volver al overview
+        </Button>
+      </div>
     </div>
   )
 }
@@ -28,8 +32,11 @@ function NotFound() {
 export function AppRouter() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/escena/1" replace />} />
+      <Route path="/escena" element={<Navigate to="/escena/1" replace />} />
+      <Route path="/escena/:n" element={<PresentationShell />} />
+
       <Route element={<AppShell />}>
-        <Route path="/" element={<OverviewPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/simulator" element={<SimulatorPage />} />
         <Route path="/assistant" element={<AssistantPage />} />
