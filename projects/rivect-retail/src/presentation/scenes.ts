@@ -72,8 +72,9 @@ export const scenes: Scene[] = [
     tagline:
       'Un asistente responde las consultas de tus clientes las 24 horas, en segundos y con la info de tu catálogo.',
     notes: [
-      'Mostrá una consulta típica del rubro, como envíos o horarios.',
-      'Aclará que el asistente deriva a una persona cuando la consulta es compleja.',
+      'Mostrá una consulta típica del rubro, como stock, talles u horarios.',
+      'Si preguntan por envíos o pagos, mostrá que no inventa: lo consulta con el equipo.',
+      'Escribí «Quiero hablar con una persona» para mostrar la derivación con el resumen de la charla.',
       'Preguntá por qué canales les llegan consultas hoy: WhatsApp, Instagram, web.',
     ],
     steps: [
@@ -82,7 +83,7 @@ export const scenes: Scene[] = [
         caption: 'El asistente responde con datos del catálogo y del stock.',
         notify: {
           title: 'Nuevo mensaje',
-          message: '«¿Hacen envíos al interior?» respondido en 3 s',
+          message: '«¿Tienen zapatillas negras talle 42?» respondida con el stock del catálogo',
         },
       },
       { caption: 'Si la consulta es compleja, pasa a una persona con todo el contexto.' },

@@ -16,6 +16,14 @@ describe('liveEventAt', () => {
     expect([...kinds].sort()).toEqual([...ALL_KINDS].sort())
   })
 
+  it('nunca muestra como «respondida» una consulta de envíos o pagos (no está en el perfil)', () => {
+    for (let i = 0; i < 300; i++) {
+      const event = liveEventAt(i)
+      if (event.kind !== 'mensaje') continue
+      if (/envíos|tarjeta/.test(event.detail)) expect(event.title).not.toBe('Consulta respondida')
+    }
+  })
+
   it('el id es igual al índice', () => {
     for (let i = 0; i < 100; i++) {
       expect(liveEventAt(i).id).toBe(i)

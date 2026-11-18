@@ -3,6 +3,7 @@ import type { SalesChannel, StoreProfile } from '@/domain/models'
 import { NumberField, RangeField, SelectField, TextField } from '@/components/ui/Field'
 import { Panel } from '@/components/ui/Card'
 import { money, pct } from '@/utils/format'
+import { useFieldLimits } from './useFieldLimits'
 
 const BUSINESS_TYPES = [
   'Calzado y deportes',
@@ -23,6 +24,7 @@ export function SimulatorForm({
   profile: StoreProfile
   onChange: (patch: Partial<StoreProfile>) => void
 }) {
+  const { bind } = useFieldLimits()
   const warnings: string[] = []
   if (profile.workingDays <= 0) warnings.push('Definí al menos un día de funcionamiento al mes.')
   if (profile.averageMinutesPerQuery <= 0)
@@ -61,7 +63,7 @@ export function SimulatorForm({
           <NumberField
             label="Cantidad de productos"
             value={profile.totalProducts}
-            onChange={(value) => onChange({ totalProducts: value })}
+            {...bind('totalProducts', (value) => onChange({ totalProducts: value }))}
             suffix="SKU"
           />
           <TextField
@@ -104,27 +106,26 @@ export function SimulatorForm({
           <NumberField
             label="Consultas diarias"
             value={profile.dailyQueries}
-            onChange={(value) => onChange({ dailyQueries: value })}
+            {...bind('dailyQueries', (value) => onChange({ dailyQueries: value }))}
             suffix="/día"
           />
           <NumberField
             label="Minutos por consulta"
             value={profile.averageMinutesPerQuery}
-            onChange={(value) => onChange({ averageMinutesPerQuery: value })}
+            {...bind('averageMinutesPerQuery', (value) => onChange({ averageMinutesPerQuery: value }))}
             suffix="min"
             step={0.5}
           />
           <NumberField
             label="Días de funcionamiento"
             value={profile.workingDays}
-            onChange={(value) => onChange({ workingDays: value })}
+            {...bind('workingDays', (value) => onChange({ workingDays: value }))}
             suffix="/mes"
-            max={31}
           />
           <NumberField
             label="Personas en atención"
             value={profile.employeesInService}
-            onChange={(value) => onChange({ employeesInService: value })}
+            {...bind('employeesInService', (value) => onChange({ employeesInService: value }))}
             suffix="pers."
           />
         </div>
@@ -153,7 +154,7 @@ export function SimulatorForm({
           <NumberField
             label="Ventas mensuales"
             value={profile.monthlySales}
-            onChange={(value) => onChange({ monthlySales: value })}
+            {...bind('monthlySales', (value) => onChange({ monthlySales: value }))}
             prefix="$"
             step={100000}
             hint={money(profile.monthlySales)}
@@ -161,7 +162,7 @@ export function SimulatorForm({
           <NumberField
             label="Ticket promedio"
             value={profile.averageTicket}
-            onChange={(value) => onChange({ averageTicket: value })}
+            {...bind('averageTicket', (value) => onChange({ averageTicket: value }))}
             prefix="$"
             step={1000}
             hint={money(profile.averageTicket)}
@@ -169,15 +170,16 @@ export function SimulatorForm({
           <NumberField
             label="Ventas recuperadas por mes"
             value={profile.recoveredSales}
-            onChange={(value) => onChange({ recoveredSales: value })}
+            {...bind('recoveredSales', (value) => onChange({ recoveredSales: value }))}
             suffix="u."
             hint="Escenario independiente de ventas recuperadas"
           />
           <NumberField
-            label="Clientes sin seguimiento"
+            label="Clientes sin seguimiento (dato declarado)"
             value={profile.customersWithoutFollowUp}
-            onChange={(value) => onChange({ customersWithoutFollowUp: value })}
+            {...bind('customersWithoutFollowUp', (value) => onChange({ customersWithoutFollowUp: value }))}
             suffix="clientes"
+            hint="Estimación del comercio. El CRM de Recuperación muestra solo una muestra de ejemplo."
           />
         </div>
         <div className="mt-4">

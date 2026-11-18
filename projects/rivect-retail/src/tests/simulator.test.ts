@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateSimulator, clampPct } from '@/domain/calculations/simulator'
+import { calculateSimulator, clampPct, clampProfileField, sanitizeProfile } from '@/domain/calculations/simulator'
 import type { StoreProfile } from '@/domain/models'
 
 const profile: StoreProfile = {
@@ -70,5 +70,60 @@ describe('calculateSimulator', () => {
     expect(clampPct(-20)).toBe(0)
     const metrics = calculateSimulator({ ...profile, automationPercentage: 150 })
     expect(metrics.recoverableHours).toBeCloseTo(metrics.manualHours, 5)
+  })
+})
+
+describe('límites del simulador', () => {
+  it('999.999.999 consultas diarias se ajustan a 5.000 con mensaje visible', () => {
+    const result = clampProfileField('dailyQueries', 999_999_999)
+    expect(result.value).toBe(5_000)
+    expect(result.message).toMatch(/Máximo 5\.000 consultas por día/)
+  })
+
+  it('40 días se ajustan a 31 y lo dice', () => {
+    const result = clampProfileField('workingDays', 40)
+    expect(result.value).toBe(31)
+    expect(result.message).toMatch(/31 días por mes/)
+  })
+
+  it('0 minutos por consulta y ticket 0 se ajustan al mínimo', () => {
+    expect(clampProfileField('averageMinutesPerQuery', 0)).toMatchObject({ value: 0.5 })
+    expect(clampProfileField('averageMinutesPerQuery', 0).message).toMatch(/Mínimo 0,5 minutos/)
+    expect(clampProfileField('averageTicket', 0).value).toBe(1)
+    expect(clampProfileField('averageTicket', 0).message).toMatch(/\$ 1/)
+  })
+
+  it('un valor dentro del rango no genera mensaje', () => {
+    expect(clampProfileField('dailyQueries', 65)).toEqual({ value: 65 })
+    expect(clampProfileField('averageMinutesPerQuery', 7)).toEqual({ value: 7 })
+  })
+
+  it('NaN o infinito vuelven al mínimo', () => {
+    expect(clampProfileField('workingDays', Number.NaN).value).toBe(1)
+    expect(clampProfileField('dailyQueries', Number.POSITIVE_INFINITY).value).toBe(0)
+  })
+
+  it('sanitizeProfile corrige un perfil guardado con datos absurdos', () => {
+    const broken = {
+      ...profile,
+      dailyQueries: 999_999_999,
+      workingDays: 0,
+      averageMinutesPerQuery: 0,
+      averageTicket: 0,
+      automationPercentage: 250,
+    }
+    const fixed = sanitizeProfile(broken)
+    expect(fixed.dailyQueries).toBe(5_000)
+    expect(fixed.workingDays).toBe(1)
+    expect(fixed.averageMinutesPerQuery).toBe(0.5)
+    expect(fixed.averageTicket).toBe(1)
+    expect(fixed.automationPercentage).toBe(100)
+    // las horas quedan acotadas: nada de «1.880.666.664,8 h»
+    const metrics = calculateSimulator({ ...fixed, workingDays: 31, averageMinutesPerQuery: 240 })
+    expect(metrics.manualHours).toBeLessThanOrEqual(5_000 * 31 * 4)
+  })
+
+  it('sanitizeProfile no toca un perfil válido', () => {
+    expect(sanitizeProfile(profile)).toEqual(profile)
   })
 })

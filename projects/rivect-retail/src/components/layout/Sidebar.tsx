@@ -90,14 +90,8 @@ export function Sidebar({
                     isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300',
                   )}
                 />
-                <span className="flex-1 truncate font-medium">{item.label}</span>
-                <span
-                  className={cn(
-                    'text-[9px] uppercase tracking-wider',
-                    isActive ? 'text-brand-300/80 font-semibold' : 'text-slate-700',
-                  )}
-                >
-                  {item.description.split(' ')[0]}
+                <span className="flex-1 truncate font-medium" title={item.description}>
+                  {item.label}
                 </span>
               </>
             )}
