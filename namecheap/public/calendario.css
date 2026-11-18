@@ -1,0 +1,1367 @@
+/*
+  Calendario · RIVECT Portal (modo oscuro)
+  Identidad RIVECT: Medianoche como base, Pizarra como secundario y Mandarín como acento.
+  - Tipografía propia (Plus Jakarta Sans / JetBrains Mono) servida desde /fonts.
+  - Movimiento con transform y opacity: fondo ambiental, entradas escalonadas (--i),
+    cambio de mes con deslizamiento, chips que caen al soltarlo, diálogo con escala y fade.
+  - prefers-reduced-motion desactiva animaciones y transiciones.
+  Clases que usa calendario.mjs (contrato):
+    Vistas: #cal-grid.view-month | .view-week | .view-agenda; deslizamiento .slide-left | .slide-right
+    Celdas: .cal-day[data-date] (+ .is-weekend .is-today .is-outside .drop-target .enter, --i),
+            .cal-day-num, .cal-day-jobs, .cal-dow (encabezado de día)
+    Semana: .cal-week-col[data-date] > .cal-slot-list
+    Agenda: .cal-agenda-day (+ .is-today) > h3 + ul.cal-agenda-list > li.cal-agenda-item
+    Chips:  .cal-chip[data-job-id] (+ .p-pulso .p-landur .p-studio .p-retail .p-general,
+            .s-pendiente .s-en_curso .s-hecho, .allday, .dragging, .dropped, .enter, --i)
+            contenido: .cal-chip-time, .cal-chip-title
+    Vacío:  .cal-empty
+    Aviso:  #toast.show (+ .is-error)
+    Campos: input/select/textarea[aria-invalid="true"] para marcar errores
+*/
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/pjs-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/pjs-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/pjs-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/pjs-800.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/jbm-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/jbm-600.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: dark;
+
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Marca RIVECT */
+  --medianoche: #0a151c;
+  --medianoche-2: #11222c;
+  --surface-3: #172d39;
+  --pizarra: #405c6b;
+  --pizarra-hi: #5b7d8f;
+  --mandarin: #ff762e;
+  --mandarin-hover: #e6621b;
+  --mandarin-soft: #ffb08a;
+  --cream: #f7f5ef;
+
+  /* Texto (AA sobre superficies) */
+  --ink: #f7f5ef;
+  --ink-2: #c4d0d7;
+  --ink-3: #8aa2b0;
+  --ink-on-accent: #0a151c;
+
+  /* Superficies y bordes */
+  --bg: #0a151c;
+  --surface: #11222c;
+  --surface-2: #172d39;
+  --field: #0a151c;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Acentos */
+  --accent-soft: rgba(255, 118, 46, 0.12);
+  --accent-glow: rgba(255, 118, 46, 0.35);
+  --focus: #ff762e;
+  --danger: #fca5a5;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 14px 34px -16px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-dialog: 0 40px 80px -24px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Curvas */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Reset y base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  background-color: var(--medianoche);
+  background-image: linear-gradient(180deg, #0a151c 0%, #11222c 55%, #0a151c 100%);
+  background-repeat: no-repeat;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-main);
+  color: var(--ink);
+  background: var(--medianoche);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+h1, h2, h3, p, ul, ol {
+  margin: 0;
+  padding: 0;
+}
+
+button, select, input, textarea, a {
+  font: inherit;
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(255, 118, 46, 0.35);
+  color: var(--cream);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.noscript {
+  position: relative;
+  z-index: 50;
+  margin: 24px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+/* ==========================================================================
+   Fondo ambiental: orbes derivando + malla que respira
+   ========================================================================== */
+.ambient-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.6;
+  will-change: transform;
+  animation: orbFloat 24s ease-in-out infinite alternate;
+}
+
+.orb-1 {
+  width: 580px;
+  height: 580px;
+  background: radial-gradient(circle, rgba(255, 118, 46, 0.2), transparent 70%);
+  top: -140px;
+  right: -80px;
+}
+
+.orb-2 {
+  width: 680px;
+  height: 680px;
+  background: radial-gradient(circle, rgba(64, 92, 107, 0.55), transparent 70%);
+  bottom: -200px;
+  left: -140px;
+  animation-duration: 30s;
+  animation-direction: alternate-reverse;
+}
+
+.orb-3 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(91, 125, 143, 0.35), transparent 70%);
+  top: 38%;
+  left: 46%;
+  opacity: 0.45;
+  animation-duration: 36s;
+}
+
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(247, 245, 239, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 50% 30%, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, black 40%, transparent 85%);
+  animation: gridBreath 9s ease-in-out infinite;
+}
+
+@keyframes orbFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-36px, 52px) scale(1.07); }
+  100% { transform: translate(30px, -40px) scale(0.95); }
+}
+
+@keyframes gridBreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+.top {
+  height: 74px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(10, 21, 28, 0.78);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(24px, calc((100% - 1200px) / 2));
+  gap: 20px;
+  animation: topSlide 0.75s var(--ease-spring) backwards;
+}
+
+@keyframes topSlide {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.25s var(--ease-spring), opacity 0.2s ease;
+}
+
+.brand:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.brand img {
+  display: block;
+  width: 154px;
+  height: auto;
+}
+
+.back {
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, transform 0.2s var(--ease-spring);
+}
+
+.back:hover {
+  color: var(--ink);
+  border-color: rgba(255, 118, 46, 0.45);
+  background: rgba(255, 118, 46, 0.08);
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Contenedor y título
+   ========================================================================== */
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 48px;
+  position: relative;
+}
+
+.intro h1 {
+  position: relative;
+  display: inline-block;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1.12;
+  padding-bottom: 12px;
+  animation: titleUp 0.8s var(--ease-spring) backwards;
+}
+
+.intro h1::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 96px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--mandarin), rgba(255, 118, 46, 0.2));
+  transform-origin: left center;
+  animation: underlineDraw 1s var(--ease-spring) 0.45s backwards;
+}
+
+.intro p {
+  font-size: 15.5px;
+  color: var(--ink-3);
+  margin-top: 10px;
+  letter-spacing: -0.01em;
+  animation: titleUp 0.8s var(--ease-spring) 0.2s backwards;
+}
+
+@keyframes titleUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes underlineDraw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.glass {
+  background: rgba(17, 34, 44, 0.72);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ==========================================================================
+   Barra de herramientas y filtros
+   ========================================================================== */
+.toolbar {
+  margin-top: 32px;
+  padding: 14px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  animation: groupEnter 0.7s var(--ease-spring) 0.25s backwards;
+}
+
+.nav-group,
+.view-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cal-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin-left: 8px;
+  min-width: 10ch;
+  text-transform: none;
+}
+
+.tool-btn {
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
+}
+
+.tool-btn.icon-btn {
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 12px 6px;
+}
+
+.tool-btn:hover:not(:disabled) {
+  border-color: rgba(255, 118, 46, 0.45);
+  color: var(--ink);
+  background: rgba(255, 118, 46, 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgba(255, 118, 46, 0.35);
+}
+
+.tool-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.tool-btn[aria-pressed="true"] {
+  background: var(--mandarin);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--ink-on-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 18px -10px rgba(255, 118, 46, 0.7);
+}
+
+.tool-btn[aria-pressed="true"]:hover {
+  background: var(--mandarin-hover);
+  color: var(--ink-on-accent);
+}
+
+/* Botones con barrido de brillo */
+.btn::before,
+.tool-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%);
+  transform: translateX(-130%) skewX(-18deg);
+  transition: transform 0.75s var(--ease-spring);
+  pointer-events: none;
+}
+
+.btn:hover::before,
+.tool-btn:hover::before {
+  transform: translateX(340%) skewX(-18deg);
+}
+
+.btn {
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: transform 0.25s var(--ease-spring), background-color 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--mandarin);
+  color: var(--ink-on-accent);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 20px -10px rgba(255, 118, 46, 0.6);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--mandarin-hover);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 14px 28px -10px rgba(255, 118, 46, 0.7);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-2);
+  border: 1px solid var(--line-strong);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: rgba(255, 118, 46, 0.45);
+  background: rgba(255, 118, 46, 0.08);
+}
+
+.btn-danger {
+  background: rgba(252, 165, 165, 0.08);
+  color: var(--danger);
+  border: 1px solid rgba(252, 165, 165, 0.35);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(252, 165, 165, 0.16);
+  border-color: rgba(252, 165, 165, 0.6);
+}
+
+.filters {
+  margin-top: 14px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  animation: groupEnter 0.7s var(--ease-spring) 0.35s backwards;
+}
+
+@keyframes groupEnter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.readonly-note {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Campos (select, input, textarea) con anillo mandarín al foco
+   ========================================================================== */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field > span {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.field-wide {
+  margin-top: 14px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+  align-items: end;
+}
+
+input, select, textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color-scheme: dark;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-3);
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  background: var(--surface-2);
+  border-color: var(--mandarin);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  outline: none;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(252, 165, 165, 0.22);
+}
+
+input[type="date"],
+input[type="time"] {
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+/* Casilla "Todo el día" con área táctil de 44px */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--mandarin);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Tablero (cuadrícula de mes / semana / agenda)
+   ========================================================================== */
+.board {
+  margin-top: 16px;
+}
+
+.cal-grid {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cal-grid.view-month,
+.cal-grid.view-week {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-grid.view-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cal-grid.slide-left {
+  animation: slideLeft 0.42s var(--ease-spring) both;
+}
+
+.cal-grid.slide-right {
+  animation: slideRight 0.42s var(--ease-spring) both;
+}
+
+@keyframes slideLeft {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Encabezado de día (lun-dom) */
+.cal-dow {
+  text-align: center;
+  padding: 6px 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Celda de día (mes y semana) */
+.cal-day {
+  position: relative;
+  min-width: 0;
+  min-height: 118px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, outline-color 0.2s ease;
+}
+
+.cal-day:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.cal-day.is-weekend {
+  background: linear-gradient(180deg, #14303d 0%, #102530 100%);
+}
+
+.cal-day.is-outside {
+  background: rgba(10, 21, 28, 0.62);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.cal-day.is-outside .cal-day-num {
+  color: var(--ink-3);
+}
+
+.cal-day.is-outside .cal-chip {
+  opacity: 0.78;
+}
+
+.cal-day.is-today {
+  box-shadow: 0 0 0 2px var(--mandarin), 0 0 22px -2px var(--accent-glow);
+  border-color: transparent;
+}
+
+.cal-day-num {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cal-day.is-today .cal-day-num {
+  background: var(--mandarin);
+  color: var(--ink-on-accent);
+}
+
+.cal-day-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Arrastre: zona de destino */
+.cal-day.drop-target {
+  background: var(--accent-soft);
+  outline: 2px dashed var(--mandarin);
+  outline-offset: -4px;
+}
+
+/* Vista semana: columnas con lista de franjas horarias */
+.cal-week-col {
+  min-height: 62vh;
+}
+
+.cal-week-col .cal-day-num {
+  display: none;
+}
+
+.cal-slot-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding-top: 2px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 47px,
+    rgba(255, 255, 255, 0.06) 47px,
+    rgba(255, 255, 255, 0.06) 48px
+  );
+  background-size: 100% 48px;
+}
+
+/* ==========================================================================
+   Chips de trabajo
+   ========================================================================== */
+.cal-chip {
+  --chip-ink: #d5dfe5;
+  --chip-bg: rgba(138, 162, 176, 0.16);
+  --chip-line: rgba(138, 162, 176, 0.4);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 8px 5px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--chip-line);
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  letter-spacing: -0.01em;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.cal-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--chip-ink);
+  box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.8);
+}
+
+.cal-chip:active {
+  cursor: grabbing;
+}
+
+.cal-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.cal-chip-time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.cal-chip-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-chip.allday .cal-chip-time {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Proyectos: colores distintos y legibles sobre Medianoche */
+.cal-chip.p-pulso {
+  --chip-ink: #ffb08a;
+  --chip-bg: rgba(255, 118, 46, 0.16);
+  --chip-line: rgba(255, 118, 46, 0.5);
+}
+
+.cal-chip.p-landur {
+  --chip-ink: #cbbcff;
+  --chip-bg: rgba(155, 122, 255, 0.16);
+  --chip-line: rgba(155, 122, 255, 0.5);
+}
+
+.cal-chip.p-studio {
+  --chip-ink: #7fe3d6;
+  --chip-bg: rgba(46, 196, 176, 0.14);
+  --chip-line: rgba(46, 196, 176, 0.5);
+}
+
+.cal-chip.p-retail {
+  --chip-ink: #9fd8f5;
+  --chip-bg: rgba(86, 170, 220, 0.15);
+  --chip-line: rgba(86, 170, 220, 0.5);
+}
+
+.cal-chip.p-general {
+  --chip-ink: #d5dfe5;
+  --chip-bg: rgba(138, 162, 176, 0.16);
+  --chip-line: rgba(138, 162, 176, 0.45);
+}
+
+/* Estados */
+.cal-chip.s-hecho {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  opacity: 0.72;
+}
+
+.cal-chip.s-en_curso::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--mandarin), var(--mandarin-soft));
+  animation: barPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes barPulse {
+  0%, 100% { opacity: 0.55; transform: scaleY(0.82); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+
+/* Arrastre */
+.cal-chip.dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+  transform: rotate(-1.5deg) scale(1.03);
+  box-shadow: 0 18px 30px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--mandarin);
+}
+
+/* Caída al soltar */
+.cal-chip.dropped {
+  animation: chipDrop 0.55s var(--ease-spring);
+}
+
+@keyframes chipDrop {
+  0% { transform: translateY(-16px) scale(1.07); }
+  55% { transform: translateY(3px) scale(0.97); }
+  80% { transform: translateY(-1px) scale(1.01); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Entrada escalonada: --i fijado por el script */
+.cal-day.enter,
+.cal-chip.enter,
+.cal-agenda-day.enter,
+.cal-dow.enter {
+  animation: enterIn 0.55s var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 16ms);
+}
+
+@keyframes enterIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Vista agenda */
+.cal-agenda-day {
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.cal-agenda-day h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-transform: none;
+}
+
+.cal-agenda-day h3::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--pizarra-hi);
+  box-shadow: 0 0 10px rgba(91, 125, 143, 0.5);
+}
+
+.cal-agenda-day.is-today {
+  border-color: rgba(255, 118, 46, 0.45);
+  box-shadow: var(--shadow-card), 0 0 24px -10px var(--accent-glow);
+}
+
+.cal-agenda-day.is-today h3::before {
+  background: var(--mandarin);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.cal-agenda-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cal-agenda-item {
+  min-width: 0;
+}
+
+.cal-agenda-item .cal-chip {
+  min-height: 44px;
+  font-size: 14px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.cal-agenda-item .cal-chip:hover {
+  transform: translateX(3px);
+}
+
+.cal-empty {
+  grid-column: 1 / -1;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 15px;
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+}
+
+/* ==========================================================================
+   Diálogo de trabajo
+   ========================================================================== */
+#job-dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  color: var(--ink);
+  background: linear-gradient(180deg, #152b38 0%, #0f1f28 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
+  transition:
+    opacity 0.25s ease,
+    transform 0.4s var(--ease-spring),
+    display 0.4s allow-discrete,
+    overlay 0.4s allow-discrete;
+}
+
+#job-dialog[open] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@starting-style {
+  #job-dialog[open] {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+}
+
+#job-dialog::backdrop {
+  background: rgba(5, 12, 16, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.3s ease, display 0.3s allow-discrete, overlay 0.3s allow-discrete;
+}
+
+#job-dialog[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  #job-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+.job-form {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  min-height: 0;
+}
+
+.dialog-head {
+  padding: 22px 26px 0;
+  position: relative;
+}
+
+.dialog-head::after {
+  content: "";
+  position: absolute;
+  left: 26px;
+  bottom: 0;
+  width: 64px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--mandarin), rgba(255, 118, 46, 0.2));
+}
+
+.dialog-head h2 {
+  padding-bottom: 14px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.dialog-body {
+  padding: 0 26px 6px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.form-error {
+  margin-top: 14px;
+  min-height: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.form-error:not(:empty) {
+  animation: msgIn 0.45s var(--ease-spring) backwards;
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px 26px 22px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  background: rgba(10, 21, 28, 0.4);
+}
+
+.dialog-actions .spacer {
+  flex: 1;
+}
+
+/* ==========================================================================
+   Aviso (toast)
+   ========================================================================== */
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 80;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(23, 45, 57, 0.96);
+  border: 1px solid rgba(255, 118, 46, 0.4);
+  box-shadow: 0 20px 40px -14px rgba(0, 0, 0, 0.8);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(100% + 40px));
+  transition: transform 0.5s var(--ease-spring), opacity 0.3s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast.is-error {
+  border-color: rgba(252, 165, 165, 0.55);
+  color: #fecaca;
+}
+
+/* ==========================================================================
+   Pantallas estrechas: agenda a ancho completo
+   ========================================================================== */
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .cal-day {
+    min-height: 96px;
+  }
+}
+
+@media (max-width: 960px) {
+  .toolbar {
+    justify-content: flex-start;
+  }
+  .view-group {
+    order: 3;
+  }
+}
+
+@media (max-width: 699px) {
+  .top {
+    height: auto;
+    min-height: 64px;
+    padding: 12px 16px;
+  }
+  .brand img {
+    width: 124px;
+  }
+  .back {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  main {
+    padding: 24px 16px 32px;
+  }
+  .intro h1 {
+    font-size: 30px;
+  }
+  .toolbar {
+    padding: 12px;
+    gap: 12px;
+  }
+  .nav-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .cal-title {
+    order: -1;
+    flex-basis: 100%;
+    width: 100%;
+    margin: 0 0 4px;
+    min-width: 0;
+    text-align: center;
+    font-size: 17px;
+  }
+  .view-group {
+    width: 100%;
+    display: none;
+  }
+  .toolbar #cal-new {
+    width: 100%;
+  }
+  .filters {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+  /* Vistas de cuadrícula ocultas: se muestra la agenda */
+  .cal-grid.view-month,
+  .cal-grid.view-week {
+    display: none;
+  }
+  .cal-grid.view-agenda {
+    display: flex;
+  }
+  .cal-agenda-day {
+    padding: 14px 14px;
+  }
+  .field-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .dialog-head,
+  .dialog-body {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .dialog-head::after {
+    left: 20px;
+  }
+  .dialog-actions {
+    padding: 14px 20px 18px;
+  }
+  .dialog-actions .btn {
+    flex: 1 1 auto;
+  }
+  .dialog-actions .spacer {
+    display: none;
+  }
+  #job-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 18px;
+  }
+  .toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    max-width: none;
+  }
+}
+
+/* ==========================================================================
+   Reducción de movimiento (accesibilidad): sin animaciones ni transiciones
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .cal-chip:hover,
+  .btn:hover:not(:disabled),
+  .tool-btn:hover:not(:disabled) {
+    transform: none;
+  }
+  .btn::before,
+  .tool-btn::before {
+    display: none;
+  }
+}
+
+/* Solo la primera letra en mayúscula: «16 al 22 de noviembre de 2026», no «Al» ni «De». */
+#cal-title::first-letter,
+.cal-agenda-day h3::first-letter { text-transform: uppercase; }
