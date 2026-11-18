@@ -40,7 +40,7 @@ const KIND_HINTS = [
 // Palabras que no forman parte del concepto: verbos de registro, artículos,
 // conectores, monedas, muletillas de cortesía y palabras propias del tipo de operación.
 const STOPWORDS = new Set([
-  'eh', 'em', 'bueno', 'ok', 'okay', 'dale', 'listo', 'nada', 'gracias', 'pues', 'entonces', 'vale', 'bien',
+  'eh', 'em', 'bueno', 'ok', 'okay', 'dale', 'listo', 'gracias', 'pues', 'entonces', 'vale', 'bien',
   'registra', 'registrar', 'registrame', 'anota', 'anotar', 'anotame', 'carga', 'cargar', 'cargame',
   'agrega', 'agregar', 'agregame', 'pone', 'poner', 'poneme', 'pasame', 'ingresa', 'ingresar',
   'apunta', 'apuntar', 'apuntame', 'guarda', 'guardame',
@@ -54,6 +54,7 @@ const STOPWORDS = new Set([
   'uruguayos', 'americanos', 'brasilenos', 'centesimos', 'centavos'
 ]);
 
+const TOTAL_WORDS = new Set(['total', 'importe', 'monto']);
 const CURRENCY_WORDS = new Set(['pesos', 'peso', 'dolares', 'dolar', 'reales', 'uyu', 'usd', 'brl']);
 const CENTS_WORDS = new Set(['centesimos', 'centavos']);
 // Palabras que anuncian el importe: «total 500», «por 3.000».
@@ -272,7 +273,9 @@ function expandSpokenComma(text) {
   const word = i => (i >= 0 && i < list.length ? bare(list[i].value) : '');
   for (let c = 1; c + 1 < list.length; c++) {
     const separator = word(c);
-    if (separator !== 'coma' && separator !== 'con') continue;
+    // «y» solo separa decimales con la palabra de centavos después: «4.567 pesos y 89 centavos».
+    if (separator !== 'coma' && separator !== 'con' && separator !== 'y') continue;
+    if (separator === 'y' && !CENTS_WORDS.has(word(c + 2)) && !CENTS_WORDS.has(word(c + 3))) continue;
     const isComma = separator === 'coma';
     // «500 pesos con 50 centésimos»: la moneda dicha antes del separador se conserva junto a la cifra.
     const currency = CURRENCY_WORDS.has(word(c - 1)) ? word(c - 1) : '';
@@ -324,7 +327,14 @@ function expandSpokenComma(text) {
     }
     // «2 coma 5 coma 6»: dos comas seguidas no dicen cuál es la decimal.
     if (isComma && word(to + 1) === 'coma') { ambiguous = true; continue; }
-    if (CENTS_WORDS.has(word(to + 1))) to++;
+    if (separator === 'y' && !CENTS_WORDS.has(word(to + 1))) continue;
+    // Con «centavos»/«centésimos» la cifra vale tal cual: «5 centésimos» son 0,05 y no 0,50.
+    if (CENTS_WORDS.has(word(to + 1))) {
+      const said = list.slice(c + 1, to + 1).map(token => bare(token.value));
+      const literal = said.length === 1 && /^\d{1,2}$/.test(said[0]) ? Number(said[0]) : wordsToNumber(said.filter(w => w !== 'cero'));
+      if (literal !== null && literal <= 99) fraction = literal;
+      to++;
+    }
     const cents = wholeCents + fraction;
     if (!cents || !Number.isSafeInteger(cents) || cents > MAX_CENTS) continue;
     const digits = `${Math.floor(cents / 100)},${String(cents % 100).padStart(2, '0')}${currency ? ` ${currency}` : ''}`;
@@ -391,10 +401,17 @@ function findAmount(text, list) {
 function maskFillers(text) {
   // «mirá», «escuchá», «fijate» llaman la atención solo al empezar o seguidos de una coma:
   // en «a Mira Digital» son parte de un nombre.
-  const attention = (token, i) => /^(?:mira|escucha|fijate)$/.test(bare(token.value)) && (i === 0 || /,$/.test(token.value));
-  const spans = tokenize(text).filter((token, i) => FILLER_TOKEN.test(bare(token.value)) || attention(token, i))
+  // Al empezar sin coma solo cuentan si sigue un verbo o palabra vacía («mirá pagué»): «Mira Digital
+  // 4500» es una marca.
+  const list = tokenize(text);
+  const attention = (token, i) => /^(?:mira|escucha|fijate)$/.test(bare(token.value))
+    && (/,$/.test(token.value) || (i === 0 && STOPWORDS.has(bare(list[1]?.value ?? ''))));
+  const spans = list.filter((token, i) => FILLER_TOKEN.test(bare(token.value)) || attention(token, i))
     .map(token => ({ start: token.start, end: token.end }));
   for (const match of text.matchAll(FILLER_PHRASE)) spans.push(spanOf(match));
+  // «nada» cierra la frase («… y nada», «nada más»); en el medio puede ser un nombre («La Nada Bar»).
+  const closing = /\b(?:y nada|nada mas|nada)\b[^\p{L}\p{N}]*$/u.exec(text);
+  if (closing) spans.push(spanOf(closing));
   return { text: spans.reduce((out, span) => mask(out, span), text), spans };
 }
 
@@ -455,6 +472,7 @@ function amountCandidates(text) {
     }
     found.push({
       start, end: tail, cents, countable,
+      prev, next,
       currency: /\$\s*$/.test(before) || CURRENCY_WORDS.has(next),
       keyword: AMOUNT_KEYWORDS.has(prev)
     });
@@ -486,7 +504,12 @@ function pickAmount({ text, regions }) {
   const currency = found.filter(c => c.currency);
   const keyword = found.filter(c => c.keyword && c.countable);
   const plain = found.filter(c => c.countable);
-  const pool = currency.length ? currency : keyword.length ? keyword : plain;
+  // «total 1500» compite con «300 pesos»: un total distinto del importe con moneda no se adivina.
+  const strong = keyword.filter(c => TOTAL_WORDS.has(c.prev));
+  let pool = currency.length ? [...currency, ...strong] : keyword.length ? keyword : plain;
+  // «300 pesos de nafta y 200 de peaje»: una cifra suelta que se dice como importe («y 200», «200 de»)
+  // es un segundo importe. «12 cajas» es una cantidad y no compite.
+  if (pool !== plain) pool = [...pool, ...plain.filter(c => !pool.includes(c) && (c.prev === 'y' || ['de', 'en', 'para'].includes(c.next)))];
   const values = [...new Set(pool.map(c => c.cents))];
   const spans = pool.map(c => extendByRegions(c, regions));
   if (!values.length) return { cents: null, spans: [], ambiguous: null };
@@ -586,14 +609,28 @@ export function parseSpokenInvoice(transcript, { today = new Date().toISOString(
   hide(thisFillers(working));
 
   const expansion = expandSpoken(working);
-  const picked = expansion.ambiguous ? { cents: null, spans: [], ambiguous: null } : pickAmount(expansion);
+  // «la mitad de 800», «15% de 800»: el importe hay que calcularlo, no se adivina.
+  const computed = /\d\s*%|\bpor ?ciento\b|\b(?:la mitad|un tercio|un cuarto|el doble|el triple)\b/.test(working);
+  // «60 200 pesos», «1 eh 500»: dos cifras pegadas pueden ser una sola o dos; no se adivina.
+  const split = /(?:^|\s)\d{1,3}\s+\d{3}(?![\d.,])/.test(expansion.text);
+  const picked = expansion.ambiguous || computed ? { cents: null, spans: [], ambiguous: null }
+    : split ? { cents: null, spans: [], ambiguous: [] } : pickAmount(expansion);
   hide(picked.spans);
   const cents = picked.cents;
 
   const concept = buildConcept(original, folded, removed, tokenize(folded));
 
+  // «10 lápices de 50 pesos», «5 cajas a 300 pesos (cada una)»: una cantidad antes de un precio.
+  if (cents) {
+    const chosen = amountCandidates(expansion.text).find(c => c.cents === cents);
+    const quantityBefore = chosen && amountCandidates(expansion.text).some(c => c.end <= chosen.start && c.cents !== cents && !c.currency);
+    if (quantityBefore && (['a', 'de'].includes(chosen.prev) || /^\s*(?:\S+\s+)?cada\b/.test(expansion.text.slice(chosen.end))))
+      warnings.push('Parece un precio por unidad: revisá si el importe es el total.');
+  }
   if (approximate.length && cents) warnings.push('El importe parece aproximado: revisalo antes de guardar.');
-  if (expansion.ambiguous) warnings.push('Escuché más de un importe o una coma dudosa. Escribí el correcto.');
+  if (/^\s*no\s+(?:pague|compre|gaste|vendi|cobre|debo|abone)\b/.test(folded)) warnings.push('Escuché «no» al principio: revisá que corresponda registrarlo.');
+  if (computed) warnings.push('Escuché un porcentaje o una fracción: escribí el importe final.');
+  else if (expansion.ambiguous || (picked.ambiguous && !picked.ambiguous.length)) warnings.push('Escuché más de un importe o una coma dudosa. Escribí el correcto.');
   else if (picked.ambiguous) warnings.push(`Escuché más de un importe (${picked.ambiguous.slice(0, 2).map(formatPesos).join(' y ')}). Escribí el correcto.`);
   else if (!cents) warnings.push('No reconocí un importe. Escribilo a mano: es el dato que más cuidado necesita.');
   if (!concept) warnings.push('No reconocí el concepto. Escribí a qué corresponde.');
