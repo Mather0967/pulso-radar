@@ -139,7 +139,7 @@ export function AssistantPage() {
             onReset={resetAssistant}
             onSelectProduct={setSelected}
           />
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
             <Users className="h-3.5 w-3.5" />
             Probá: «zapatillas negras talle 42», «¿tienen botines marrones?», «algo más económico» o
             «quiero reservar». Precio promedio de ticket: {money(profile.averageTicket)}.
@@ -159,7 +159,7 @@ export function AssistantPage() {
 
       <div className="panel panel-pad">
         <h2 className="font-display text-sm font-semibold text-white">Cómo interpreta la conversación</h2>
-        <div className="mt-3 grid gap-3 text-[11px] leading-relaxed text-slate-500 sm:grid-cols-3">
+        <div className="mt-3 grid gap-3 text-[11px] leading-relaxed text-slate-400 sm:grid-cols-3">
           <div className="rounded-xl border border-line bg-ink-900/50 p-3">
             <p className="font-medium text-slate-300">1 · Detección de intención</p>
             Reglas de demostración identifican búsqueda, precio, colores, talles, alternativas,
@@ -176,7 +176,7 @@ export function AssistantPage() {
             trazabilidad en las métricas.
           </div>
         </div>
-        <p className="mt-3 text-[10px] text-slate-600">
+        <p className="mt-3 text-[11px] text-slate-400/75">
           {num(products.length)} productos en catálogo · motor determinístico local · sin IA externa
           ni credenciales.
         </p>

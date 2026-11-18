@@ -31,7 +31,7 @@ export function ProductDetailModal({
             <ProductThumb category={product.category} name={product.name} size="lg" />
             <div>
               <p className="font-display text-2xl font-semibold text-white">{money(product.price)}</p>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <p className="mt-1 text-[11px] text-slate-400">
                 Costo {money(product.cost)} · margen{' '}
                 {pct(((product.price - product.cost) / product.price) * 100)}
               </p>
@@ -55,7 +55,7 @@ export function ProductDetailModal({
             <p className="kpi-label mb-2">Variantes y disponibilidad</p>
             <div className="overflow-hidden rounded-xl border border-line">
               <table className="w-full text-left text-xs">
-                <thead className="bg-ink-800/70 text-[10px] uppercase tracking-wider text-slate-500">
+                <thead className="bg-ink-800/70 text-[11px] uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="px-3 py-2 font-medium">Color</th>
                     <th className="px-3 py-2 font-medium">Talle</th>
@@ -91,13 +91,13 @@ export function ProductDetailModal({
           <StaggerItem>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-xl border border-line bg-ink-900/60 p-3">
-              <p className="text-slate-500">Ventas mensuales</p>
+              <p className="text-slate-400">Ventas mensuales</p>
               <p className="mt-1 font-display text-base font-semibold text-white">
                 {num(product.monthlyUnitsSold)} u.
               </p>
             </div>
             <div className="rounded-xl border border-line bg-ink-900/60 p-3">
-              <p className="text-slate-500">Última venta</p>
+              <p className="text-slate-400">Última venta</p>
               <p className="mt-1 font-display text-base font-semibold text-white">
                 {daysSince(product.lastSaleAt)} días
               </p>

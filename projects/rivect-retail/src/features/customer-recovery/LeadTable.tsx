@@ -5,6 +5,7 @@ import { RECOVERY_STATUS_META } from '@/domain/calculations/recovery'
 import { StatusBadge } from '@/components/ui/Badge'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, num, relativeDays } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 export function LeadTable({
   leads,
@@ -20,14 +21,14 @@ export function LeadTable({
     return (
       <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <p className="text-sm text-slate-300">No hay oportunidades con estos filtros.</p>
-        <p className="text-xs text-slate-500">Probá con otro estado o limpiá la búsqueda.</p>
+        <p className="text-xs text-slate-400">Probá con otro estado o limpiá la búsqueda.</p>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="hidden grid-cols-[1.4fr_1.3fr_0.8fr_0.6fr_0.9fr_auto] gap-3 border-b border-line px-4 py-2.5 text-[10px] uppercase tracking-[0.14em] text-slate-600 lg:grid">
+      <div className="hidden grid-cols-[1.4fr_1.3fr_0.8fr_0.6fr_0.9fr_auto] gap-3 border-b border-line px-4 py-2.5 text-[11px] uppercase tracking-[0.08em] text-slate-400/75 lg:grid">
         <span>Cliente</span>
         <span>Producto consultado</span>
         <span>Ticket est.</span>
@@ -45,9 +46,9 @@ export function LeadTable({
               initial={reduce ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.35,
+                duration: DUR.slow,
                 delay: reduce ? 0 : Math.min(index, 12) * 0.035,
-                ease: [0.22, 1, 0.36, 1],
+                ease: EASE_OUT,
               }}
             >
               <button
@@ -64,7 +65,7 @@ export function LeadTable({
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-slate-200">{lead.customerName}</p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[11px] text-slate-400">
                       {lead.channel} · {relativeDays(lead.lastContact)}
                     </p>
                   </div>
@@ -78,17 +79,17 @@ export function LeadTable({
                     <p className="truncate text-[11px] text-slate-300">
                       {product?.name ?? 'Producto sin referencia'}
                     </p>
-                    <p className="text-[10px] text-slate-600">{product?.sku}</p>
+                    <p className="text-[11px] text-slate-400/75">{product?.sku}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between lg:block">
-                  <span className="text-[10px] text-slate-600 lg:hidden">Ticket</span>
+                  <span className="text-[11px] text-slate-400/75 lg:hidden">Ticket</span>
                   <span className="text-xs text-slate-200">{money(lead.estimatedTicket)}</span>
                 </div>
 
                 <div className="flex items-center justify-between lg:block">
-                  <span className="text-[10px] text-slate-600 lg:hidden">Probabilidad</span>
+                  <span className="text-[11px] text-slate-400/75 lg:hidden">Probabilidad</span>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1 w-10 overflow-hidden rounded-full bg-ink-700">
                       <div
@@ -96,7 +97,7 @@ export function LeadTable({
                         style={{ width: `${lead.estimatedConversion}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-slate-400">{num(lead.estimatedConversion)}%</span>
+                    <span className="text-[11px] text-slate-400">{num(lead.estimatedConversion)}%</span>
                   </div>
                 </div>
 
@@ -108,10 +109,10 @@ export function LeadTable({
                 </div>
 
                 <div className="flex items-center justify-between gap-2 lg:justify-end">
-                  <span className="truncate text-[10px] text-slate-500 lg:hidden">
+                  <span className="truncate text-[11px] text-slate-400 lg:hidden">
                     {lead.suggestedAction}
                   </span>
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-slate-500">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-slate-400">
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </span>
                 </div>

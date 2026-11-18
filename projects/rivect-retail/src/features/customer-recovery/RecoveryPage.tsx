@@ -109,7 +109,7 @@ export function RecoveryPage() {
               />
               <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400/75" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
@@ -119,7 +119,7 @@ export function RecoveryPage() {
                   />
                 </div>
                 <div className="relative">
-                  <Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
+                  <Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400/75" />
                   <select
                     value={status}
                     onChange={(event) => setStatus(event.target.value as 'todos' | RecoveryStatus)}
@@ -169,13 +169,13 @@ export function RecoveryPage() {
 
             <Panel className="panel-pad">
               <PanelHeader title="Qué significa recuperar" subtitle="Impacto de retomar una conversación." />
-              <ul className="mt-3 space-y-2 text-[11px] leading-relaxed text-slate-500">
+              <ul className="mt-3 space-y-2 text-[11px] leading-relaxed text-slate-400">
                 <li>· Cada oportunidad tiene un ticket tomado del catálogo simulado.</li>
                 <li>· La probabilidad es un supuesto editable, no un dato histórico.</li>
                 <li>· Al marcar «Compra realizada», el margen recuperado se recalcula.</li>
                 <li>· El seguimiento simulado queda registrado en el historial.</li>
               </ul>
-              <div className="mt-3 rounded-lg border border-line bg-ink-900/60 p-2.5 text-[10px] text-slate-600">
+              <div className="mt-3 rounded-lg border border-line bg-ink-900/60 p-2.5 text-[11px] text-slate-400/75">
                 No se envían mensajes reales ni se accede a conversaciones de clientes.
               </div>
             </Panel>

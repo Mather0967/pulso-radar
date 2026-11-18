@@ -8,6 +8,7 @@ import worker from '../dist/server/index.js';
 import {publicAPI,adminSiteAPI} from './site.mjs';
 import {projectMethodAllowed} from './access.mjs';
 import {projectAccess,availableProjects,mergeProjectGrants,renderProjectsPage} from './projects.mjs';
+import {adminMessagesAPI} from './messages.mjs';
 import {createLandurPortal} from './landur.mjs';
 import {createStudio,createProjectSite} from './studio.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -64,6 +65,7 @@ async function route(req,ip){
  if(p.startsWith('/api/admin/')){
   if(u.role!=='admin')return json({error:'Sólo administradores.'},403);
   if(['/api/admin/settings','/api/admin/inquiries'].includes(p))return adminSiteAPI(req,{store:siteStore});
+  if(p.startsWith('/api/admin/messages')){const r=await adminMessagesAPI(req,{store,user:u,path:p,method});if(r)return r;}
   if(p==='/api/admin/project-access'&&method==='PUT'){
    const b=await req.json();
    return store.transact(db=>{

@@ -45,7 +45,7 @@ export function NumberField({
       <span className="field-label">{label}</span>
       <div className="relative">
         {prefix ? (
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-slate-500">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[11px] font-medium text-slate-400">
             {prefix}
           </span>
         ) : null}
@@ -68,7 +68,7 @@ export function NumberField({
           onBlur={() => setDraft(null)}
         />
         {suffix ? (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-medium text-slate-500">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] font-medium text-slate-400">
             {suffix}
           </span>
         ) : null}
@@ -76,7 +76,7 @@ export function NumberField({
       {error ? (
         <span className="mt-1 block text-[11px] text-coral-400">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-[11px] text-slate-600">{hint}</span>
+        <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span>
       ) : null}
     </label>
   )
@@ -107,7 +107,7 @@ export function TextField({
       {error ? (
         <span className="mt-1 block text-[11px] text-coral-400">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-[11px] text-slate-600">{hint}</span>
+        <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span>
       ) : null}
     </label>
   )
@@ -135,7 +135,7 @@ export function SelectField({
           </option>
         ))}
       </select>
-      {hint ? <span className="mt-1 block text-[11px] text-slate-600">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-[11px] text-slate-400/75">{hint}</span> : null}
     </label>
   )
 }
@@ -178,7 +178,7 @@ export function RangeField({
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400/75">{hint}</p> : null}
     </div>
   )
 }

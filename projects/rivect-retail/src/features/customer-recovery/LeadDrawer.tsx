@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { cn, formatDate, money, num, relativeDays } from '@/utils/format'
+import { EASE_OUT } from '@/theme/motion'
 
 export function LeadDrawer({
   lead,
@@ -49,7 +50,7 @@ export function LeadDrawer({
           className="grid gap-5 lg:grid-cols-[1.15fr_1fr]"
           initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.4, ease: EASE_OUT }}
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -67,7 +68,7 @@ export function LeadDrawer({
                   <p className="text-sm font-medium text-slate-100">
                     {product?.name ?? 'Sin producto asociado'}
                   </p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-slate-400">
                     {money(lead.estimatedTicket)} · {product?.stock ?? 0} u. en stock
                   </p>
                 </div>
@@ -76,7 +77,7 @@ export function LeadDrawer({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-line bg-ink-900/60 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-slate-600">Probabilidad</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-400/75">Probabilidad</p>
                 <p className="mt-1 font-display text-lg font-semibold text-white">
                   {num(lead.estimatedConversion)}%
                 </p>
@@ -88,11 +89,11 @@ export function LeadDrawer({
                 </div>
               </div>
               <div className="rounded-xl border border-line bg-ink-900/60 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-slate-600">Ticket estimado</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-400/75">Ticket estimado</p>
                 <p className="mt-1 font-display text-lg font-semibold text-white">
                   {money(lead.estimatedTicket)}
                 </p>
-                <p className="mt-1 text-[10px] text-slate-500">Valor hipotético</p>
+                <p className="mt-1 text-[11px] text-slate-400">Valor hipotético</p>
               </div>
             </div>
 
@@ -115,7 +116,7 @@ export function LeadDrawer({
                       'rounded-full border px-2.5 py-1 text-[11px] transition',
                       lead.status === status
                         ? 'border-brand-500/50 bg-brand-500/15 text-brand-200'
-                        : 'border-line bg-ink-900/60 text-slate-500 hover:text-slate-200',
+                        : 'border-line bg-ink-900/60 text-slate-400 hover:text-slate-200',
                     )}
                   >
                     {RECOVERY_STATUS_META[status].label}
@@ -143,7 +144,7 @@ export function LeadDrawer({
                     )}
                   />
                   <p className="text-xs leading-relaxed text-slate-300">{event.label}</p>
-                  <p className="mt-0.5 text-[10px] text-slate-600">
+                  <p className="mt-0.5 text-[11px] text-slate-400/75">
                     {formatDate(event.at)} · {event.kind}
                   </p>
                 </li>
@@ -155,7 +156,7 @@ export function LeadDrawer({
                 <MessageSquare className="h-3.5 w-3.5" />
                 Seguimiento por {lead.channel}
               </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400/75">
                 El envío es simulado. Podés editar el mensaje antes de registrarlo.
               </p>
               <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={onFollowUp}>

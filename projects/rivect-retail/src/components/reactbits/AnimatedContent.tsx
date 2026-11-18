@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 interface AnimatedContentProps {
   children: ReactNode
@@ -16,7 +17,7 @@ export function AnimatedContent({ children, delay = 0, y = 14, className }: Anim
       className={className}
       initial={reduce ? undefined : { opacity: 0, y, filter: 'blur(6px)' }}
       animate={reduce ? undefined : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: DUR.slow, delay, ease: EASE_OUT }}
     >
       {children}
     </motion.div>

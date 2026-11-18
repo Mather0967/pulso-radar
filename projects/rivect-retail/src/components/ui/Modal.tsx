@@ -65,12 +65,12 @@ export function Modal({
             <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-ink-850/95 p-5 backdrop-blur">
               <div>
                 <h3 className="font-display text-base font-semibold text-white">{title}</h3>
-                {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
+                {description ? <p className="mt-1 text-xs text-slate-400">{description}</p> : null}
               </div>
               <button
                 onClick={onClose}
                 aria-label="Cerrar"
-                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-ink-800 hover:text-white"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-ink-800 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>

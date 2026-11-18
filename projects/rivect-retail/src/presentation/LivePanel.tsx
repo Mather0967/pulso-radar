@@ -3,14 +3,13 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Text } from '@mantine/core'
 import { HeartHandshake, MessageCircle, Megaphone, PackageX, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { CountUp } from '@/components/reactbits/CountUp'
-import { TiltCard } from '@/components/reactbits/TiltCard'
 import { liveEventAt, nextDelayMs, type LiveEvent } from '@/presentation/liveFeed'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 const MANDARIN = '#FF762E'
 const WARM = '#F7F5EF'
 const MAX_ITEMS = 8
 const INITIAL_COUNT = 3
-const EASE = [0.22, 1, 0.36, 1] as const
 
 type Kind = LiveEvent['kind']
 
@@ -86,7 +85,7 @@ export function LiveDot({ color = '#4ADE80' }: { color?: string }) {
 
 function StatTile({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <TiltCard className="min-w-0 flex-1">
+    <div className="min-w-0 flex-1">
     <div
       style={{
         flex: 1,
@@ -123,7 +122,7 @@ function StatTile({ label, value, color }: { label: string; value: number; color
         <CountUp value={value} separator={false} />
       </div>
     </div>
-    </TiltCard>
+    </div>
   )
 }
 
@@ -196,8 +195,8 @@ export function LivePanel({ open }: { open: boolean }) {
       aria-label="Panel en vivo"
       aria-hidden={!open}
       initial={false}
-      animate={{ width: open ? 340 : 0, opacity: open ? 1 : 0 }}
-      transition={{ duration: reduce ? 0 : 0.45, ease: EASE }}
+      animate={{ width: open ? 288 : 0, opacity: open ? 1 : 0 }}
+      transition={{ duration: reduce ? 0 : 0.45, ease: EASE_OUT }}
       style={{
         flexShrink: 0,
         overflow: 'hidden',
@@ -208,7 +207,7 @@ export function LivePanel({ open }: { open: boolean }) {
     >
       <div
         style={{
-          width: 340,
+          width: 288,
           height: '100%',
           boxSizing: 'border-box',
           display: 'flex',
@@ -224,11 +223,11 @@ export function LivePanel({ open }: { open: boolean }) {
             style={{
               fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.2em',
+              letterSpacing: '0.12em',
               color: WARM,
             }}
           >
-            EN VIVO
+            SIMULACIÓN EN VIVO
           </Text>
         </div>
 
@@ -285,7 +284,7 @@ function FeedRow({ item, index, reduce }: { item: FeedItem; index: number; reduc
         layout: { type: 'spring', stiffness: 400, damping: 35 },
         x: { type: 'spring', stiffness: 380, damping: 30, delay },
         scale: { type: 'spring', stiffness: 380, damping: 30, delay },
-        opacity: { duration: 0.35, delay },
+        opacity: { duration: DUR.slow, delay },
         backgroundColor: { duration: 1.6, ease: 'easeOut', delay },
       }}
       style={{

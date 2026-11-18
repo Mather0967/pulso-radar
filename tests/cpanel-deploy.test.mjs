@@ -70,3 +70,12 @@ test('el despliegue falla si un proyecto montado no está en managedPaths o le f
   assert.throws(()=>verifyMountedProjects({repository}),/Mounted project references a missing asset: projects\/studio\/public\/assets\/app\.js/);
  }finally{fs.rmSync(temp,{recursive:true,force:true})}
 });
+
+test('deploy: todo módulo que importa server/main.mjs viaja en managedPaths',async()=>{
+  const {managedPaths}=await import('../scripts/cpanel-deploy.mjs');
+  const main=(await import('node:fs')).readFileSync(new URL('../namecheap/server/main.mjs',import.meta.url),'utf8');
+  // site.mjs lo provee el hosting y el deploy exige que ya exista allá.
+  const local=[...main.matchAll(/from '\.\/([\w-]+\.mjs)'/g)].map(m=>'server/'+m[1]).filter(f=>f!=='server/site.mjs');
+  assert.ok(local.length>0);
+  for(const file of local)assert.ok(managedPaths.includes(file),`${file} falta en managedPaths`);
+});

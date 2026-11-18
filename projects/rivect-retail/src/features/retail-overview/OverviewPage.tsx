@@ -124,7 +124,7 @@ export function OverviewPage() {
                   </Button>
                 </Link>
               </div>
-              <p className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <p className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-400">
                 <Info className="h-3.5 w-3.5" />
                 <span>
                   <ShinyText>Datos simulados</ShinyText> · no se conecta a WhatsApp ni a sistemas
@@ -139,7 +139,7 @@ export function OverviewPage() {
                 <p className="mt-2 font-display text-lg font-semibold capitalize text-white">
                   {scenario === 'custom' ? 'Personalizado' : scenario}
                 </p>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-[11px] text-slate-400">
                   {pct(profile.automationPercentage)} de automatización
                 </p>
               </div>
@@ -165,7 +165,7 @@ export function OverviewPage() {
                     }}
                   />
                 </div>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-2 text-[11px] text-slate-400">
                   {num(simulator.manualHours, 1)} h mensuales · {num(profile.employeesInService)} personas
                 </p>
               </div>
@@ -293,7 +293,7 @@ export function OverviewPage() {
                 hint={`${money(recovery.recoveredRevenue)} en ${num(recovery.total)} oportunidades de ejemplo`}
               />
             </div>
-            <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">
+            <div className="mt-4 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-400">
               <span className="font-medium text-slate-300">Cómo leer los datos:</span> los valores
               ingresados por el visitante, el catálogo simulado y las estimaciones se muestran por
               separado. Ninguna cifra representa una promesa de resultado.

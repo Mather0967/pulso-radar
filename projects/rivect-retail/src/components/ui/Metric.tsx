@@ -89,7 +89,7 @@ export function StatTile({
             {Math.abs(delta).toFixed(1)}%
           </span>
         ) : null}
-        {hint ? <p className="text-[11px] leading-relaxed text-slate-500">{hint}</p> : null}
+        {hint ? <p className="text-[11px] leading-relaxed text-slate-400">{hint}</p> : null}
       </div>
     </SpotlightCard>
   )
@@ -108,7 +108,7 @@ export function MetricRow({
     <div className="flex items-center justify-between gap-4 border-b border-line/60 py-2.5 last:border-0">
       <div>
         <p className="text-xs text-slate-400">{label}</p>
-        {hint ? <p className="mt-0.5 text-[11px] text-slate-600">{hint}</p> : null}
+        {hint ? <p className="mt-0.5 text-[11px] text-slate-400/75">{hint}</p> : null}
       </div>
       <p className="font-display text-sm font-semibold text-white">{value}</p>
     </div>
