@@ -37,7 +37,7 @@ async function api(path, input, key) {
   let response;
   try { response = await fetch(endpoint(path), {method:input === undefined ? 'GET':'POST',cache:'no-store',credentials:'same-origin',
     headers:input === undefined ? {} : {'Content-Type':'application/json','X-Landur-Request':'1',...(session?.csrf?{'X-CSRF-Token':session.csrf}:{}),...(key?{'Idempotency-Key':key}:{})},
-    ...(input === undefined ? {} : {body:JSON.stringify(input)}),signal:AbortSignal.timeout(20000)}); }
+    ...(input === undefined ? {} : {body:JSON.stringify(input)}),signal:AbortSignal.timeout(input===undefined?60000:20000)}); }
   catch { const error=new Error(input===undefined?'No pudimos conectar con el servidor.':'No se pudo confirmar la respuesta. Reintentá con este mismo formulario para no duplicar la operación.');error.uncertain=input!==undefined;throw error; }
   let data;
   try { data=await response.json(); }
@@ -1494,7 +1494,7 @@ async function boot(){
     clearTimeout(bootRetry);
     app.innerHTML=`<main class="loading"><span class="wordmark">LANDUR<span>®</span></span><p>${escape(error.message)}</p><button class="primary" type="button" id="boot-retry">Reintentar</button></main>`;
     $('#boot-retry').onclick=boot;
-    bootRetry=setTimeout(boot,15000);
+    // Sin reintento automático: apilaba un `state` nuevo por cada uno que seguía armándose en el servidor.
   }
 }
 // Un corte de red no es una sesión vencida: no se cierra el formulario ni se pierde lo escrito.
