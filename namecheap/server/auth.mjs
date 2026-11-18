@@ -84,10 +84,10 @@ export function clientAddress({ peer, forwarded, trustProxy = false } = {}) {
 export class AuthStore{
  constructor(directory,filename='identity.json'){this.directory=directory;this.file=path.join(directory,filename);}
  async transact(fn){await mkdir(this.directory,{recursive:true,mode:0o700});const lock=this.file+'.lock';let acquired=false;for(let n=0;n<100;n++){try{await mkdir(lock);acquired=true;break}catch(e){if(e.code!=='EEXIST')throw e;try{if(Date.now()-(await stat(lock)).mtimeMs>120000)await rm(lock,{recursive:true,force:true})}catch{}await new Promise(r=>setTimeout(r,40))}}if(!acquired)throw Error('Servidor ocupado. Intentá otra vez.');try{let db;try{db=JSON.parse(await readFile(this.file,'utf8'))}catch(e){if(e.code!=='ENOENT')throw e;db={users:[],sessions:[],invites:[],attempts:{}}}const result=await fn(db);const temp=this.file+'.'+randomUUID();await writeFile(temp,JSON.stringify(db),{mode:0o600});await rename(temp,this.file);return result}finally{await rm(lock,{recursive:true,force:true})}}
- async session(cookie){const tokens=[];for(const part of String(cookie||'').split(';')){const at=part.indexOf('=');if(at<0)continue;const name=part.slice(0,at).trim(),value=part.slice(at+1).trim();if(value&&SESSION_COOKIES.includes(name))tokens.push(value)}if(!tokens.length)return null;return this.transact(db=>{const now=Date.now();db.sessions=db.sessions.filter(s=>s.expires>now);
+ async session(cookie){const tokens=[];for(const part of String(cookie||'').split(';')){const at=part.indexOf('=');if(at<0)continue;const name=part.slice(0,at).trim(),value=part.slice(at+1).trim();if(value&&SESSION_COOKIES.includes(name))tokens.push(value)}if(!tokens.length)return null;let db;try{db=JSON.parse(await readFile(this.file,'utf8'))}catch(e){if(e.code==='ENOENT')return null;throw e}const now=Date.now();db.sessions=db.sessions.filter(s=>s.expires>now);
   // Se prueban todas: una galleta duplicada o vieja no debe anular la sesión válida.
   for(const token of tokens.slice(0,8)){const s=db.sessions.find(x=>x.hash===digest(token));const u=s&&db.users.find(u=>u.id===s.userId&&u.active);if(u)return {...publicUser(u),csrf:s.csrf}}
-  return null})}
+  return null}
  // Dos contadores: por cliente y por cuenta. El de la cuenta no depende de
  // `X-Forwarded-For`, así que rotar la cabecera no multiplica los intentos permitidos. El
  // costo es que un tercero puede bloquear a un usuario durante 15 minutos; con 20 intentos
