@@ -176,7 +176,7 @@ export function AssistantPage() {
             trazabilidad en las métricas.
           </div>
         </div>
-        <p className="mt-3 text-[10px] text-slate-400/75">
+        <p className="mt-3 text-[11px] text-slate-400/75">
           {num(products.length)} productos en catálogo · motor determinístico local · sin IA externa
           ni credenciales.
         </p>

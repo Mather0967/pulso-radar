@@ -4,6 +4,7 @@ import type { InventoryItem } from '@/domain/models'
 import type { InventorySortKey } from '@/services/inventory/inventoryService'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, num } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 const COLUMNS: { key: InventorySortKey | null; label: string; align?: string }[] = [
   { key: 'name', label: 'Producto' },
@@ -41,7 +42,7 @@ export function StockTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] text-left text-xs">
         <thead>
-          <tr className="border-b border-line text-[10px] uppercase tracking-[0.12em] text-slate-400/75">
+          <tr className="border-b border-line text-[11px] uppercase tracking-[0.12em] text-slate-400/75">
             {COLUMNS.map((column) => (
               <th key={column.label} className={`px-4 py-2.5 font-medium ${column.align ?? ''}`}>
                 {column.key ? (
@@ -76,9 +77,9 @@ export function StockTable({
               initial={reduce ? false : { opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{
-                duration: 0.35,
+                duration: DUR.slow,
                 delay: reduce ? 0 : Math.min(index, 14) * 0.03,
-                ease: [0.22, 1, 0.36, 1],
+                ease: EASE_OUT,
               }}
               className="cursor-pointer transition hover:bg-ink-800/50"
             >
@@ -89,7 +90,7 @@ export function StockTable({
                     <p className="truncate text-[11px] font-medium text-slate-200">
                       {item.product.name}
                     </p>
-                    <p className="text-[10px] text-slate-400/75">
+                    <p className="text-[11px] text-slate-400/75">
                       {item.product.sku} · {item.product.category}
                     </p>
                   </div>
@@ -121,9 +122,9 @@ export function StockTable({
               <td className="px-4 py-2.5 text-right text-slate-300">{money(item.inventoryCapital)}</td>
               <td className="px-4 py-2.5 text-right">
                 {item.alerts.length === 0 ? (
-                  <span className="text-[10px] text-mint-400">saludable</span>
+                  <span className="text-[11px] text-mint-400">saludable</span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-300">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-amber-300">
                     {item.alerts[0].title}
                     {item.alerts.length > 1 ? ` +${item.alerts.length - 1}` : ''}
                   </span>

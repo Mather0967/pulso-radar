@@ -175,7 +175,7 @@ export function RecoveryPage() {
                 <li>· Al marcar «Compra realizada», el margen recuperado se recalcula.</li>
                 <li>· El seguimiento simulado queda registrado en el historial.</li>
               </ul>
-              <div className="mt-3 rounded-lg border border-line bg-ink-900/60 p-2.5 text-[10px] text-slate-400/75">
+              <div className="mt-3 rounded-lg border border-line bg-ink-900/60 p-2.5 text-[11px] text-slate-400/75">
                 No se envían mensajes reales ni se accede a conversaciones de clientes.
               </div>
             </Panel>

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 /** React Bits · Stagger — contenedor que escalona la entrada de sus hijos `StaggerItem`. */
 export function Stagger({ children, step = 0.06 }: { children: ReactNode; step?: number }) {
@@ -35,7 +36,7 @@ export function StaggerItem({ children }: { children: ReactNode }) {
     <motion.div
       variants={{
         hidden: { opacity: 0, y: 10 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+        visible: { opacity: 1, y: 0, transition: { duration: DUR.slow, ease: EASE_OUT } },
       }}
     >
       {children}

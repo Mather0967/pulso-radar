@@ -5,6 +5,7 @@ import { NumberField } from '@/components/ui/Field'
 import { Badge } from '@/components/ui/Badge'
 import { cn, num, pct } from '@/utils/format'
 import { useFieldLimits } from './useFieldLimits'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 export function ScenarioLab({
   scenarios,
@@ -35,7 +36,7 @@ export function ScenarioLab({
             El motor recalcula todo al instante: no son proyecciones garantizadas.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-400">
+        <div className="flex items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[11px] text-slate-400">
           <Sparkles className="h-3 w-3 text-brand-300" />
           Supuestos editables
         </div>
@@ -52,7 +53,7 @@ export function ScenarioLab({
               initial={reduce ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               whileTap={reduce ? undefined : { scale: 0.985 }}
-              transition={{ duration: 0.35, delay: reduce ? 0 : index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: DUR.slow, delay: reduce ? 0 : index * 0.06, ease: EASE_OUT }}
               className={cn(
                 'group relative overflow-hidden rounded-xl border p-4 text-left transition-colors',
                 isActive

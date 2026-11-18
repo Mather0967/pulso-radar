@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Menu, RotateCcw, ShieldCheck } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { NAV_ITEMS } from './nav'
 import { Button } from '@/components/ui/Button'
+import { EASE_OUT } from '@/theme/motion'
 
 const clockFmt = new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false })
 
@@ -18,7 +19,7 @@ function LiveClock() {
 
   return (
     <div
-      className="hidden items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-400 lg:flex"
+      className="hidden items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[11px] text-slate-400 lg:flex"
       title="Hora local"
     >
       <Clock className="h-3 w-3 text-brand-400" />
@@ -44,7 +45,7 @@ export function Topbar({ onMenu, onReset }: { onMenu: () => void; onReset: () =>
             <Menu className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <p className="hidden text-[10px] uppercase tracking-[0.2em] text-slate-400 sm:block">
+            <p className="hidden text-[11px] uppercase tracking-[0.08em] text-slate-400 sm:block">
               <motion.span
                 className="inline-block"
                 style={{
@@ -68,7 +69,7 @@ export function Topbar({ onMenu, onReset }: { onMenu: () => void; onReset: () =>
                   initial={reduce ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.25, ease: EASE_OUT }}
                   className="truncate font-display text-sm font-semibold text-slate-100"
                 >
                   {current.label}
@@ -95,15 +96,15 @@ export function Topbar({ onMenu, onReset }: { onMenu: () => void; onReset: () =>
               )}
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#ff762e]" />
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#ff762e]">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#ff762e]">
               Demo
             </span>
-            <span className="hidden text-[10px] text-[#ff762e]/80 sm:inline">· datos simulados</span>
+            <span className="hidden text-[11px] text-[#ff762e]/80 sm:inline">· datos simulados</span>
           </div>
 
           <LiveClock />
 
-          <div className="hidden items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[10px] text-slate-400 md:flex">
+          <div className="hidden items-center gap-1.5 rounded-full border border-line bg-ink-900/70 px-3 py-1 text-[11px] text-slate-400 md:flex">
             <ShieldCheck className="h-3 w-3 text-mint-400" />
             Sin conexiones externas
           </div>

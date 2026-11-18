@@ -37,12 +37,12 @@ import { ReportPage } from '@/features/impact-report/ReportPage'
 import { scenes, type Scene, type SceneSlug } from '@/presentation/scenes'
 import { usePresenter } from '@/presentation/usePresenter'
 import { LivePanel, LiveDot } from '@/presentation/LivePanel'
+import { EASE_OUT } from '@/theme/motion'
 
 const MANDARIN = '#FF762E'
 const MIDNIGHT = '#11222C'
 const SLATE = '#405C6B'
 const WARM = '#F7F5EF'
-const EASE = [0.22, 1, 0.36, 1] as const
 const SCENE_IN = 0.35
 const SCENE_OUT = 0.2
 const SLIDE_PX = 56
@@ -81,21 +81,21 @@ const sceneVariants = {
     x: SLIDE_PX * d,
     scale: 0.98,
     filter: 'blur(6px)',
-    transition: { duration: SCENE_IN, ease: EASE },
+    transition: { duration: SCENE_IN, ease: EASE_OUT },
   }),
   center: {
     opacity: 1,
     x: 0,
     scale: 1,
     filter: 'blur(0px)',
-    transition: { duration: SCENE_IN, ease: EASE },
+    transition: { duration: SCENE_IN, ease: EASE_OUT },
   },
   exit: (d: number) => ({
     opacity: 0,
     x: -SLIDE_PX * d,
     scale: 0.985,
     filter: 'blur(4px)',
-    transition: { duration: SCENE_OUT, ease: EASE },
+    transition: { duration: SCENE_OUT, ease: EASE_OUT },
   }),
 }
 // Movimiento reducido: solo opacidad, sin desplazamiento ni escala.
@@ -503,12 +503,23 @@ export function PresentationShell() {
                 initial={{ opacity: 0, y: r ? 0 : 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: r ? 0 : -10 }}
-                transition={{ duration: r ? 0 : 0.25, ease: EASE }}
+                transition={{ duration: r ? 0 : 0.25, ease: EASE_OUT }}
                 style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                <Badge size="xs" variant="outline" radius="sm" color="gray">
+                <span
+                  style={{
+                    flex: 'none',
+                    padding: '1px 8px',
+                    border: '1px solid rgba(247,245,239,0.28)',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'rgba(247,245,239,0.85)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {`Paso ${step + 1}/${scene.steps.length}`}
-                </Badge>
+                </span>
                 <Text size="sm" fw={500} style={{ color: 'rgba(247,245,239,0.9)' }}>
                   {caption}
                 </Text>
@@ -582,7 +593,37 @@ export function PresentationShell() {
             </ActionIcon>
 
             <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
-              <Group gap={6} justify="center" wrap="wrap">
+              {/* En celular: indicador compacto con la lista nativa del sistema. */}
+              {!wide && (
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(247,245,239,0.72)', whiteSpace: 'nowrap' }}>
+                    {`${scene.n}/${scenes.length}`}
+                  </span>
+                  <select
+                    aria-label="Ir a la escena"
+                    value={scene.n}
+                    onChange={(e) => goTo(Number(e.target.value))}
+                    style={{
+                      minWidth: 0,
+                      maxWidth: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 999,
+                      border: '1px solid rgba(247,245,239,0.18)',
+                      background: 'rgba(17,34,44,0.9)',
+                      color: WARM,
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {scenes.map((s) => (
+                      <option key={s.slug} value={s.n}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <Group gap={6} justify="center" wrap="wrap" style={wide ? undefined : { display: 'none' }}>
                 {scenes.map((s) => {
                   const active = s.slug === scene.slug
                   return (

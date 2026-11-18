@@ -4,12 +4,12 @@ import { Text } from '@mantine/core'
 import { HeartHandshake, MessageCircle, Megaphone, PackageX, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { CountUp } from '@/components/reactbits/CountUp'
 import { liveEventAt, nextDelayMs, type LiveEvent } from '@/presentation/liveFeed'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 const MANDARIN = '#FF762E'
 const WARM = '#F7F5EF'
 const MAX_ITEMS = 8
 const INITIAL_COUNT = 3
-const EASE = [0.22, 1, 0.36, 1] as const
 
 type Kind = LiveEvent['kind']
 
@@ -196,7 +196,7 @@ export function LivePanel({ open }: { open: boolean }) {
       aria-hidden={!open}
       initial={false}
       animate={{ width: open ? 288 : 0, opacity: open ? 1 : 0 }}
-      transition={{ duration: reduce ? 0 : 0.45, ease: EASE }}
+      transition={{ duration: reduce ? 0 : 0.45, ease: EASE_OUT }}
       style={{
         flexShrink: 0,
         overflow: 'hidden',
@@ -284,7 +284,7 @@ function FeedRow({ item, index, reduce }: { item: FeedItem; index: number; reduc
         layout: { type: 'spring', stiffness: 400, damping: 35 },
         x: { type: 'spring', stiffness: 380, damping: 30, delay },
         scale: { type: 'spring', stiffness: 380, damping: 30, delay },
-        opacity: { duration: 0.35, delay },
+        opacity: { duration: DUR.slow, delay },
         backgroundColor: { duration: 1.6, ease: 'easeOut', delay },
       }}
       style={{

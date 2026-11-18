@@ -84,10 +84,10 @@ export function ReportPage() {
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-display text-sm font-bold tracking-[0.16em] text-brand-300">
+                <span className="font-display text-sm font-bold tracking-[0.08em] text-brand-300">
                   RIVECT
                 </span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400/75">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-slate-400/75">
                   Retail Intelligence
                 </span>
               </div>
@@ -108,7 +108,7 @@ export function ReportPage() {
               <Badge tone={status === 'oportunidad' ? 'mint' : 'neutral'}>
                 {status === 'oportunidad' ? 'Oportunidad estimada' : 'Sin datos suficientes'}
               </Badge>
-              <span className="text-[10px] text-slate-400/75">{num(products.length)} productos analizados</span>
+              <span className="text-[11px] text-slate-400/75">{num(products.length)} productos analizados</span>
             </div>
           </div>
 
@@ -188,7 +188,7 @@ export function ReportPage() {
                 formatter={(value) => money(value)}
               />
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
               Diferencia estimada de {money(report.simulator.additionalContribution)} mensuales. Cifra
               hipotética basada en supuestos editables.
             </p>
@@ -199,7 +199,7 @@ export function ReportPage() {
 
         <ReportSectionCard section={report.sections[6]} />
 
-        <div className="rounded-2xl border border-line bg-ink-900/50 p-4 text-[10px] leading-relaxed text-slate-400">
+        <div className="rounded-2xl border border-line bg-ink-900/50 p-4 text-[11px] leading-relaxed text-slate-400">
           <p className="flex items-center gap-1.5 font-medium text-slate-400">
             <ShieldCheck className="h-3.5 w-3.5 text-mint-400" />
             Alcance del documento
@@ -250,7 +250,7 @@ export function ReportPage() {
               Ayuda
             </Button>
           </div>
-          {message ? <p className="mt-2 text-[10px] text-slate-400">{message}</p> : null}
+          {message ? <p className="mt-2 text-[11px] text-slate-400">{message}</p> : null}
         </div>
 
         <div className="panel panel-pad">
@@ -262,7 +262,7 @@ export function ReportPage() {
             {money(report.simulator.additionalContribution)} de margen por mes si se recuperan{' '}
             {num(profile.recoveredSales)} ventas mensuales (supuesto del escenario, no un resultado).
           </p>
-          <p className="mt-2 text-[10px] text-slate-400/75">
+          <p className="mt-2 text-[11px] text-slate-400/75">
             Fuente: módulos Simulador de negocio (proyección con supuestos), Recuperación de clientes (muestra del CRM de ejemplo) y Control de stock. Datos de demostración, no resultados reales.
           </p>
         </div>
@@ -274,7 +274,7 @@ export function ReportPage() {
 function Summary({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-xl border border-line/80 bg-ink-950/40 px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-slate-400/75">{label}</p>
+      <p className="text-[11px] uppercase tracking-wider text-slate-400/75">{label}</p>
       <p className="mt-0.5 font-display text-sm font-semibold text-white">{value}</p>
     </div>
   )

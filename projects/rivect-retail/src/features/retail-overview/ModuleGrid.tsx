@@ -39,7 +39,7 @@ export function ModuleGrid({ stats }: { stats: ModuleStat[] }) {
                           {stat ? (
                             <div className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t border-line/70 pt-3">
                               <span className="font-display text-xl font-bold tracking-tight text-white">{stat.stat}</span>
-                              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
                                 {stat.statLabel}
                               </span>
                             </div>

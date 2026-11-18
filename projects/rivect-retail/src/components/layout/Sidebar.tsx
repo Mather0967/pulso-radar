@@ -29,7 +29,7 @@ export function Sidebar({
           </div>
           <div>
             <p className="font-display text-sm font-bold tracking-wider text-white">RIVECT</p>
-            <p className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Retail Intelligence</p>
+            <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">Retail Intelligence</p>
           </div>
         </div>
         <button
@@ -51,11 +51,11 @@ export function Sidebar({
             <ArrowLeft className="h-3.5 w-3.5 text-brand-400 transition-transform group-hover:-translate-x-0.5" />
             <span>Mis proyectos</span>
           </span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-400/75 group-hover:text-slate-400">Portal</span>
+          <span className="text-[11px] uppercase tracking-wider text-slate-400/75 group-hover:text-slate-400">Portal</span>
         </a>
 
         <div className="rounded-xl border border-line/80 bg-ink-900/60 p-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400/75">Comercio en demo</p>
+          <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400/75">Comercio en demo</p>
           <p className="mt-1 truncate font-display text-sm font-medium text-slate-200">{storeName}</p>
         </div>
       </div>
@@ -68,7 +68,7 @@ export function Sidebar({
         >
           <Presentation className="h-4 w-4 shrink-0 text-brand-300 transition-transform group-hover:scale-110" />
           <span className="flex-1 truncate">Modo presentación</span>
-          <span className="text-[9px] uppercase tracking-wider text-brand-300/80">Demo</span>
+          <span className="text-[11px] uppercase tracking-wider text-brand-300/80">Demo</span>
         </NavLink>
 
         {NAV_ITEMS.map((item) => (
@@ -135,7 +135,7 @@ export function Sidebar({
         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
           Todos los datos son ficticios. Ninguna acción envía mensajes ni modifica sistemas reales.
         </p>
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-slate-400/75">
+        <div className="mt-2 flex items-center gap-1 text-[11px] text-slate-400/75">
           <Info className="h-3 w-3" /> Datos guardados en este navegador
         </div>
       </div>

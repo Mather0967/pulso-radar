@@ -5,6 +5,11 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* Tokens compartidos con Retail (src/theme/motion.ts): una curva, tres duraciones. */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --dur-fast: 150ms;
+    --dur-base: 250ms;
+    --dur-slow: 400ms;
   }
 
   html,
@@ -69,7 +74,7 @@
   }
 
   .kpi-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400;
   }
 
   .field-label {

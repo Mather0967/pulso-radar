@@ -55,7 +55,7 @@ export function ProductDetailModal({
             <p className="kpi-label mb-2">Variantes y disponibilidad</p>
             <div className="overflow-hidden rounded-xl border border-line">
               <table className="w-full text-left text-xs">
-                <thead className="bg-ink-800/70 text-[10px] uppercase tracking-wider text-slate-400">
+                <thead className="bg-ink-800/70 text-[11px] uppercase tracking-wider text-slate-400">
                   <tr>
                     <th className="px-3 py-2 font-medium">Color</th>
                     <th className="px-3 py-2 font-medium">Talle</th>

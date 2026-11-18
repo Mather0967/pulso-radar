@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { money } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 export interface FunnelStep {
   label: string
@@ -32,7 +33,7 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
                 className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-300"
                 initial={reduce ? false : { width: '0%' }}
                 animate={{ width: `${width}%` }}
-                transition={{ duration: 0.8, delay: reduce ? 0 : index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: DUR.slow, delay: reduce ? 0 : index * 0.08, ease: EASE_OUT }}
                 style={{ opacity }}
               />
             </div>

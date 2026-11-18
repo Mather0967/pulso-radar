@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, num, pct } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 const severityTone = { alta: 'coral', media: 'amber', baja: 'brand' } as const
 
@@ -29,7 +30,7 @@ export function StockProductModal({
           className="space-y-5"
           initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.4, ease: EASE_OUT }}
         >
           <div className="flex flex-wrap items-center gap-4">
             <ProductThumb category={item.product.category} name={item.product.name} size="lg" />
@@ -131,7 +132,7 @@ export function StockProductModal({
               {item.product.variants.map((variant) => (
                 <span
                   key={variant.id}
-                  className="rounded-lg border border-line bg-ink-900/60 px-2 py-1 text-[10px] text-slate-400"
+                  className="rounded-lg border border-line bg-ink-900/60 px-2 py-1 text-[11px] text-slate-400"
                 >
                   {variant.name} · {variant.size} ·{' '}
                   <span className={variant.stock === 0 ? 'text-coral-400' : 'text-slate-200'}>
@@ -164,11 +165,11 @@ function Insight({
       className="rounded-xl border border-line bg-ink-900/60 p-3"
       initial={reduce ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: reduce ? 0 : 0.1 + index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: DUR.slow, delay: reduce ? 0 : 0.1 + index * 0.05, ease: EASE_OUT }}
     >
-      <p className="text-[10px] uppercase tracking-wider text-slate-400/75">{label}</p>
+      <p className="text-[11px] uppercase tracking-wider text-slate-400/75">{label}</p>
       <p className="mt-1 font-display text-sm font-semibold text-white">{value}</p>
-      <p className="mt-0.5 text-[10px] text-slate-400/75">{hint}</p>
+      <p className="mt-0.5 text-[11px] text-slate-400/75">{hint}</p>
     </motion.div>
   )
 }

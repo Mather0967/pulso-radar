@@ -4,13 +4,13 @@ import { BadgeCheck, RotateCcw, Send, ShieldCheck, UserRound } from 'lucide-reac
 import type { AssistantMessage, Product } from '@/domain/models'
 import { ProductThumb } from '@/components/ui/ProductThumb'
 import { money, formatTime } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 /** Pausa de «escribiendo…» antes de que aparezca el texto de una respuesta nueva. */
 const THINKING_MS = 650
 /** Intervalo entre avances del tipeo y cantidad de avances para todo el texto (~0,8 s). */
 const TICK_MS = 16
 const TICKS_PER_TEXT = 48
-const EASE_OUT = [0.22, 1, 0.36, 1] as const
 
 function RichText({ text }: { text: string }) {
   return (
@@ -203,11 +203,11 @@ export function ChatPanel({
               Asistente Rivect
               <BadgeCheck className="h-3.5 w-3.5 text-brand-400" />
             </p>
-            <p className="text-[10px] text-mint-400">en línea · respuesta simulada</p>
+            <p className="text-[11px] text-mint-400">en línea · respuesta simulada</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-line px-2 py-0.5 text-[10px] text-slate-400 sm:inline">
+          <span className="hidden rounded-full border border-line px-2 py-0.5 text-[11px] text-slate-400 sm:inline">
             WhatsApp demo
           </span>
           <button
@@ -244,7 +244,7 @@ export function ChatPanel({
                 key={message.id}
                 initial={isNew && !reduce ? { opacity: 0, y: 12, x: isCustomer ? 16 : -16 } : false}
                 animate={{ opacity: 1, y: 0, x: 0 }}
-                transition={{ duration: 0.35, ease: EASE_OUT }}
+                transition={{ duration: DUR.slow, ease: EASE_OUT }}
                 className={`flex ${isCustomer ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`max-w-[86%] ${isCustomer ? 'items-end' : 'items-start'}`}>
@@ -269,7 +269,7 @@ export function ChatPanel({
                     )}
                     {ready ? (
                       <p
-                        className={`mt-1 text-right text-[9px] ${
+                        className={`mt-1 text-right text-[11px] ${
                           isCustomer ? 'text-white/70' : 'text-slate-400'
                         }`}
                       >
@@ -297,7 +297,7 @@ export function ChatPanel({
                               {ref.variant ? ` · ${ref.variant}` : ''}
                             </p>
                           </div>
-                          <span className="rounded-full border border-line bg-ink-800/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 group-hover/prod:border-brand-500/30 group-hover/prod:text-brand-300">
+                          <span className="rounded-full border border-line bg-ink-800/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 group-hover/prod:border-brand-500/30 group-hover/prod:text-brand-300">
                             {ref.reason}
                           </span>
                         </button>
@@ -306,14 +306,14 @@ export function ChatPanel({
                   ) : null}
 
                   {ready && !isCustomer && message.meta?.handoff ? (
-                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-200">
                       <UserRound className="h-3 w-3" />
                       Derivado a una persona · con el contexto de la charla
                     </p>
                   ) : null}
 
                   {ready && !isCustomer && message.meta?.detected?.length ? (
-                    <p className="mt-1 pl-1 text-[9px] text-slate-400">
+                    <p className="mt-1 pl-1 text-[11px] text-slate-400">
                       {message.meta.detected.join(' · ')}
                     </p>
                   ) : null}
@@ -384,7 +384,7 @@ export function ChatPanel({
             <Send className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-2 flex items-center gap-1 text-[10px] text-slate-400/75">
+        <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400/75">
           <ShieldCheck className="h-3 w-3" />
           Conversación simulada: no se envía ningún mensaje real ni se reserva stock.
         </p>

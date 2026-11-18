@@ -19,10 +19,14 @@ function make(tag,options={},children=[]){
   node.append(...children);
   return node;
 }
+const statusTimers=new WeakMap();
 function setStatus(node,text,tone='info'){
   if(!node)return;
   node.textContent=text;
   node.dataset.tone=tone;
+  // Los avisos de éxito se cierran solos; errores y notas quedan hasta la próxima acción.
+  clearTimeout(statusTimers.get(node));
+  if(text&&tone==='ok')statusTimers.set(node,setTimeout(()=>{if(node.textContent===text)node.textContent='';},5000));
 }
 function normalize(text){
   return String(text).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -132,12 +136,13 @@ async function setupAdmin(){
     edit.addEventListener('click',()=>openGrants(user.id));
 
     const row=make('tr',{className:`user-row${user.active?'':' is-inactive'}${self?' is-self':''}${busy?' is-busy':''}`},[
-      make('td',{},[make('strong',{text:user.name}),make('span',{className:'user-email',text:user.email})]),
-      make('td',{},roleCell),
-      make('td',{},[make('span',{className:`badge ${user.active?'badge-active':'badge-inactive'}`,text:user.active?'Activo':'Inactivo'})]),
-      make('td',{},[accessBadge(user,'pulso')]),
-      make('td',{},[accessBadge(user,'landur')]),
-      make('td',{},[make('div',{className:'row-actions'},[toggle,edit])]),
+      // data-label: en celular cada fila se muestra como tarjeta con su rótulo.
+      make('td',{attrs:{'data-label':'Usuario'}},[make('strong',{text:user.name}),make('span',{className:'user-email',text:user.email})]),
+      make('td',{attrs:{'data-label':'Rol'}},roleCell),
+      make('td',{attrs:{'data-label':'Estado'}},[make('span',{className:`badge ${user.active?'badge-active':'badge-inactive'}`,text:user.active?'Activo':'Inactivo'})]),
+      make('td',{attrs:{'data-label':'Pulso'}},[accessBadge(user,'pulso')]),
+      make('td',{attrs:{'data-label':'LANDUR'}},[accessBadge(user,'landur')]),
+      make('td',{attrs:{'data-label':'Acciones'},className:'row-actions-cell'},[make('div',{className:'row-actions'},[toggle,edit])]),
     ]);
     row.style.setProperty('--row-index',index);
     return row;

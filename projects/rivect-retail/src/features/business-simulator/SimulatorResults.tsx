@@ -7,6 +7,7 @@ import { Panel, PanelHeader } from '@/components/ui/Card'
 import { StatTile } from '@/components/ui/Metric'
 import { Badge } from '@/components/ui/Badge'
 import { money, num, pct } from '@/utils/format'
+import { EASE_OUT } from '@/theme/motion'
 
 export function SimulatorResults({
   metrics,
@@ -31,7 +32,7 @@ export function SimulatorResults({
       className="space-y-4"
       initial={reduce ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.4, ease: EASE_OUT }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <StatTile

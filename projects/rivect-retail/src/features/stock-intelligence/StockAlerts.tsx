@@ -68,7 +68,7 @@ export function StockAlerts({
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] font-medium text-slate-200">{alert.productName}</p>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[11px] text-slate-400">
                 {alert.title} · {alert.detail}
               </p>
             </div>
@@ -77,7 +77,7 @@ export function StockAlerts({
         ))
       )}
       {report.alerts.length > 8 ? (
-        <p className="text-center text-[10px] text-slate-400/75">
+        <p className="text-center text-[11px] text-slate-400/75">
           +{report.alerts.length - 8} alertas adicionales en la tabla
         </p>
       ) : null}

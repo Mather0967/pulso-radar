@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 /** React Bits · RevealText — revela el texto palabra por palabra (opacidad, desplazamiento y leve blur). */
 export function RevealText({
@@ -31,9 +32,9 @@ export function RevealText({
           initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={{
-            duration: 0.5,
+            duration: DUR.slow,
             delay: delay + index * 0.05,
-            ease: [0.22, 1, 0.36, 1],
+            ease: EASE_OUT,
           }}
         >
           {word}
