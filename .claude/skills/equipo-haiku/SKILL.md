@@ -16,15 +16,37 @@ El modelo principal es el **orquestador**: reparte, integra, decide y verifica. 
 5. **Sin efectos externos.** Ningún Haiku hace commits, push, deploys, abre sesiones ni lanza otros agentes. Eso lo hace solo el orquestador, después de verificar.
 6. **Modelo.** Todos con `model: "haiku"` en la herramienta Agent. Los 10 trabajadores van en paralelo (`run_in_background: true`). Los 2 finales también van en paralelo entre sí, pero recién cuando terminaron los 10.
 
+## Qué hace el orquestador (lo mínimo)
+
+El orquestador **no explora, no programa y no prueba a mano**: eso lo hacen los Haiku. Hace solo 5 cosas:
+
+1. **Decidir**: qué se construye, qué es crítico y qué se le pregunta al usuario (nunca lo delega).
+2. **Repartir**: aprobar el mapa de archivos y dueños que propone el Haiku 1.
+3. **Lanzar**: un mensaje con todos los prompts en paralelo.
+4. **Aprobar o rechazar** solo lo que los agentes marcan como crítico.
+5. **Cerrar**: corre él mismo **un** comando de verificación final (no confía en el «pasan» de nadie), hace commit y push, y le resume al usuario.
+
+## Los roles de los 12
+
+| # | Rol | Qué hace | Edita |
+|---|-----|----------|-------|
+| 1 | Explorador-repartidor | Lee el código, fija la línea base (tests y build), anota restricciones (`AGENTS.md`, CSP, hosting) y propone el mapa «archivo → dueño» con las interfaces entre ellos | Nada |
+| 2–9 | Trabajadores | Cada uno implementa su lote de archivos con TDD cuando hay lógica, y corre su verificación | Solo sus archivos |
+| 10 | Integrador-QA | Cuando terminan 2–9: typecheck, tests, build y prueba real (navegador con capturas, entradas reales). Reporta **solo fallas**, con su archivo dueño | Nada |
+| 11 | Pentester | Revisión de seguridad del diff (abajo) | Nada |
+| 12 | Cliente escéptico | Usa el producto como un cliente desconfiado (abajo) | Nada |
+
+Si la tarea es chica, se usan menos trabajadores (2–9): manda la regla de un dueño por archivo, no llegar a 12. El 1, el 10, el 11 y el 12 van siempre.
+
 ## Flujo
 
-1. **Mirar antes de repartir.** Leé el código que se va a tocar, fijá la línea base (tests y build en verde) y anotá restricciones como la CSP, el hosting o las reglas del proyecto (`AGENTS.md`).
-2. **Repartir.** Hacé la lista de archivos y dueños (hasta 10 trabajadores). Los reemplazos mecánicos que tocan muchos archivos los hace el orquestador **antes** de lanzar, para no pisar a nadie.
-3. **Lanzar los 10** con prompts autosuficientes: contexto, archivos propios, interfaces, criterio de terminado y el comando de verificación.
-4. **Integrar.** Cuando terminan: typecheck, tests y build, y además **probar de verdad** lo que se cambió (navegador, capturas, entradas reales). No confíes en un «pasan» de un agente sin correrlo vos.
-5. **Ronda final: los 2 revisores** (solo lectura, abajo).
-6. **Triage.** Corregí los hallazgos críticos, cada uno con un test que falla primero y pasa después. Los menores van a la lista de pendientes. Contale al usuario qué decidiste y por qué.
-7. **Recién ahí:** commit, push y el registro que pida el proyecto (por ejemplo, BACKLOG).
+1. **Haiku 1** explora y devuelve el mapa de archivos en ≤15 líneas. El orquestador lo aprueba o lo corrige.
+2. Los reemplazos mecánicos que tocan muchos archivos los hace un solo trabajador **antes** que el resto, para no pisar a nadie.
+3. **Haikus 2–9** en paralelo, con prompts autosuficientes: contexto, archivos propios, interfaces, criterio de terminado y comando de verificación.
+4. **Haiku 10** integra y prueba. Si algo falla, el orquestador relanza **al dueño de ese archivo** con el error (no lo arregla él).
+5. **Haikus 11 y 12** en paralelo, solo lectura.
+6. **Triage del orquestador.** Lo crítico vuelve a su dueño, con la orden de escribir primero un test que falle. Lo menor va a pendientes. Le cuenta al usuario qué decidió y por qué.
+7. **Cierre del orquestador**: un comando de verificación propio, commit, push y el registro que pida el proyecto (por ejemplo, BACKLOG, que puede escribir un trabajador).
 
 ## Revisor 11 · Pentester (Haiku, solo lectura)
 
