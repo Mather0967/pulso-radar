@@ -5,6 +5,7 @@ import { ProductThumb } from '@/components/ui/ProductThumb'
 import { Badge } from '@/components/ui/Badge'
 import { money } from '@/utils/format'
 import { cn } from '@/utils/format'
+import { Stagger, StaggerItem } from '../../components/reactbits/Stagger'
 
 export function CatalogPanel({
   products,
@@ -44,7 +45,7 @@ export function CatalogPanel({
           <Badge tone="neutral">{products.length} productos</Badge>
         </div>
         <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400/75" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -59,10 +60,10 @@ export function CatalogPanel({
               key={item}
               onClick={() => setCategory(item)}
               className={cn(
-                'rounded-full px-2 py-1 text-[10px] font-medium transition',
+                'rounded-full px-2 py-1 text-[11px] font-medium transition',
                 category === item
                   ? 'bg-brand-500/15 text-brand-200'
-                  : 'text-slate-500 hover:text-slate-300',
+                  : 'text-slate-400 hover:text-slate-300',
               )}
             >
               {item}
@@ -74,21 +75,24 @@ export function CatalogPanel({
       <div className="flex-1 overflow-y-auto p-2">
         {filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-            <PackageSearch className="h-6 w-6 text-slate-600" />
-            <p className="text-xs text-slate-500">
+            <PackageSearch className="h-6 w-6 text-slate-400/75" />
+            <p className="text-xs text-slate-400">
               Sin resultados para «{query}». Probá con otra categoría o etiqueta.
             </p>
           </div>
         ) : (
+          <Stagger step={0.03}>
           <ul className="space-y-1">
             {filtered.map((product) => {
               const isHighlighted = highlighted.includes(product.id)
               return (
                 <li key={product.id}>
+                <StaggerItem>
+                <div className="rounded-xl">
                   <button
                     onClick={() => onSelect(product)}
                     className={cn(
-                      'flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition',
+                      'flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_-12px_rgba(255,118,46,0.45)]',
                       isHighlighted
                         ? 'border border-brand-500/30 bg-brand-500/[0.08]'
                         : 'border border-transparent hover:bg-ink-800/70',
@@ -97,7 +101,7 @@ export function CatalogPanel({
                     <ProductThumb category={product.category} name={product.name} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[11px] font-medium text-slate-200">{product.name}</p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-[11px] text-slate-400">
                         {money(product.price)} · {product.stock} u.
                       </p>
                     </div>
@@ -119,15 +123,18 @@ export function CatalogPanel({
                       }
                     />
                   </button>
+                </div>
+                </StaggerItem>
                 </li>
               )
             })}
           </ul>
+          </Stagger>
         )}
       </div>
 
       <div className="border-t border-line p-3">
-        <p className="text-[10px] leading-relaxed text-slate-600">
+        <p className="text-[11px] leading-relaxed text-slate-400/75">
           Catálogo ficticio de demostración. El asistente consulta estos datos: precios, variantes y
           stock se actualizan con la simulación.
         </p>

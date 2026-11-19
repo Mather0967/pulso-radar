@@ -18,6 +18,8 @@ export interface AssistantMessage {
   meta?: {
     intent: string
     detected?: string[]
+    /** La conversación se derivó a una persona del equipo. */
+    handoff?: boolean
   }
 }
 
@@ -28,6 +30,8 @@ export interface AssistantMetrics {
   productsRecommended: number
   reservations: number
   purchaseOpportunities: number
+  /** Conversaciones derivadas a una persona (opcional para estados guardados antes). */
+  handoffs?: number
 }
 
 export interface AssistantReply {
@@ -38,6 +42,7 @@ export interface AssistantReply {
   detected: string[]
   resolved: boolean
   reserved?: boolean
+  handoff?: boolean
   detectedProducts?: Product[]
 }
 

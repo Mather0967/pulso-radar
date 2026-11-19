@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { RecoveryLead } from '@/domain/models'
 import { Modal } from '@/components/ui/Modal'
@@ -18,6 +19,7 @@ export function FollowUpModal({
   onSend: (message: string) => void
 }) {
   const [draft, setDraft] = useState(message)
+  const reduce = useReducedMotion()
 
   useEffect(() => {
     if (open) setDraft(message)
@@ -55,9 +57,14 @@ export function FollowUpModal({
             Para <span className="text-slate-200">{lead?.customerName}</span> · {lead?.channel}
           </p>
         </div>
-        <div className="mt-3 max-w-[92%] rounded-2xl rounded-bl-md border border-line bg-ink-800/90 p-3 text-[13px] leading-relaxed text-slate-200">
+        <motion.div
+          className="mt-3 max-w-[92%] rounded-2xl rounded-bl-md border border-line bg-ink-800/90 p-3 text-[13px] leading-relaxed text-slate-200"
+          initial={reduce ? false : { opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 360, damping: 28, delay: reduce ? 0 : 0.08 }}
+        >
           <p className="whitespace-pre-line">{draft}</p>
-        </div>
+        </motion.div>
       </div>
 
       <label className="mt-4 block">
@@ -70,7 +77,7 @@ export function FollowUpModal({
         />
       </label>
 
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-500">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-ink-900/60 p-3 text-[11px] leading-relaxed text-slate-400">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-400" />
         En la demo ningún mensaje sale del navegador. El envío simulado queda registrado en el
         historial de la oportunidad y actualiza su estado.

@@ -1,4 +1,6 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import { money } from '@/utils/format'
+import { EASE_OUT, DUR } from '@/theme/motion'
 
 export interface FunnelStep {
   label: string
@@ -8,6 +10,7 @@ export interface FunnelStep {
 }
 
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
+  const reduce = useReducedMotion()
   const max = Math.max(1, ...steps.map((s) => s.count))
 
   return (
@@ -19,16 +22,19 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
           <div key={step.label} className="group">
             <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
               <span className="text-slate-400">{step.label}</span>
-              <span className="flex items-center gap-2 text-slate-500">
+              <span className="flex items-center gap-2 text-slate-400">
                 <span className="font-semibold text-slate-200">{step.count}</span>
-                <span className="text-slate-600">·</span>
+                <span className="text-slate-400/75">·</span>
                 <span>{money(step.value)}</span>
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-ink-800">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-300 transition-all duration-700"
-                style={{ width: `${width}%`, opacity }}
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-400 to-brand-300"
+                initial={reduce ? false : { width: '0%' }}
+                animate={{ width: `${width}%` }}
+                transition={{ duration: DUR.slow, delay: reduce ? 0 : index * 0.08, ease: EASE_OUT }}
+                style={{ opacity }}
               />
             </div>
           </div>

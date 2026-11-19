@@ -157,7 +157,7 @@ export function reportCsvRows(report: ReportModel) {
 }
 
 export const summaryLine = (report: ReportModel): string =>
-  `${report.storeName}: ${money(report.simulator.additionalContribution)} de margen adicional estimado · ${num(
+  `${report.storeName}: ${money(report.simulator.additionalContribution)} de margen potencial mensual (proyección, datos de ejemplo) · ${num(
     report.simulator.recoverableHours,
     1,
   )} h recuperables · ${pct(report.simulator.upliftPct, 1)} de mejora`

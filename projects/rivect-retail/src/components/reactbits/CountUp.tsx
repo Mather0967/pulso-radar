@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useReducedMotion } from 'framer-motion'
 
 interface CountUpProps {
   value: number
@@ -11,7 +12,7 @@ interface CountUpProps {
   separator?: boolean
 }
 
-/** React Bits · CountUp — anima el número cuando cambia. */
+/** React Bits · CountUp — corre desde 0 al montar y anima cuando cambia. Con movimiento reducido muestra el valor final. */
 export function CountUp({
   value,
   decimals = 0,
@@ -21,13 +22,19 @@ export function CountUp({
   className,
   separator = true,
 }: CountUpProps) {
-  const [display, setDisplay] = useState(value)
-  const fromRef = useRef(value)
+  const reduce = useReducedMotion()
+  const [display, setDisplay] = useState(reduce ? value : 0)
+  const fromRef = useRef(reduce ? value : 0)
   const frameRef = useRef<number>()
 
   useEffect(() => {
     const from = fromRef.current
     const to = Number.isFinite(value) ? value : 0
+    if (reduce) {
+      fromRef.current = to
+      setDisplay(to)
+      return
+    }
     const start = performance.now()
 
     const tick = (now: number) => {
@@ -46,7 +53,7 @@ export function CountUp({
       if (frameRef.current) cancelAnimationFrame(frameRef.current)
       fromRef.current = to
     }
-  }, [value, duration])
+  }, [value, duration, reduce])
 
   const formatted = separator
     ? new Intl.NumberFormat('es-AR', {

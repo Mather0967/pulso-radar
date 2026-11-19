@@ -41,12 +41,12 @@ export function ResetDialog({ open, onClose }: { open: boolean; onClose: () => v
         Se van a descartar los datos que ingresaste en el simulador, las reservas simuladas, los
         cambios de estado del CRM y las campañas creadas en esta sesión.
       </p>
-      <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
+      <ul className="mt-4 space-y-1.5 text-xs text-slate-400">
         <li>· Perfil del comercio → valores iniciales de la demo.</li>
         <li>· Conversaciones y oportunidades → estado original.</li>
         <li>· Inventario y escenarios → configuración de fábrica.</li>
       </ul>
-      <p className="mt-4 rounded-lg border border-line bg-ink-900/70 px-3 py-2 text-[11px] text-slate-500">
+      <p className="mt-4 rounded-lg border border-line bg-ink-900/70 px-3 py-2 text-[11px] text-slate-400">
         Esta acción no se puede deshacer.
       </p>
     </Modal>

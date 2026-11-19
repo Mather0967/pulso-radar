@@ -37,7 +37,7 @@ async function api(path, input, key) {
   let response;
   try { response = await fetch(endpoint(path), {method:input === undefined ? 'GET':'POST',cache:'no-store',credentials:'same-origin',
     headers:input === undefined ? {} : {'Content-Type':'application/json','X-Landur-Request':'1',...(session?.csrf?{'X-CSRF-Token':session.csrf}:{}),...(key?{'Idempotency-Key':key}:{})},
-    ...(input === undefined ? {} : {body:JSON.stringify(input)}),signal:AbortSignal.timeout(20000)}); }
+    ...(input === undefined ? {} : {body:JSON.stringify(input)}),signal:AbortSignal.timeout(input===undefined?60000:20000)}); }
   catch { const error=new Error(input===undefined?'No pudimos conectar con el servidor.':'No se pudo confirmar la respuesta. Reintentá con este mismo formulario para no duplicar la operación.');error.uncertain=input!==undefined;throw error; }
   let data;
   try { data=await response.json(); }
@@ -1354,7 +1354,7 @@ function commandDialog({title,subtitle,body,confirm,retryLabel,success,input,ref
 // cuenta existente, crear una cuenta nueva con esa información, o borrarlos también.
 function accountDeleteDialog(id){
   const account=state.accounts.find(a=>a.id===id);if(!account||state.access==='viewer')return;
-  const movements=state.entries.filter(e=>e.account===id).length;
+  const movements=account.movements??state.entries.filter(e=>e.account===id).length;
   if(!movements){
     commandDialog({title:'Eliminar cuenta',subtitle:'Sin movimientos: no se pierde historial.',body:`<p class="form-note">Se eliminará la cuenta «${escape(account.name)}» y su saldo inicial de ${fmt(account.opening,account.currency)}. Esta acción no se puede deshacer.</p>`,confirm:'Eliminar cuenta',retryLabel:'Reintentar eliminación',success:'Cuenta eliminada.',refreshMessage:'La cuenta se eliminó, pero no se pudo actualizar la vista. Reconectá antes de seguir.',input:()=>({kind:'account.delete',accountId:account.id})});
     return;
@@ -1483,9 +1483,19 @@ document.addEventListener('click',async e=>{
     case 'update':if(busy||modal.open){toast('Terminá o cerrá el formulario antes de actualizar.');return;}updateWorker?.postMessage('ACTIVATE_UPDATE');break;
   }
 });
+let bootRetry;
 async function boot(){
+  clearTimeout(bootRetry);
   try{session=await api('/api/session');if(session.authenticated)await refresh();else lock();}
-  catch(error){lock(error.message);}
+  catch(error){
+    // Un 401 ya bloqueó la app dentro de api(). Cualquier otro fallo (servidor lento, respuesta cortada)
+    // no es una sesión vencida: ir al login en modo portal devolvía a la app y armaba un bucle.
+    if(error.status===401)return;
+    clearTimeout(bootRetry);
+    app.innerHTML=`<main class="loading"><span class="wordmark">LANDUR<span>®</span></span><p>${escape(error.message)}</p><button class="primary" type="button" id="boot-retry">Reintentar</button></main>`;
+    $('#boot-retry').onclick=boot;
+    // Sin reintento automático: apilaba un `state` nuevo por cada uno que seguía armándose en el servidor.
+  }
 }
 // Un corte de red no es una sesión vencida: no se cierra el formulario ni se pierde lo escrito.
 // Guardar sin red falla con su propio aviso; solo un 401 del servidor bloquea la aplicación.

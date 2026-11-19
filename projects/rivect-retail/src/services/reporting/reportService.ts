@@ -122,13 +122,17 @@ export function buildReport(input: ReportInput): ReportModel {
       metrics: [
         { label: 'Ventas recuperadas', value: `${num(input.profile.recoveredSales)} u./mes` },
         { label: 'Facturación adicional', value: money(simulator.additionalRevenue) },
-        { label: 'Margen adicional', value: money(simulator.additionalContribution) },
-        { label: 'Oportunidades abiertas', value: num(recovery.open), hint: 'CRM simulado' },
+        {
+          label: 'Margen potencial mensual',
+          value: money(simulator.additionalContribution),
+          hint: `Proyección: ${num(input.profile.recoveredSales)} ventas/mes`,
+        },
+        { label: 'Oportunidades abiertas', value: num(recovery.open), hint: 'CRM de ejemplo' },
       ],
       bullets: [
-        `${input.profile.customersWithoutFollowUp} clientes declarados sin seguimiento.`,
-        `Valor esperado del pipeline: ${money(recovery.expectedValue)}.`,
-        `Ventas ya recuperadas en la demo: ${money(recovery.recoveredRevenue)}.`,
+        `${num(input.profile.customersWithoutFollowUp)} clientes sin seguimiento (dato declarado por el comercio).`,
+        `Valor esperado del pipeline (CRM de ejemplo): ${money(recovery.expectedValue)}.`,
+        `Ventas recuperadas en la muestra del CRM: ${money(recovery.recoveredRevenue)} (${num(recovery.won)} compras de ${num(recovery.total)} oportunidades de ejemplo).`,
       ],
     },
     {

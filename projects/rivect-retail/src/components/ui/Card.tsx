@@ -6,15 +6,29 @@ export function Panel({
   children,
   className,
   spotlight = false,
+  hoverLift = false,
 }: {
   children: ReactNode
   className?: string
   spotlight?: boolean
+  /** Eleva la tarjeta al pasar el cursor (sombra y desplazamiento leve). */
+  hoverLift?: boolean
 }) {
   if (spotlight) {
     return <SpotlightCard className={className}>{children}</SpotlightCard>
   }
-  return <div className={cn('panel', className)}>{children}</div>
+  return (
+    <div
+      className={cn(
+        'panel',
+        hoverLift &&
+          'hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-[0_24px_56px_-18px_rgba(0,0,0,0.85)]',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
 }
 
 export function PanelHeader({
@@ -34,13 +48,13 @@ export function PanelHeader({
     <div className={cn('flex flex-wrap items-start justify-between gap-3', className)}>
       <div className="flex items-start gap-3">
         {icon ? (
-          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-ink-800 text-brand-300">
+          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-ink-800 text-brand-300 transition-transform duration-300 hover:scale-105">
             {icon}
           </div>
         ) : null}
         <div>
           <h2 className="font-display text-[15px] font-semibold tracking-tight text-white">{title}</h2>
-          {subtitle ? <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{subtitle}</p> : null}
         </div>
       </div>
       {action}

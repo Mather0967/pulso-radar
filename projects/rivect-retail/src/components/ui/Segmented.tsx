@@ -30,7 +30,7 @@ export function Segmented<T extends string>({
               'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
               active
                 ? 'bg-brand-500/15 text-brand-200 shadow-[inset_0_0_0_1px_rgba(255, 118, 46,0.35)]'
-                : 'text-slate-500 hover:text-slate-200',
+                : 'text-slate-400 hover:text-slate-200',
             )}
           >
             {option.icon}

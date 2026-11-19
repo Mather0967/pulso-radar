@@ -9,7 +9,6 @@ import {
   Group,
   Kbd,
   Paper,
-  Progress,
   ScrollArea,
   Stack,
   Text,
@@ -27,7 +26,7 @@ import {
   StickyNote,
 } from 'lucide-react'
 import { Aurora } from '@/components/reactbits/Aurora'
-import { ShinyText } from '@/components/reactbits/ShinyText'
+import { RevealText } from '@/components/reactbits/RevealText'
 import { OverviewPage } from '@/features/retail-overview/OverviewPage'
 import { SimulatorPage } from '@/features/business-simulator/SimulatorPage'
 import { AssistantPage } from '@/features/sales-assistant/AssistantPage'
@@ -38,12 +37,15 @@ import { ReportPage } from '@/features/impact-report/ReportPage'
 import { scenes, type Scene, type SceneSlug } from '@/presentation/scenes'
 import { usePresenter } from '@/presentation/usePresenter'
 import { LivePanel, LiveDot } from '@/presentation/LivePanel'
+import { EASE_OUT } from '@/theme/motion'
 
 const MANDARIN = '#FF762E'
 const MIDNIGHT = '#11222C'
 const SLATE = '#405C6B'
 const WARM = '#F7F5EF'
-const EASE = [0.22, 1, 0.36, 1] as const
+const SCENE_IN = 0.35
+const SCENE_OUT = 0.2
+const SLIDE_PX = 56
 
 const PAGES: Record<SceneSlug, ComponentType> = {
   apertura: OverviewPage,
@@ -71,7 +73,37 @@ const clockFmt = new Intl.DateTimeFormat('es-UY', {
 
 /** Un paso sin steps cuenta como uno, para que el progreso siempre avance. */
 const stepsIn = (s: Scene) => Math.max(1, s.steps.length)
-const TOTAL_STEPS = scenes.reduce((acc, s) => acc + stepsIn(s), 0)
+
+/** Transición de escena según la dirección (1 = adelante, -1 = atrás). */
+const sceneVariants = {
+  enter: (d: number) => ({
+    opacity: 0,
+    x: SLIDE_PX * d,
+    scale: 0.98,
+    filter: 'blur(6px)',
+    transition: { duration: SCENE_IN, ease: EASE_OUT },
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: SCENE_IN, ease: EASE_OUT },
+  },
+  exit: (d: number) => ({
+    opacity: 0,
+    x: -SLIDE_PX * d,
+    scale: 0.985,
+    filter: 'blur(4px)',
+    transition: { duration: SCENE_OUT, ease: EASE_OUT },
+  }),
+}
+// Movimiento reducido: solo opacidad, sin desplazamiento ni escala.
+const sceneVariantsReduced = {
+  enter: { opacity: 0, transition: { duration: 0 } },
+  center: { opacity: 1, transition: { duration: 0 } },
+  exit: { opacity: 0, transition: { duration: 0 } },
+}
 
 function toggleFullscreen() {
   try {
@@ -253,21 +285,12 @@ export function PresentationShell() {
     }
   }, [scene, step])
 
+  // Progreso global: cada escena pesa igual; dentro de la escena, según el paso.
   const sceneIndex = scenes.findIndex((s) => s.slug === scene.slug)
-  const stepsBefore = scenes.slice(0, sceneIndex).reduce((acc, s) => acc + stepsIn(s), 0)
-  const progress = ((stepsBefore + step + 1) / TOTAL_STEPS) * 100
+  const stepFraction = (step + 1) / stepsIn(scene)
+  const progress = ((sceneIndex + stepFraction) / scenes.length) * 100
   const caption = scene.steps[step]?.caption ?? ''
   const Page = PAGES[scene.slug]
-
-  const off = r ? 0 : 56 * dir
-  const blurIn = r ? 'blur(0px)' : 'blur(8px)'
-  const pageVariants = r
-    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
-    : {
-        initial: { opacity: 0, scale: 0.96, y: 18, filter: 'blur(6px)' },
-        animate: { opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' },
-        exit: { opacity: 0, scale: 0.985, filter: 'blur(4px)' },
-      }
 
   const iconBtnStyle: CSSProperties = { color: WARM }
 
@@ -291,8 +314,42 @@ export function PresentationShell() {
           radius={0}
           px="md"
           py={10}
-          style={{ ...GLASS, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
+          style={{
+            ...GLASS,
+            position: 'relative',
+            borderTop: 'none',
+            borderLeft: 'none',
+            borderRight: 'none',
+          }}
         >
+          {/* Progreso global: ancho con spring, un tramo por escena. */}
+          <div
+            role="progressbar"
+            aria-label="Progreso de la presentación"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress)}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 3,
+              background: 'rgba(247,245,239,0.08)',
+              overflow: 'hidden',
+            }}
+          >
+            <motion.div
+              initial={false}
+              animate={{ width: `${progress}%` }}
+              transition={r ? { duration: 0 } : { type: 'spring', stiffness: 170, damping: 26 }}
+              style={{
+                height: '100%',
+                background: `linear-gradient(90deg, ${MANDARIN}, #ffb88a)`,
+                boxShadow: 'none',
+              }}
+            />
+          </div>
           <Group justify="space-between" wrap="nowrap">
             <Group gap="md" wrap="nowrap">
               <img
@@ -400,35 +457,40 @@ export function PresentationShell() {
         </Paper>
 
         {/* Encabezado de escena */}
-        <Box px="md" pt="sm" pb={6} style={{ minWidth: 0 }}>
-          <AnimatePresence mode="wait">
+        <Box px="md" pt={10} pb={6} style={{ minWidth: 0 }}>
+          <AnimatePresence mode="wait" initial={false} custom={dir}>
             <motion.div
               key={scene.n}
-              initial={{ opacity: 0, x: off, filter: blurIn }}
-              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: -off, filter: blurIn }}
-              transition={{ duration: r ? 0 : 0.45, ease: EASE }}
+              custom={dir}
+              variants={r ? sceneVariantsReduced : sceneVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
             >
-              <Text
-                size="xs"
-                fw={600}
-                style={{ letterSpacing: '0.18em', textTransform: 'uppercase', color: MANDARIN }}
-              >
-                {`Escena ${scene.n} de ${scenes.length} · ${scene.label}`}
-              </Text>
-              <Text
-                component="h1"
-                style={{
-                  fontFamily: 'Sora, Inter, sans-serif',
-                  fontSize: 'clamp(1.5rem, 2.8vw, 2.25rem)',
-                  fontWeight: 700,
-                  lineHeight: 1.15,
-                  margin: '4px 0',
-                }}
-              >
-                <ShinyText speed={6}>{scene.title}</ShinyText>
-              </Text>
-              <Text size="md" style={{ color: 'rgba(247,245,239,0.7)', maxWidth: 820 }}>
+              {/* Encabezado compacto: el contenido de la escena es el protagonista. */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                <Text
+                  size="xs"
+                  fw={600}
+                  style={{ letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(247,245,239,0.62)', whiteSpace: 'nowrap' }}
+                >
+                  {`${scene.n}/${scenes.length} · ${scene.label}`}
+                </Text>
+                <Text
+                  component="h1"
+                  style={{
+                    fontFamily: 'Sora, Inter, sans-serif',
+                    fontSize: 'clamp(1.25rem, 2vw, 1.75rem)',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    margin: 0,
+                    color: '#F7F5EF',
+                  }}
+                >
+                  <RevealText key={scene.n} text={scene.title} />
+                </Text>
+              </div>
+              <Text size="sm" style={{ color: 'rgba(247,245,239,0.72)', maxWidth: 900, marginTop: 2 }}>
                 <Typewriter text={scene.tagline} />
               </Text>
             </motion.div>
@@ -438,16 +500,27 @@ export function PresentationShell() {
             {caption && (
               <motion.div
                 key={`${scene.n}-${step}`}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: r ? 0 : 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: r ? 0 : 0.3 }}
-                style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}
+                exit={{ opacity: 0, y: r ? 0 : -10 }}
+                transition={{ duration: r ? 0 : 0.25, ease: EASE_OUT }}
+                style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                <Badge size="sm" variant="light" radius="sm">
-                  {`Paso ${step + 1} de ${scene.steps.length}`}
-                </Badge>
-                <Text size="sm" fw={500}>
+                <span
+                  style={{
+                    flex: 'none',
+                    padding: '1px 8px',
+                    border: '1px solid rgba(247,245,239,0.28)',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'rgba(247,245,239,0.85)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {`Paso ${step + 1}/${scene.steps.length}`}
+                </span>
+                <Text size="sm" fw={500} style={{ color: 'rgba(247,245,239,0.9)' }}>
                   {caption}
                 </Text>
               </motion.div>
@@ -476,12 +549,15 @@ export function PresentationShell() {
               boxShadow: '0 24px 60px -32px rgba(0,0,0,0.9)',
             }}
           >
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="wait" initial={false} custom={dir}>
               <motion.div
                 key={scene.n}
+                custom={dir}
                 style={{ flex: 1, minHeight: 0, display: 'flex' }}
-                {...pageVariants}
-                transition={{ duration: r ? 0 : 0.5, ease: EASE }}
+                variants={r ? sceneVariantsReduced : sceneVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
               >
                 <ScrollArea h="100%" w="100%" type="auto" offsetScrollbars>
                   <Box p="md">
@@ -517,14 +593,37 @@ export function PresentationShell() {
             </ActionIcon>
 
             <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
-              <Progress
-                value={progress}
-                size="xs"
-                radius="xl"
-                transitionDuration={600}
-                aria-label="Progreso de la presentación"
-              />
-              <Group gap={6} justify="center" wrap="wrap">
+              {/* En celular: indicador compacto con la lista nativa del sistema. */}
+              {!wide && (
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(247,245,239,0.72)', whiteSpace: 'nowrap' }}>
+                    {`${scene.n}/${scenes.length}`}
+                  </span>
+                  <select
+                    aria-label="Ir a la escena"
+                    value={scene.n}
+                    onChange={(e) => goTo(Number(e.target.value))}
+                    style={{
+                      minWidth: 0,
+                      maxWidth: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 999,
+                      border: '1px solid rgba(247,245,239,0.18)',
+                      background: 'rgba(17,34,44,0.9)',
+                      color: WARM,
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {scenes.map((s) => (
+                      <option key={s.slug} value={s.n}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <Group gap={6} justify="center" wrap="wrap" style={wide ? undefined : { display: 'none' }}>
                 {scenes.map((s) => {
                   const active = s.slug === scene.slug
                   return (
@@ -552,7 +651,7 @@ export function PresentationShell() {
                             inset: 0,
                             borderRadius: 999,
                             background: MANDARIN,
-                            boxShadow: `0 0 18px ${MANDARIN}88`,
+                            boxShadow: 'none',
                           }}
                         />
                       )}

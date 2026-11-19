@@ -1,6 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useReducedMotion } from 'framer-motion'
 import { Download, FileSpreadsheet, FileText, Printer, ShieldCheck } from 'lucide-react'
 import { AnimatedContent } from '@/components/reactbits/AnimatedContent'
+import { CountUp } from '@/components/reactbits/CountUp'
+import { Stagger, StaggerItem } from '@/components/reactbits/Stagger'
+import { RevealText } from '@/components/reactbits/RevealText'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { SectionHeading } from '@/components/ui/Card'
@@ -26,6 +30,8 @@ export function ReportPage() {
   const scenario = useSimulationStore((s) => s.scenario)
   const settings = useSimulationStore((s) => s.campaignSettings)
   const [message, setMessage] = useState<string | null>(null)
+  const reduceMotion = useReducedMotion()
+  const countDuration = reduceMotion ? 0 : 900
 
   const report = useMemo(
     () =>
@@ -54,7 +60,7 @@ export function ReportPage() {
         <AnimatedContent>
           <SectionHeading
             eyebrow="Módulo 06 · Informe"
-            title="Impact Report"
+            title="Informe de impacto"
             description="Informe consolidado con los datos actuales del simulador, el CRM y el inventario. Se actualiza en tiempo real y puede descargarse en PDF o CSV."
             action={
               <div className="flex flex-wrap gap-2">
@@ -78,20 +84,20 @@ export function ReportPage() {
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-display text-sm font-bold tracking-[0.16em] text-brand-300">
+                <span className="font-display text-sm font-bold tracking-[0.08em] text-brand-300">
                   RIVECT
                 </span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-600">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-slate-400/75">
                   Retail Intelligence
                 </span>
               </div>
               <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight text-white">
-                Informe de oportunidades
+                <RevealText text="Informe de oportunidades" />
               </h1>
               <p className="mt-1 text-sm text-slate-400">
                 {report.storeName} · {report.businessType}
               </p>
-              <p className="mt-1 text-[11px] text-slate-600">
+              <p className="mt-1 text-[11px] text-slate-400/75">
                 Generado el {formatDateTime(report.generatedAt)} · escenario {scenario}
               </p>
             </div>
@@ -102,37 +108,75 @@ export function ReportPage() {
               <Badge tone={status === 'oportunidad' ? 'mint' : 'neutral'}>
                 {status === 'oportunidad' ? 'Oportunidad estimada' : 'Sin datos suficientes'}
               </Badge>
-              <span className="text-[10px] text-slate-600">{num(products.length)} productos analizados</span>
+              <span className="text-[11px] text-slate-400/75">{num(products.length)} productos analizados</span>
             </div>
           </div>
 
-          <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <Summary label="Horas recuperables" value={`${num(report.simulator.recoverableHours, 1)} h/mes`} />
-            <Summary label="Margen adicional" value={money(report.simulator.additionalContribution)} />
-            <Summary
-              label="Capital inmovilizado"
-              value={money(report.inventory.totals.inventoryCapital)}
-            />
-            <Summary
-              label="Mejora sobre margen"
-              value={pct(report.simulator.upliftPct, 1)}
-            />
+          <Stagger>
+            <div className="relative mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <StaggerItem>
+                <Summary
+                  label="Horas recuperables"
+                  value={
+                    <CountUp
+                      value={report.simulator.recoverableHours}
+                      decimals={1}
+                      suffix=" h/mes"
+                      duration={countDuration}
+                    />
+                  }
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label={`Margen potencial mensual (proyección: ${num(profile.recoveredSales)} ventas/mes)`}
+                  value={money(report.simulator.additionalContribution)}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label="Capital inmovilizado"
+                  value={money(report.inventory.totals.inventoryCapital)}
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <Summary
+                  label="Mejora sobre margen"
+                  value={
+                    <CountUp
+                      value={report.simulator.upliftPct}
+                      decimals={1}
+                      suffix="%"
+                      duration={countDuration}
+                    />
+                  }
+                />
+              </StaggerItem>
+            </div>
+          </Stagger>
+        </div>
+
+        <Stagger>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {report.sections.slice(0, 4).map((section) => (
+              <StaggerItem key={section.id}>
+                <ReportSectionCard section={section} />
+              </StaggerItem>
+            ))}
           </div>
-        </div>
+        </Stagger>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {report.sections.slice(0, 4).map((section) => (
-            <ReportSectionCard key={section.id} section={section} />
-          ))}
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {report.sections.slice(4, 6).map((section) => (
-            <ReportSectionCard key={section.id} section={section} />
-          ))}
+        <Stagger>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {report.sections.slice(4, 6).map((section) => (
+              <StaggerItem key={section.id}>
+                <ReportSectionCard section={section} />
+              </StaggerItem>
+            ))}
+            <StaggerItem>
           <div className="print-panel rounded-2xl border border-line/90 bg-ink-850/60 p-5">
             <h3 className="font-display text-sm font-semibold text-white">Comparativa económica</h3>
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-[11px] text-slate-400">
               Margen de contribución mensual, escenario actual vs. propuesto.
             </p>
             <div className="mt-3">
@@ -144,16 +188,18 @@ export function ReportPage() {
                 formatter={(value) => money(value)}
               />
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
               Diferencia estimada de {money(report.simulator.additionalContribution)} mensuales. Cifra
               hipotética basada en supuestos editables.
             </p>
           </div>
-        </div>
+            </StaggerItem>
+          </div>
+        </Stagger>
 
         <ReportSectionCard section={report.sections[6]} />
 
-        <div className="rounded-2xl border border-line bg-ink-900/50 p-4 text-[10px] leading-relaxed text-slate-500">
+        <div className="rounded-2xl border border-line bg-ink-900/50 p-4 text-[11px] leading-relaxed text-slate-400">
           <p className="flex items-center gap-1.5 font-medium text-slate-400">
             <ShieldCheck className="h-3.5 w-3.5 text-mint-400" />
             Alcance del documento
@@ -171,7 +217,7 @@ export function ReportPage() {
       <div className="no-print grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <div className="panel panel-pad">
           <h3 className="font-display text-sm font-semibold text-white">Exportar datos</h3>
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-slate-400">
             Los CSV se generan con los datos actuales de esta sesión.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -204,7 +250,7 @@ export function ReportPage() {
               Ayuda
             </Button>
           </div>
-          {message ? <p className="mt-2 text-[10px] text-slate-500">{message}</p> : null}
+          {message ? <p className="mt-2 text-[11px] text-slate-400">{message}</p> : null}
         </div>
 
         <div className="panel panel-pad">
@@ -213,11 +259,11 @@ export function ReportPage() {
             Con {pct(profile.automationPercentage)} de automatización sobre {num(report.simulator.monthlyQueries)}{' '}
             consultas mensuales, {report.storeName} podría liberar{' '}
             {num(report.simulator.recoverableHours, 0)} horas de atención y agregar{' '}
-            {money(report.simulator.additionalContribution)} de margen mediante ventas recuperadas y
-            seguimiento comercial.
+            {money(report.simulator.additionalContribution)} de margen por mes si se recuperan{' '}
+            {num(profile.recoveredSales)} ventas mensuales (supuesto del escenario, no un resultado).
           </p>
-          <p className="mt-2 text-[10px] text-slate-600">
-            Fuente: módulos Business Simulator, Customer Recovery y Stock Intelligence.
+          <p className="mt-2 text-[11px] text-slate-400/75">
+            Fuente: módulos Simulador de negocio (proyección con supuestos), Recuperación de clientes (muestra del CRM de ejemplo) y Control de stock. Datos de demostración, no resultados reales.
           </p>
         </div>
       </div>
@@ -225,10 +271,10 @@ export function ReportPage() {
   )
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-xl border border-line/80 bg-ink-950/40 px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wider text-slate-600">{label}</p>
+      <p className="text-[11px] uppercase tracking-wider text-slate-400/75">{label}</p>
       <p className="mt-0.5 font-display text-sm font-semibold text-white">{value}</p>
     </div>
   )
