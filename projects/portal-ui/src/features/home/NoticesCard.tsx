@@ -25,7 +25,7 @@ export function NoticesCard() {
           <h2 id="notices-title" className="text-lg font-semibold leading-7">Centro de avisos</h2>
           <p className="text-sm text-muted-foreground">Trabajos de los próximos 7 días y mensajes del equipo.</p>
         </div>
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" size="sm" className="min-h-11 md:min-h-0">
           <Link to="/calendario">Ver calendario</Link>
         </Button>
       </header>
@@ -34,7 +34,7 @@ export function NoticesCard() {
         {error && (
           <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
             <span>No se pudieron cargar los avisos.</span>
-            <Button variant="outline" size="sm" onClick={refresh}>Reintentar</Button>
+            <Button variant="outline" size="sm" className="min-h-11 md:min-h-0" onClick={refresh}>Reintentar</Button>
           </div>
         )}
 
@@ -84,7 +84,7 @@ export function NoticesCard() {
 
             {upcoming.length > MAX_ROWS && (
               <p className="pt-2 text-[13px]">
-                <Link to="/calendario" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Link to="/calendario" className="inline-flex min-h-11 items-center text-muted-foreground underline-offset-4 md:min-h-0 hover:text-foreground hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   Ver los {upcoming.length - MAX_ROWS} restantes en el calendario
                 </Link>
               </p>
@@ -94,7 +94,7 @@ export function NoticesCard() {
               <Link
                 to="/administracion?tab=messages"
                 data-testid="unread-badge"
-                className="mt-2 flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors duration-150 hover:border-[#354650] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="mt-2 flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors duration-150 hover:border-[#354650] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>{unread === 1 ? 'Tenés 1 mensaje sin leer.' : `Tenés ${unread} mensajes sin leer.`}</span>
                 <span className="text-muted-foreground">Ver mensajes</span>

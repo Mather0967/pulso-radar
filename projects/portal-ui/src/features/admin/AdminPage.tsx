@@ -78,7 +78,7 @@ function AdminPanel() {
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-6 md:px-6 md:py-8">
       <header className="flex flex-col gap-3 animate-panel-in">
-        <p className="font-mono text-xs font-semibold uppercase leading-4 tracking-[0.08em] text-primary">
+        <p className="font-mono text-xs font-semibold uppercase leading-4 tracking-[0.08em] text-[#ff9a63]">
           Solo administradores
         </p>
         <h1 className="text-2xl font-semibold leading-8 tracking-[-0.02em] text-foreground md:text-[28px] md:leading-9">

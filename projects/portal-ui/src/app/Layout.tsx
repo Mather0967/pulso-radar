@@ -85,7 +85,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
         <Link
           to="/"
           aria-label="RIVECT · Inicio"
-          className="flex shrink-0 items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex min-h-11 shrink-0 items-center rounded-sm focus-visible:outline-none md:min-h-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <img src={logo} alt="RIVECT" className="h-5 w-auto" />
         </Link>
@@ -143,7 +143,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
                 {noticesError && !notices && (
                   <div role="alert" className="flex items-center justify-between gap-2 p-2 text-sm">
                     <span>No se pudieron cargar los avisos.</span>
-                    <Button variant="outline" size="sm" onClick={refreshNotices}>Reintentar</Button>
+                    <Button variant="outline" size="sm" className="min-h-11 md:min-h-0" onClick={refreshNotices}>Reintentar</Button>
                   </div>
                 )}
                 {upcoming.slice(0, 5).map((job) => (

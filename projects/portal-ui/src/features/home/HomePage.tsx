@@ -68,7 +68,7 @@ export default function HomePage() {
       {error && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm">
           <span>No se pudieron cargar tus proyectos. Revisá tu conexión e intentá de nuevo.</span>
-          <Button variant="outline" size="sm" onClick={() => void loadProjects()}>Reintentar</Button>
+          <Button variant="outline" size="sm" className="min-h-11 md:min-h-0" onClick={() => void loadProjects()}>Reintentar</Button>
         </div>
       )}
 

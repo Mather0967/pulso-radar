@@ -64,12 +64,9 @@ export function ProjectCard({ project, primary = false, compact = false, delay =
           <h3 className={cn('min-w-0 text-base font-semibold leading-6', !compact && 'mt-1')}>
             <a
               href={project.url}
-              className={cn(
-                'min-w-0 rounded-sm after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none',
-                compact ? 'block truncate md:whitespace-normal md:break-words' : 'break-words',
-              )}
+              className="flex min-h-11 min-w-0 items-center rounded-sm after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none md:inline md:min-h-0"
             >
-              {project.name}
+              <span className={cn('min-w-0', compact ? 'truncate md:whitespace-normal md:break-words' : 'break-words')}>{project.name}</span>
             </a>
           </h3>
           {compact && (
@@ -88,7 +85,7 @@ export function ProjectCard({ project, primary = false, compact = false, delay =
       {links.length > 0 && (
         <nav aria-label={`Accesos directos de ${project.name}`} className={cn('relative z-10 flex flex-wrap gap-x-4 gap-y-1 text-sm', compact && 'hidden md:flex')}>
           {links.map((link) => (
-            <a key={link.url} href={link.url} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <a key={link.url} href={link.url} className="inline-flex min-h-11 items-center rounded-sm underline-offset-4 md:min-h-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {link.label}
             </a>
           ))}
@@ -101,7 +98,7 @@ export function ProjectCard({ project, primary = false, compact = false, delay =
           asChild
           size="sm"
           variant={primary ? 'default' : 'secondary'}
-          className={cn('max-w-full whitespace-normal text-left', compact && 'h-11 md:h-10')}
+          className={cn('max-w-full whitespace-normal text-left min-h-11 md:min-h-0', compact && 'h-11 md:h-10')}
         >
           <span aria-hidden="true">
             Abrir {project.name}

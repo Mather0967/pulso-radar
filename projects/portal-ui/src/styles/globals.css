@@ -93,7 +93,9 @@
 
   body {
     @apply text-foreground font-sans antialiased;
-    background: #0a151c;
+    /* Sin fondo propio: el de <html> pinta el lienzo por debajo de la capa ambiente (z-index -1).
+       Con fondo en los dos, el del body se dibujaba encima y tapaba los orbes. */
+    background: transparent;
     min-height: 100vh;
     margin: 0;
     overflow-x: hidden;
@@ -163,7 +165,7 @@
 }
 
 @keyframes gridBreath {
-  0%, 100% { opacity: 0.55; }
+  0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }
 }
 
@@ -232,7 +234,7 @@
   position: absolute;
   border-radius: 50%;
   filter: blur(110px);
-  opacity: 0.6;
+  opacity: 0.85;
   will-change: transform;
   animation: orbFloat 22s ease-in-out infinite alternate;
 }
@@ -242,7 +244,7 @@
   height: 580px;
   top: -140px;
   right: -80px;
-  background: radial-gradient(circle, rgba(255, 118, 46, 0.2), transparent 70%);
+  background: radial-gradient(circle, rgba(255, 118, 46, 0.32), transparent 70%);
 }
 
 .ambient-orb.orb-2 {
@@ -258,7 +260,7 @@
 .ambient-grid {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(247, 245, 239, 0.085) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(247, 245, 239, 0.14) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
   -webkit-mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
@@ -271,7 +273,7 @@
 @layer components {
   /* Encabezado de vidrio (máximo un blur de encabezado por vista). */
   .glass {
-    background: rgba(10, 21, 28, 0.78);
+    background: rgba(10, 21, 28, 0.72);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     backdrop-filter: blur(20px) saturate(160%);
     border-bottom: 1px solid var(--line);
