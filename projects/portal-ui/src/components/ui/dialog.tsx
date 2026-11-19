@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:duration-200 data-[state=closed]:duration-150",
+      "fixed inset-0 z-50 bg-[rgba(5,10,14,0.6)] backdrop-blur-[6px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:duration-[250ms] data-[state=closed]:duration-[250ms]",
       className
     )}
     {...props}
@@ -44,7 +44,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg max-h-[min(85dvh,calc(100dvh-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 text-card-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:duration-200 data-[state=closed]:duration-150",
+        "fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg max-h-[min(85dvh,calc(100dvh-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto glass-panel rounded-xl border border-border p-6 text-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:duration-[250ms] data-[state=closed]:duration-[250ms]",
         className
       )}
       {...props}
@@ -70,7 +70,7 @@ DialogHeader.displayName = "DialogHeader"
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto flex flex-col-reverse justify-end gap-2 border-t border-border bg-card px-6 py-4 sm:flex-row",
+      "sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto flex flex-col-reverse justify-end gap-2 border-t border-border bg-[rgba(17,34,44,0.96)] px-6 py-4 sm:flex-row",
       className
     )}
     {...props}

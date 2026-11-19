@@ -118,7 +118,7 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
   }
 
   return (
-    <form data-testid="grants-form" className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
+    <form data-testid="grants-form" className="glass-panel flex flex-col gap-5 p-5" onSubmit={onSubmit} noValidate>
       <div className="flex flex-col gap-2">
         <Label htmlFor="grant-user">Usuario</Label>
         <Select value={selected?.id ?? ''} onValueChange={onSelect}>
@@ -160,7 +160,7 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
           role="status"
           data-testid="grants-status"
           data-tone={notice.tone}
-          className={`text-[13px] leading-5 ${notice.tone === 'error' ? 'text-destructive' : notice.tone === 'ok' ? 'text-foreground' : 'text-muted-foreground'}`}
+          className={`animate-msg-in text-[13px] leading-5 ${notice.tone === 'error' ? 'text-destructive' : notice.tone === 'ok' ? 'text-foreground' : 'text-muted-foreground'}`}
         >
           {notice.text}
         </p>

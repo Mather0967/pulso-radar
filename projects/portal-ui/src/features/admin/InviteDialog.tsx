@@ -104,7 +104,7 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="invite-dialog" className="sm:max-w-md">
+      <DialogContent data-testid="invite-dialog" className="glass-panel sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Invitar usuario</DialogTitle>
           <DialogDescription>

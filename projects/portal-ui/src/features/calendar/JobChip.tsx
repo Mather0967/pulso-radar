@@ -2,7 +2,7 @@ import type { DragEvent, KeyboardEvent, MouseEvent } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Job } from '@/lib/types'
-import { PROJECT_LABEL, PROJECT_DOT, STATUS_LABEL } from './constants'
+import { PROJECT_LABEL, PROJECT_DOT, PROJECT_TINT, STATUS_LABEL } from './constants'
 import { JOB_DRAG_TYPE, initials } from './jobs'
 
 type Props = {
@@ -80,7 +80,8 @@ export function JobChip({
       title={tooltip}
       aria-label={`${job.title}, ${timeLabel ? `${timeLabel}, ` : ''}${PROJECT_LABEL[job.project]}, ${STATUS_LABEL[job.status]}`}
       className={cn(
-        'relative flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-sm border border-border bg-background/60 text-left text-xs leading-4 text-foreground transition-colors duration-150 hover:border-[#354650] hover:bg-accent',
+        'relative flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-sm border border-l-2 border-y-transparent border-r-transparent text-left text-xs leading-4 text-foreground transition-[box-shadow,background-color] duration-150',
+        PROJECT_TINT[job.project],
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         variant === 'chip' ? 'min-h-6 px-1.5 py-0.5' : 'min-h-11 w-full px-3 py-2 text-sm leading-5',

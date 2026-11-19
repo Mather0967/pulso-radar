@@ -1,9 +1,10 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/lib/session';
-import { dateChip, dateText, timeText, toProjectKey, PROJECT_LABEL, useDelayed } from './shared';
+import { dateChip, dateText, timeText, toProjectKey, PROJECT_COLOR, PROJECT_LABEL, useDelayed } from './shared';
 import { useNotices } from './useNotices';
 
 const MAX_ROWS = 5;
@@ -18,7 +19,7 @@ export function NoticesCard() {
   const visible = upcoming.slice(0, MAX_ROWS);
 
   return (
-    <section data-testid="notices-card" aria-labelledby="notices-title" className="rounded-lg border bg-card p-5">
+    <section data-testid="notices-card" aria-labelledby="notices-title" className="glass-panel rounded-2xl p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="notices-title" className="text-lg font-semibold leading-7">Centro de avisos</h2>
@@ -53,11 +54,11 @@ export function NoticesCard() {
 
             {visible.length > 0 && (
               <ul className="divide-y">
-                {visible.map((job) => {
+                {visible.map((job, i) => {
                   const chip = dateChip(job.date);
                   const time = timeText(job);
                   return (
-                    <li key={job.id} data-testid="notice-item" className="flex items-center gap-3 py-2.5">
+                    <li key={job.id} data-testid="notice-item" className="animate-fade-in flex items-center gap-3 py-2.5" style={{ '--d': `${0.35 + i * 0.045}s` } as CSSProperties}>
                       <div className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-md border bg-muted/40 font-mono tabular-nums">
                         <span className="text-xs uppercase leading-4 text-muted-foreground">{chip.top}</span>
                         <span className="text-sm font-semibold leading-5">{chip.bottom}</span>
@@ -67,7 +68,11 @@ export function NoticesCard() {
                         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-muted-foreground">
                           <span className="font-mono tabular-nums">{dateText(job.date)}{time ? ` · ${time}` : ''}</span>
                         </p>
-                        <Badge variant={toProjectKey(job.project)} className="mt-1 max-w-full">
+                        <Badge
+                          variant={toProjectKey(job.project)}
+                          className="mt-1 max-w-full"
+                          style={{ boxShadow: `0 0 12px -4px hsl(${PROJECT_COLOR[toProjectKey(job.project)]} / 0.45)` }}
+                        >
                           {PROJECT_LABEL[toProjectKey(job.project)]}
                         </Badge>
                       </div>

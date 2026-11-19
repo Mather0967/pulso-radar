@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,16 +45,15 @@ export default function HomePage() {
     () => GROUPS.map((g) => ({ ...g, items: list.filter((p) => p.group === g.id) })).filter((g) => g.items.length > 0),
     [list],
   );
-  const primaryId = groups[0]?.items[0]?.id;
-
+  
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1200px] flex-col gap-8">
       <section>
-        <h1 className="text-2xl font-semibold leading-8 tracking-[-0.02em] md:text-[28px] md:leading-9">
+        <h1 className="title-underline animate-title-up inline-block text-2xl font-semibold leading-8 tracking-[-0.02em] md:text-[28px] md:leading-9">
           {firstName ? `Hola, ${firstName}` : 'Hola'}
         </h1>
         {projects !== null && (
-          <p className="mt-2 text-sm leading-[22px] text-muted-foreground">
+          <p className="animate-fade-in mt-2 text-sm leading-[22px] text-muted-foreground" style={{ '--d': '0.22s' } as CSSProperties}>
             {count === 0
               ? 'Todavía no tenés proyectos habilitados.'
               : count === 1
@@ -96,19 +95,20 @@ export default function HomePage() {
         </section>
       )}
 
-      {groups.map((group) => (
-        <section key={group.id} aria-labelledby={`group-${group.id}`} className="flex flex-col gap-4">
+      {groups.map((group, groupIndex) => (
+        <section key={group.id} aria-labelledby={`group-${group.id}`} className="animate-group-in flex flex-col gap-4" style={{ '--d': groupIndex === 0 ? '0.3s' : '0.42s' } as CSSProperties}>
           <header>
             <h2 id={`group-${group.id}`} className="text-lg font-semibold leading-7">{group.title}</h2>
             <p className="text-sm leading-[22px] text-muted-foreground">{group.note}</p>
           </header>
           <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)] md:grid-cols-2 md:gap-4 ${group.id === 'ventas' ? 'gap-2' : 'gap-4'}`}>
-            {group.items.map((project) => (
+            {group.items.map((project, index) => (
               <ProjectCard
                 key={project.id}
                 project={project}
-                primary={project.id === primaryId}
+                primary={group.id === 'operacion'}
                 compact={group.id === 'ventas'}
+                delay={Math.min(0.5 + index * 0.1, 1)}
               />
             ))}
           </div>

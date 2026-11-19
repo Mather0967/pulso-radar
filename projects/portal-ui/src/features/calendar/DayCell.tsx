@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from 'react'
+import { useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { toIso } from './dates'
 import { JOB_DRAG_TYPE } from './jobs'
@@ -12,6 +12,7 @@ type Props = {
   /** Se llama al soltar un trabajo arrastrado sobre la celda. */
   onDropJob: (jobId: string, dateKey: string) => void
   className?: string
+  style?: CSSProperties
   children: ReactNode
 }
 
@@ -19,7 +20,7 @@ function carriesJob(e: DragEvent): boolean {
   return Array.from(e.dataTransfer?.types ?? []).includes(JOB_DRAG_TYPE)
 }
 
-export function DayCell({ date, isToday, isOutside = false, onCreate, onDropJob, className, children }: Props) {
+export function DayCell({ date, isToday, isOutside = false, onCreate, onDropJob, className, style, children }: Props) {
   const dateKey = toIso(date)
   const [over, setOver] = useState(false)
 
@@ -28,6 +29,7 @@ export function DayCell({ date, isToday, isOutside = false, onCreate, onDropJob,
       data-date={dateKey}
       data-today={isToday ? 'true' : undefined}
       tabIndex={-1}
+      style={style}
       onClick={onCreate ? () => onCreate(date) : undefined}
       onDragOver={(e) => {
         if (!carriesJob(e)) return

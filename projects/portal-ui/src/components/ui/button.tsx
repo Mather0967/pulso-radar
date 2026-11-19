@@ -7,12 +7,12 @@ import { cn } from "@/lib/utils"
 // Un solo primario (default) por vista. Sin sombras ni glow.
 // Alto 44 en móvil (touch), 36 en escritorio.
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 ease-[var(--ease-spring)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-[3px] focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default: "btn-shine bg-primary text-primary-foreground shadow-[0_8px_20px_-10px_rgba(255,118,46,0.6)] hover:-translate-y-0.5 hover:bg-[#e6621b] hover:shadow-[0_14px_28px_-10px_rgba(255,118,46,0.7)]",
+        secondary: "bg-[#405c6b] text-[#f7f5ef] hover:bg-[#4d6e80]",
         outline:
           "border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
         ghost: "text-foreground hover:bg-accent hover:text-accent-foreground",

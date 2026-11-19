@@ -150,7 +150,7 @@ function WideToolbar({
   const active = activeFilterCount(filters)
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-xl p-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={onPrev} disabled={!nav} aria-label="Anterior" data-testid="cal-prev">
             <ChevronLeft />
@@ -191,7 +191,7 @@ function NarrowToolbar({ title, view, filters, people, onFiltersChange, onToday,
   const [open, setOpen] = useState(false)
   const active = activeFilterCount(filters)
   return (
-    <div className="sticky top-0 z-20 -mx-4 flex flex-col gap-2 border-b border-border bg-background px-4 pb-2 pt-2">
+    <div className="glass-panel sticky top-0 z-20 -mx-4 flex flex-col gap-2 rounded-none border-x-0 border-t-0 px-4 pb-2 pt-2">
       <div className="flex h-11 items-center justify-between gap-2">
         <h2 data-testid="cal-title" aria-live="polite" className="min-w-0 truncate text-base font-semibold leading-6">
           {title}

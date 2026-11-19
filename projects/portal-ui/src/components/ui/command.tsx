@@ -40,7 +40,7 @@ const CommandDialog = ({ children, label = "Buscador", filter, ...props }: Comma
         aria-label={label}
         aria-describedby={undefined}
         data-testid="command-dialog"
-        className="top-[120px] max-h-[480px] max-w-[640px] translate-y-0 overflow-hidden p-0 max-sm:top-0 max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0"
+        className="top-[120px] max-h-[480px] max-w-[640px] translate-y-0 overflow-hidden p-0 max-sm:top-0 max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 sm:rounded-2xl"
       >
         <DialogTitle className="sr-only">{label}</DialogTitle>
         <DialogDescription className="sr-only">
@@ -120,7 +120,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex min-h-11 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm text-foreground outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground md:min-h-9 [&_svg]:shrink-0",
+      "relative flex min-h-11 cursor-default select-none items-center gap-2 rounded-md px-2 text-sm text-foreground outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-[rgba(255,118,46,0.12)] data-[selected=true]:text-foreground data-[selected=true]:before:absolute data-[selected=true]:before:inset-y-1.5 data-[selected=true]:before:left-0 data-[selected=true]:before:w-0.5 data-[selected=true]:before:rounded-full data-[selected=true]:before:bg-primary data-[selected=true]:before:content-[''] md:min-h-9 [&_svg]:shrink-0",
       className
     )}
     {...props}

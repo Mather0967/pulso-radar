@@ -41,7 +41,7 @@ export function MonthView({
   const grid = monthGrid(cursor)
 
   return (
-    <div role="group" aria-label={`Mes de ${MONTHS_ES[cursor.getMonth()]}`} key={animateKey} className="flex flex-col gap-1.5 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
+    <div role="group" aria-label={`Mes de ${MONTHS_ES[cursor.getMonth()]}`} key={animateKey} className="flex flex-col gap-1.5">
       <div className="grid grid-cols-7 gap-1.5" aria-hidden="true">
         {SHORT_DAYS_ES.map((label) => (
           <div key={label} className="px-1.5 text-xs font-medium text-muted-foreground">
@@ -50,7 +50,7 @@ export function MonthView({
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1.5">
-        {grid.map((date) => {
+        {grid.map((date, i) => {
           const key = toIso(date)
           const list = byDate.get(key) ?? []
           const outside = date.getMonth() !== cursor.getMonth()
@@ -62,7 +62,8 @@ export function MonthView({
               isOutside={outside}
               onCreate={canCreate ? onCreate : undefined}
               onDropJob={onDropJob}
-              className="min-h-[112px]"
+              className="min-h-[112px] animate-fade-in"
+              style={{ animationDelay: `${Math.min(i, 12) * 18}ms` }}
             >
               <span className="flex items-center gap-1.5">
                 <span className={cn('text-xs font-medium tabular-nums', key === todayKey ? 'text-foreground' : 'text-muted-foreground')}>

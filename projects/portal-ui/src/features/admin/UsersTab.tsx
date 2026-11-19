@@ -19,11 +19,12 @@ import {
   accessLevel,
   emptyUsersMessage,
   filterUsers,
-  hueFromName,
   initials,
   usersCountLabel,
 } from './helpers';
 import { messageOf, type LoadStatus } from './useUsers';
+import { AVATAR_STYLE, staggerStyle } from './styles';
+
 import type { SaveUserPatch } from './adminApi';
 import type { AdminUser } from './types';
 import { PROJECT_LABELS, type ProjectKey } from './types';
@@ -115,8 +116,9 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
     );
   }
 
-  const rowProps = (user: AdminUser) => ({
+  const rowProps = (user: AdminUser, index: number) => ({
     user,
+    index,
     busy: busyId === user.id,
     isSelf: user.id === selfId,
     lockReason: roleLockReason(user),
@@ -167,9 +169,9 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
       ) : (
         <>
           <ul className="flex flex-col gap-3 md:hidden" data-testid="users-cards">
-            {shown.map((user) => (
-              <li key={user.id}>
-                <UserCard {...rowProps(user)} />
+            {shown.map((user, i) => (
+              <li key={user.id} className="animate-user-in" style={staggerStyle(i)}>
+                <UserCard {...rowProps(user, i)} />
               </li>
             ))}
           </ul>
@@ -189,8 +191,8 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {shown.map((user) => (
-                  <UserTableRow key={user.id} {...rowProps(user)} />
+                {shown.map((user, i) => (
+                  <UserTableRow key={user.id} {...rowProps(user, i)} />
                 ))}
               </TableBody>
             </Table>
@@ -199,7 +201,7 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
       )}
 
       <Dialog open={deactivating !== null} onOpenChange={(open) => !open && setDeactivating(null)}>
-        <DialogContent data-testid="deactivate-dialog">
+        <DialogContent data-testid="deactivate-dialog" className="glass-panel">
           <DialogHeader>
             <DialogTitle>¿Desactivar a {deactivating?.name}?</DialogTitle>
             <DialogDescription>
@@ -225,6 +227,7 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
 
 interface RowProps {
   user: AdminUser;
+  index: number;
   busy: boolean;
   isSelf: boolean;
   lockReason: string | null;
@@ -236,12 +239,12 @@ interface RowProps {
   onGrants: () => void;
 }
 
+
 function Identity({ user, isSelf }: { user: AdminUser; isSelf: boolean }) {
-  const hue = hueFromName(user.name);
   return (
     <div className="flex min-w-0 items-center gap-3">
       <Avatar className="size-8 shrink-0" aria-hidden="true">
-        <AvatarFallback className="text-xs font-semibold" style={{ backgroundColor: `hsl(${hue} 40% 22%)`, color: `hsl(${hue} 80% 85%)` }}>
+        <AvatarFallback className="text-xs font-semibold" style={AVATAR_STYLE}>
           {initials(user.name)}
         </AvatarFallback>
       </Avatar>
@@ -322,7 +325,7 @@ function ToggleButton({ user, busy, onToggle, className }: { user: AdminUser; bu
 function UserCard(props: RowProps) {
   const { user, busy, isSelf, onToggle, onGrants } = props;
   return (
-    <Card data-testid="user-row" data-user-id={user.id} aria-busy={busy || undefined} className={`flex flex-col gap-4 p-4 ${user.active ? '' : 'opacity-80'}`}>
+    <Card data-testid="user-row" data-user-id={user.id} aria-busy={busy || undefined} className={`card-surface flex flex-col gap-4 p-4 transition-transform duration-150 md:hover:-translate-y-0.5 ${user.active ? '' : 'opacity-80'}`}>
       <div className="flex items-start justify-between gap-3">
         <Identity user={user} isSelf={isSelf} />
         <DropdownMenu>
@@ -359,7 +362,8 @@ function UserTableRow(props: RowProps) {
       data-testid="user-row"
       data-user-id={user.id}
       aria-busy={busy || undefined}
-      className={`h-16 ${user.active ? '' : 'opacity-80'} ${busy ? 'opacity-60' : ''}`}
+      className={`animate-user-in h-16 transition-transform duration-150 hover:-translate-y-0.5 ${user.active ? '' : 'opacity-80'} ${busy ? 'opacity-60' : ''}`}
+      style={staggerStyle(props.index)}
     >
       <TableCell>
         <Identity user={user} isSelf={isSelf} />

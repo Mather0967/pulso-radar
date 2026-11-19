@@ -24,10 +24,11 @@ const NAV: NavItem[] = [
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
+// Indicador activo mandarín: barra de 2 px bajo el enlace (solo transform/opacity en la transición).
 const topLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-    isActive ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+    'relative inline-flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    isActive ? 'text-foreground after:absolute after:inset-x-3 after:-bottom-[10px] after:h-0.5 after:rounded-full after:bg-primary after:shadow-[0_0_10px_rgba(255,118,46,.35)] after:content-[\'\']' : 'text-muted-foreground hover:text-foreground',
   );
 
 const sheetLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -72,7 +73,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+    <div className="flex min-h-dvh flex-col text-foreground">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:ring-2 focus:ring-ring"
@@ -80,7 +81,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
         Saltar al contenido
       </a>
 
-      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:gap-4 md:px-6">
+      <header className="glass animate-top-slide sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-white/[.07] px-4 md:h-16 md:gap-4 md:px-6">
         <Link
           to="/"
           aria-label="RIVECT · Inicio"
@@ -127,14 +128,14 @@ export function Layout({ onOpenSearch }: LayoutProps) {
                 {pending > 0 && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-background bg-foreground px-1 font-mono text-xs font-semibold leading-none text-background"
+                    className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-background bg-primary px-1 font-mono text-xs font-semibold leading-none text-primary-foreground shadow-[0_0_10px_rgba(255,118,46,.35)]"
                   >
                     {pending > 9 ? '9+' : pending}
                   </span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-0">
+            <PopoverContent align="end" className="w-80 border-white/[.12] bg-[rgba(17,34,44,.92)] p-0 backdrop-blur-[16px]">
               <div className="border-b px-4 py-3">
                 <p className="text-sm font-semibold">Avisos</p>
               </div>
@@ -192,7 +193,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 border-white/[.12] bg-[rgba(17,34,44,.92)] backdrop-blur-[16px]">
               <DropdownMenuLabel className="flex flex-col gap-0.5">
                 <span className="truncate text-sm font-medium">{user.name || user.email}</span>
                 <span className="truncate font-mono text-[12px] font-normal text-muted-foreground">{user.email}</span>

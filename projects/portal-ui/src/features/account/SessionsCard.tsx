@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Loader2, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +96,7 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
       )}
 
       {state.status === 'error' && (
-        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 px-3 py-3">
+        <div role="alert" className="animate-msg-in flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 px-3 py-3">
           <p className="text-sm text-destructive">{state.message}</p>
           <Button variant="outline" onClick={() => void reload()}>
             Reintentar
@@ -113,13 +113,16 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
       )}
 
       {state.status === 'ready' && sessions.length > 0 && (
-        <ul data-testid="sessions-list" className="divide-y divide-border rounded-lg border border-border bg-card">
-          {sessions.map((s) => (
+        <ul data-testid="sessions-list" className="card-surface divide-y divide-border rounded-lg border border-border">
+          {sessions.map((s, i) => (
             <li
               key={s.id}
               data-testid="session-row"
               data-session-id={s.id}
-              className="flex min-h-12 items-center gap-3 px-4 py-3"
+              style={{ '--d': `${Math.min(i, 9) * 0.04}s` } as CSSProperties}
+              className={`animate-fade-in flex min-h-12 items-center gap-3 px-4 py-3 ${
+                s.current ? 'bg-[rgba(255,118,46,.05)] shadow-[inset_2px_0_0_0_rgba(255,118,46,.45)]' : ''
+              }`}
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                 <Monitor className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

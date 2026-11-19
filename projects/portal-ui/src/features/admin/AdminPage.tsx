@@ -22,7 +22,7 @@
  *  - messages-tab, message-compose, message-to, message-body, message-send, unread-count,
  *    mark-all-read, messages-list, message-item (data-message-id, data-read), mark-read.
  */
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from '@/lib/session';
@@ -77,8 +77,8 @@ function AdminPanel() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-6 md:px-6 md:py-8">
-      <header className="flex flex-col gap-3">
-        <p className="font-mono text-xs font-medium uppercase leading-4 tracking-[0.08em] text-muted-foreground">
+      <header className="flex flex-col gap-3 animate-panel-in">
+        <p className="font-mono text-xs font-semibold uppercase leading-4 tracking-[0.08em] text-primary">
           Solo administradores
         </p>
         <h1 className="text-2xl font-semibold leading-8 tracking-[-0.02em] text-foreground md:text-[28px] md:leading-9">
@@ -88,11 +88,11 @@ function AdminPanel() {
           Usuarios, invitaciones, permisos y mensajes del equipo. Cambiar rol, estado o permisos cierra las sesiones del
           usuario.
         </p>
-        <dl data-testid="admin-stats" className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-4">
-          <Stat label="Activos" value={statValue(stats.active)} />
-          <Stat label="Administradores" value={statValue(stats.admins)} />
-          <Stat label="Inactivos" value={statValue(stats.inactive)} />
-          <Stat label="Sin leer" value={messagesState.status === 'ready' ? String(messagesState.unread) : '–'} />
+        <dl data-testid="admin-stats" className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+          <Stat index={0} label="Activos" value={statValue(stats.active)} />
+          <Stat index={1} label="Administradores" value={statValue(stats.admins)} />
+          <Stat index={2} label="Inactivos" value={statValue(stats.inactive)} />
+          <Stat index={3} label="Sin leer" value={messagesState.status === 'ready' ? String(messagesState.unread) : '–'} />
         </dl>
       </header>
 
@@ -101,14 +101,14 @@ function AdminPanel() {
           aria-label="Secciones de administración"
           className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
         >
-          <TabsTrigger value="users" data-testid="tab-users" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
+          <TabsTrigger value="users" data-testid="tab-users">
             Usuarios
             {loaded ? <span className="ml-2 text-xs tabular-nums text-muted-foreground">{usersState.users.length}</span> : null}
           </TabsTrigger>
-          <TabsTrigger value="grants" data-testid="tab-grants" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
+          <TabsTrigger value="grants" data-testid="tab-grants">
             Permisos
           </TabsTrigger>
-          <TabsTrigger value="messages" data-testid="tab-messages" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
+          <TabsTrigger value="messages" data-testid="tab-messages">
             Mensajes
             {messagesState.unread > 0 ? (
               <span data-testid="messages-badge" className="ml-2 rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium tabular-nums text-foreground">
@@ -159,11 +159,11 @@ function AdminPanel() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ index, label, value }: { index: number; label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 bg-card px-4 py-3">
+    <div className="card-surface animate-fade-in flex flex-col gap-1 px-4 py-3" style={{ '--d': `${index * 0.06}s` } as CSSProperties}>
       <dt className="text-[13px] leading-5 text-muted-foreground">{label}</dt>
-      <dd className="text-[28px] font-semibold leading-9 tabular-nums text-foreground">{value}</dd>
+      <dd className="font-mono text-[28px] font-semibold leading-9 tabular-nums text-foreground">{value}</dd>
     </div>
   );
 }

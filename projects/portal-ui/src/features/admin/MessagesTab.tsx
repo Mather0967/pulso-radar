@@ -13,13 +13,13 @@ import {
   MESSAGE_MAX_LENGTH,
   messageBodyError,
   messageCounterText,
-  hueFromName,
   initials,
   recipientLabel,
   relativeTime,
   senderLabel,
 } from './helpers';
 import { messageOf, type LoadStatus } from './useUsers';
+import { AVATAR_STYLE, staggerStyle } from './styles';
 import type { AdminMessage, AdminRecipient } from './types';
 
 interface MessagesTabProps {
@@ -90,7 +90,7 @@ export function MessagesTab({ messages, admins, unread, status, error, onRetry, 
     <div className="grid gap-8 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]" data-testid="messages-tab">
       <form
         data-testid="message-compose"
-        className="flex flex-col gap-4 self-start"
+        className="glass-panel flex flex-col gap-4 self-start p-5"
         onSubmit={submit}
         noValidate
       >
@@ -178,8 +178,8 @@ export function MessagesTab({ messages, admins, unread, status, error, onRetry, 
           <EmptyState icon={<MessageSquare />} title="Todavía no hay mensajes." description="Escribí el primero." />
         ) : (
           <ol data-testid="messages-list" className="flex flex-col divide-y divide-border rounded-lg border border-border">
-            {messages.map((m) => (
-              <MessageItem key={m.id} message={m} onMarkRead={markOne} />
+            {messages.map((m, i) => (
+              <MessageItem key={m.id} message={m} index={i} onMarkRead={markOne} />
             ))}
           </ol>
         )}
@@ -188,18 +188,18 @@ export function MessagesTab({ messages, admins, unread, status, error, onRetry, 
   );
 }
 
-function MessageItem({ message, onMarkRead }: { message: AdminMessage; onMarkRead: (id: string) => void }) {
+function MessageItem({ message, index, onMarkRead }: { message: AdminMessage; index: number; onMarkRead: (id: string) => void }) {
   const sender = senderLabel(message);
-  const hue = hueFromName(sender);
   return (
     <li
       data-testid="message-item"
       data-message-id={message.id}
       data-read={message.read ? 'true' : 'false'}
-      className="flex gap-3 p-4"
+      className="animate-msg-in flex gap-3 p-4"
+      style={staggerStyle(index)}
     >
       <Avatar className="size-8 shrink-0" aria-hidden="true">
-        <AvatarFallback className="text-xs font-semibold" style={{ backgroundColor: `hsl(${hue} 40% 22%)`, color: `hsl(${hue} 80% 85%)` }}>
+        <AvatarFallback className="text-xs font-semibold" style={AVATAR_STYLE}>
           {initials(sender)}
         </AvatarFallback>
       </Avatar>

@@ -110,15 +110,17 @@ export function CommandPalette({ open, onOpenChange }: Props) {
 
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? id;
 
-  const itemClass = 'h-11 md:h-9';
+  const itemClass =
+    'h-11 md:h-9 data-[selected=true]:bg-[rgba(255,118,46,.12)] data-[selected=true]:shadow-[inset_2px_0_0_0_#ff762e]';
+  const groupClass = '[&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em]';
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} label="Buscar en el portal" filter={substringFilter}>
         <CommandInput placeholder="Buscar páginas, proyectos, trabajos…" />
-        <CommandList className="min-h-0 flex-1">
+        <CommandList className="animate-fade-in min-h-0 flex-1">
           <CommandEmpty>Sin resultados</CommandEmpty>
 
-          <CommandGroup heading="Ir a">
+          <CommandGroup className={groupClass} heading="Ir a">
             <CommandItem data-testid="command-item" value="nav-home" keywords={searchable('Inicio', 'página principal')} onSelect={() => go('/')} className={itemClass}>
               <Home className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               Inicio
@@ -157,7 +159,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           {projects.length > 0 && (
             <>
               <CommandSeparator />
-              <CommandGroup heading="Proyectos">
+              <CommandGroup className={groupClass} heading="Proyectos">
                 {projects.map((project) => (
                   <CommandItem data-testid="command-item"
                     key={project.id}
@@ -175,7 +177,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           )}
 
           <CommandSeparator />
-          <CommandGroup heading="Trabajos" forceMount={jobs.status === 'loading' || jobs.status === 'error'}>
+          <CommandGroup className={groupClass} heading="Trabajos" forceMount={jobs.status === 'loading' || jobs.status === 'error'}>
             {jobs.status === 'loading' && (
               <div className="p-2" aria-busy="true" aria-label="Cargando trabajos">
                 <Skeleton className="h-9 w-full" />
@@ -203,7 +205,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           </CommandGroup>
 
           <CommandSeparator />
-          <CommandGroup heading="Acciones">
+          <CommandGroup className={groupClass} heading="Acciones">
             <CommandItem data-testid="command-item" value="action-new-job" keywords={searchable('Nuevo trabajo', 'crear', 'agregar')} onSelect={newJob} className={itemClass}>
               <Plus className="mr-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               Nuevo trabajo

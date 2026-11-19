@@ -43,6 +43,10 @@ type Intent = {
 
 export const NEW_JOB_EVENT = 'portal:new-job'
 
+function animateKeyValue(view: CalView, range: { from: string; to: string }): string {
+  return `${view}:${range.from}:${range.to}`
+}
+
 /** Pantallas angostas (< 700 px): agenda forzada y filtros en un Sheet. */
 function useNarrow(): boolean {
   const [narrow, setNarrow] = useState(
@@ -114,6 +118,10 @@ export default function CalendarPage() {
   const inFlight = useRef<number | null>(null)
   const [focusNonce, setFocusNonce] = useState(0)
   const focusId = useRef<string | null>(null)
+  const bodyRef = useRef<HTMLElement>(null)
+  const slideRef = useRef<Animation | null>(null)
+  const dirRef = useRef<1 | -1>(1)
+  const [dropNonce, setDropNonce] = useState<{ id: string; n: number } | null>(null)
   const dialogSeq = useRef(0)
 
   const effectiveView: CalView = narrow ? 'agenda' : view
@@ -185,9 +193,44 @@ export default function CalendarPage() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [consumeHash])
 
+  // Caída al soltar: rebote de 600 ms sobre el chip recién montado en su celda nueva.
+  useEffect(() => {
+    if (!dropNonce || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const el = document.querySelector<HTMLElement>(`[data-job-id="${dropNonce.id}"]`)
+    el?.animate(
+      [
+        { transform: 'translateY(-16px) scale(1.07)', offset: 0 },
+        { transform: 'translateY(3px) scale(0.97)', offset: 0.55 },
+        { transform: 'translateY(-1px) scale(1.01)', offset: 0.8 },
+        { transform: 'translateY(0) scale(1)', offset: 1 },
+      ],
+      { duration: 600, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+    )
+  }, [dropNonce])
+
+  // Cambio de mes: el contenido se desliza 24 px y aparece; una animación nueva cancela la anterior.
+  const prevKey = useRef(animateKeyValue(effectiveView, range))
+  useEffect(() => {
+    const key = animateKeyValue(effectiveView, range)
+    if (prevKey.current === key) return
+    prevKey.current = key
+    const el = bodyRef.current
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    slideRef.current?.cancel()
+    const d = dirRef.current * 24
+    slideRef.current = el.animate(
+      [
+        { transform: `translateX(${d}px)`, opacity: 0 },
+        { transform: 'translateX(0)', opacity: 1 },
+      ],
+      { duration: 250, easing: 'cubic-bezier(0.34, 1.25, 0.64, 1)' },
+    )
+  }, [effectiveView, range])
+
   const navigate = useCallback(
     (dir: -1 | 1) => {
       if (effectiveView === 'agenda') return
+      dirRef.current = dir
       const next =
         effectiveView === 'month'
           ? new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1)
@@ -271,6 +314,7 @@ export default function CalendarPage() {
     (id: string, dateKey: string) => {
       const job = jobs.find((j) => j.id === id)
       if (!job || !canEditJob(me, job) || job.date === dateKey) return
+      setDropNonce((prev) => ({ id, n: (prev?.n ?? 0) + 1 }))
       void data.moveJob(job, dateKey)
     },
     [data, jobs, me],
@@ -445,7 +489,7 @@ export default function CalendarPage() {
         onNew={() => openNew(startOfDay())}
       />
 
-      <section aria-label="Trabajos" className="min-w-0">
+      <section ref={bodyRef} aria-label="Trabajos" className="card-surface min-w-0 rounded-xl p-3 md:p-4">
         {body}
       </section>
 

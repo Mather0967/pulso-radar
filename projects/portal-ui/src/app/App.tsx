@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { AmbientBackground } from './AmbientBackground';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import { SessionProvider } from '@/lib/session';
 import { AppRoutes } from './router';
@@ -46,6 +47,7 @@ export default function App() {
 
   return (
     <SessionProvider>
+      <AmbientBackground />
       <BrowserRouter basename="/portal">
         <TooltipProvider delayDuration={300}>
           <AppRoutes onOpenSearch={() => setSearch(true)} />

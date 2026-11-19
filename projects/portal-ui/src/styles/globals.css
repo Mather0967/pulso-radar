@@ -2,30 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modo oscuro único (design-brief §3). Tokens HSL: se usan como hsl(var(--x)). */
+/*
+  Portal RIVECT · modo oscuro único (design-brief-v2.md manda sobre el brief anterior).
+  Tokens HSL para shadcn (hsl(var(--x))) y variables de marca (rgba/hex) para las clases de identidad.
+*/
 :root {
-  --background: 204 38% 6%;
-  --foreground: 40 33% 96%;
-  --card: 203 32% 9%;
+  color-scheme: dark;
+
+  /* shadcn (HSL) */
+  --background: 203 47% 7%; /* #0a151c */
+  --foreground: 40 33% 96%; /* #f7f5ef */
+  --card: 202 44% 12%; /* #11222c */
   --card-foreground: 40 33% 96%;
-  --popover: 203 32% 10%;
+  --popover: 202 44% 12%;
   --popover-foreground: 40 33% 96%;
-  --primary: 21 100% 59%;
-  --primary-foreground: 202 44% 12%;
-  --secondary: 201 25% 18%;
+  --primary: 21 100% 59%; /* #ff762e */
+  --primary-foreground: 203 47% 7%; /* #0a151c sobre mandarín */
+  --secondary: 201 25% 18%; /* #223139 */
   --secondary-foreground: 40 33% 96%;
   --muted: 201 22% 14%;
-  --muted-foreground: 200 16% 66%;
+  --muted-foreground: 200 16% 66%; /* #9AADB6 */
   --accent: 201 25% 17%;
   --accent-foreground: 40 33% 96%;
-  --destructive: 4 70% 50%;
+  --destructive: 4 70% 50%; /* #D93226 */
   --destructive-foreground: 0 0% 100%;
   --border: 201 22% 18%;
   --input: 201 16% 40%;
   --ring: 21 100% 59%;
   --radius: 0.5rem;
 
-  /* Proyectos (siempre con punto + nombre) y estados de trabajo. */
+  /* Marca RIVECT */
+  --medianoche: #0a151c;
+  --medianoche-2: #11222c;
+  --surface-2: #172d39;
+  --pizarra: #405c6b;
+  --pizarra-hi: #5b7d8f;
+  --mandarin: #ff762e;
+  --mandarin-hover: #e6621b;
+  --cream: #f7f5ef;
+
+  /* Texto */
+  --ink: #f7f5ef;
+  --ink-2: #c4d0d7;
+  --ink-3: #8aa2b0;
+  --ink-on-accent: #0a151c;
+
+  /* Bordes y acentos */
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --accent-soft: rgba(255, 118, 46, 0.12);
+  --accent-glow: rgba(255, 118, 46, 0.35);
+  --focus: #ff762e;
+
+  /* Proyectos (siempre con punto + nombre) y estados de trabajo */
   --project-pulso: 186 52% 56%;
   --project-landur: 255 80% 74%;
   --project-studio: 340 60% 68%;
@@ -36,26 +65,49 @@
   --status-done: 152 55% 50%;
   --status-blocked: 4 80% 66%;
 
-  color-scheme: dark;
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 14px 34px -16px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-hover: 0 26px 50px -16px rgba(0, 0, 0, 0.75), 0 12px 32px -12px rgba(255, 118, 46, 0.22);
+
+  /* Curvas y duraciones */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
+  --dur-slow: 400ms;
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   html {
+    background: #0a151c;
+    min-height: 100%;
     -webkit-text-size-adjust: 100%;
-    background: #091015;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    background: #091015;
+    @apply text-foreground font-sans antialiased;
+    background: #0a151c;
     min-height: 100vh;
+    margin: 0;
     overflow-x: hidden;
     font-size: 14px;
     line-height: 22px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
   }
 
   h1 {
@@ -83,33 +135,442 @@
     }
   }
 
-  .tabular {
-    font-variant-numeric: tabular-nums;
+  button,
+  a {
+    touch-action: manipulation;
   }
 
-  /* Foco visible en todo interactivo: nunca outline: none. */
+  /* Foco de teclado: 2px mandarín, offset 3px. Nunca outline: none. */
   :focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-    border-radius: var(--radius);
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+
+  ::selection {
+    background: rgba(255, 118, 46, 0.35);
+    color: var(--cream);
   }
 }
 
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+@keyframes orbFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-36px, 52px) scale(1.07); }
+  100% { transform: translate(30px, -40px) scale(0.95); }
+}
+
+@keyframes gridBreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes borderSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes topSlide {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes titleUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes underlineDraw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes groupEnter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(22px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes userIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==========================================================================
+   Fondo ambiental (capa fija detrás de todo)
+   ========================================================================== */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.6;
+  will-change: transform;
+  animation: orbFloat 22s ease-in-out infinite alternate;
+}
+
+.ambient-orb.orb-1 {
+  width: 580px;
+  height: 580px;
+  top: -140px;
+  right: -80px;
+  background: radial-gradient(circle, rgba(255, 118, 46, 0.2), transparent 70%);
+}
+
+.ambient-orb.orb-2 {
+  width: 680px;
+  height: 680px;
+  bottom: -200px;
+  left: -140px;
+  background: radial-gradient(circle, rgba(64, 92, 107, 0.55), transparent 70%);
+  animation-duration: 28s;
+  animation-direction: alternate-reverse;
+}
+
+.ambient-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(247, 245, 239, 0.085) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 25%, black 40%, transparent 85%);
+  animation: gridBreath 9s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Componentes de identidad
+   ========================================================================== */
+@layer components {
+  /* Encabezado de vidrio (máximo un blur de encabezado por vista). */
+  .glass {
+    background: rgba(10, 21, 28, 0.78);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Paneles de vidrio (máximo tres capas con blur por vista). */
+  .glass-panel {
+    background: rgba(17, 34, 44, 0.72);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-surface {
+    background: linear-gradient(180deg, #152b38 0%, #11222c 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Tarjeta interactiva: reposo plano; el levantado y el cónico solo con puntero fino. */
+  .interactive-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #152b38 0%, #11222c 100%);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+    transition:
+      transform 400ms var(--ease-spring),
+      box-shadow 250ms ease,
+      border-color 300ms ease;
+  }
+
+  /* Borde cónico mandarín (::before) y superficie interior (::after) */
+  .interactive-card::before {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 350ms ease;
+    background: conic-gradient(
+      transparent 0deg,
+      transparent 230deg,
+      rgba(255, 118, 46, 0.5) 290deg,
+      #ff762e 330deg,
+      #ffb08a 345deg,
+      #ff762e 355deg,
+      transparent 360deg
+    );
+  }
+
+  .interactive-card::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    z-index: 0;
+    border-radius: 15px;
+    pointer-events: none;
+    background: linear-gradient(180deg, #152b38 0%, #11222c 100%);
+  }
+
+  /* Foco que sigue el cursor (variables --mx / --my fijadas por useSpotlight) */
+  .spotlight-glow {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 250ms ease;
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 118, 46, 0.16), transparent 70%);
+  }
+
+  /* Destello diagonal al entrar */
+  .card-glare {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    transform: translateX(-100%) rotate(25deg);
+    background: linear-gradient(90deg, transparent, rgba(247, 245, 239, 0.08), transparent);
+    transition: transform 900ms var(--ease-spring);
+  }
+
+  .interactive-card > *:not(.spotlight-glow):not(.card-glare) {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* Botón con destello diagonal (no cambia el layout) */
+  .btn-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-shine::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 42%;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
+    transform: translateX(-130%) skewX(-18deg);
+    transition: transform 600ms var(--ease-spring);
+  }
+
+  .btn-shine:focus-visible::before {
+    transform: translateX(340%) skewX(-18deg);
+  }
+
+  /* Subrayado mandarín del título que se dibuja */
+  .title-underline {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 12px;
+  }
+
+  .title-underline::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 96px;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--mandarin), rgba(255, 118, 46, 0.2));
+    transform-origin: left center;
+    animation: underlineDraw 1s var(--ease-spring) 450ms backwards;
+  }
+}
+
+/* Hover real: solo con puntero fino (touch y (hover:none) quedan sin levantar ni cónico) */
+@media (hover: hover) and (pointer: fine) {
+  .interactive-card:hover,
+  .interactive-card:focus-visible {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: transparent;
+  }
+
+  .interactive-card:hover::before,
+  .interactive-card:focus-visible::before {
+    opacity: 1;
+    animation: borderSpin 5s linear infinite;
+  }
+
+  .interactive-card:hover .spotlight-glow,
+  .interactive-card:focus-visible .spotlight-glow {
+    opacity: 1;
+  }
+
+  .interactive-card:hover .card-glare,
+  .interactive-card:focus-visible .card-glare {
+    transform: translateX(100%) rotate(25deg);
+  }
+
+  .btn-shine:hover::before {
+    transform: translateX(340%) skewX(-18deg);
+  }
+}
+
+.interactive-card:active {
+  transform: scale(0.98);
+  transition-duration: 150ms;
+}
+
+.btn-shine:active {
+  transform: scale(0.97);
+}
+
+/* Utilidades de entrada. Retraso con --d (por defecto 0s). */
 @layer utilities {
+  .animate-top-slide {
+    animation-name: topSlide;
+    animation-duration: 750ms;
+    animation-timing-function: var(--ease-spring);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-card-in {
+    animation-name: cardIn;
+    animation-duration: 750ms;
+    animation-timing-function: var(--ease-spring);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-title-up {
+    animation-name: titleUp;
+    animation-duration: 800ms;
+    animation-timing-function: var(--ease-spring);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-group-in {
+    animation-name: groupEnter;
+    animation-duration: 500ms;
+    animation-timing-function: var(--ease-spring);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-panel-in {
+    animation-name: panelIn;
+    animation-duration: 300ms;
+    animation-timing-function: var(--ease-soft);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-user-in {
+    animation-name: userIn;
+    animation-duration: 400ms;
+    animation-timing-function: var(--ease-spring);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-msg-in {
+    animation-name: msgIn;
+    animation-duration: 250ms;
+    animation-timing-function: var(--ease-out);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
+  .animate-fade-in {
+    animation-name: fadeIn;
+    animation-duration: 250ms;
+    animation-timing-function: var(--ease-out);
+    animation-delay: var(--d, 0s);
+    animation-fill-mode: backwards;
+  }
+
   .text-eyebrow {
     @apply font-mono font-medium uppercase;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 16px;
     letter-spacing: 0.08em;
   }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-::selection {
-  background: hsl(var(--primary) / 0.35);
-  color: hsl(var(--foreground));
+/* Sin mouse: orbes más chicos y sin deriva del orbe 2 ni respiración de la grilla. */
+@media (hover: none), (max-width: 767px) {
+  .ambient-orb {
+    filter: blur(60px);
+  }
+
+  .ambient-orb.orb-2 {
+    animation: none;
+  }
+
+  .ambient-grid {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
-/* Barras de desplazamiento discretas en el tema oscuro. */
+/* Movimiento reducido: todo estático, queda el estado final visible. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .ambient-orb,
+  .ambient-grid,
+  .interactive-card::before,
+  .spotlight-glow,
+  .card-glare {
+    display: none !important;
+  }
+
+  .interactive-card:hover,
+  .interactive-card:focus-visible,
+  .interactive-card:active,
+  .btn-shine:active {
+    transform: none !important;
+  }
+}
+
+/* Barras de desplazamiento discretas */
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--border)) transparent;
@@ -129,21 +590,4 @@
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--input));
-  background-clip: padding-box;
-}
-
-/* Preferencia de movimiento reducido: sin transiciones ni animaciones visibles. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
 }

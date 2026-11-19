@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import type { Project } from '@/lib/types';
@@ -39,10 +39,10 @@ export default function AccountPage() {
         <p className="text-sm text-muted-foreground">Tus datos, tu contraseña y los dispositivos donde iniciaste sesión.</p>
       </header>
 
-      <Card className="space-y-5 p-5" aria-labelledby="profile-title">
+      <Card className="glass-panel animate-panel-in space-y-5 p-5" style={{ '--d': '0s' } as CSSProperties} aria-labelledby="profile-title">
         <div className="flex items-center gap-4">
-          <Avatar className="h-12 w-12">
-            <AvatarFallback className="bg-secondary text-sm font-semibold text-foreground">
+          <Avatar className="h-16 w-16">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-[#8aa2b0] text-base font-bold text-[#0a151c]">
               {initials(user.name)}
             </AvatarFallback>
           </Avatar>
@@ -81,7 +81,7 @@ export default function AccountPage() {
         </dl>
       </Card>
 
-      <Card className="p-5" aria-labelledby="password-title">
+      <Card className="glass-panel animate-panel-in p-5" style={{ '--d': '0.08s' } as CSSProperties} aria-labelledby="password-title">
         <h2 id="password-title" className="mb-1 text-base font-semibold leading-6">
           Cambiar contraseña
         </h2>
@@ -91,7 +91,7 @@ export default function AccountPage() {
         <PasswordForm onChanged={() => setSessionsVersion((v) => v + 1)} />
       </Card>
 
-      <Card className="p-5">
+      <Card className="glass-panel animate-panel-in p-5" style={{ '--d': '0.16s' } as CSSProperties}>
         <SessionsCard refreshKey={sessionsVersion} />
       </Card>
     </main>

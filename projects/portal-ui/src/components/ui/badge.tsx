@@ -11,21 +11,21 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-transparent bg-secondary text-secondary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        outline: "border-border text-foreground",
+        default: "border-transparent bg-[#172d39] text-[#f7f5ef]",
+        secondary: "border-transparent bg-[#172d39] text-[#f7f5ef]",
+        outline: "border-[rgba(255,255,255,0.14)] text-foreground",
         destructive: "border-transparent bg-destructive text-destructive-foreground",
 
         pulso:
-          "border-border text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--pulso,186_52%_56%))]",
+          "border-[rgba(255,255,255,0.14)] text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--pulso,186_52%_56%))]",
         landur:
-          "border-border text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--landur,255_80%_74%))]",
+          "border-[rgba(255,255,255,0.14)] text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--landur,255_80%_74%))]",
         studio:
-          "border-border text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--studio,340_60%_68%))]",
+          "border-[rgba(255,255,255,0.14)] text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--studio,340_60%_68%))]",
         retail:
-          "border-border text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--retail,43_80%_62%))]",
+          "border-[rgba(255,255,255,0.14)] text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--retail,43_80%_62%))]",
         general:
-          "border-border text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--general,200_14%_62%))]",
+          "border-[rgba(255,255,255,0.14)] text-foreground before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-[hsl(var(--general,200_14%_62%))]",
 
         pendiente:
           "border-transparent text-[hsl(var(--pendiente,200_14%_62%))] before:block before:size-1.5 before:shrink-0 before:rounded-full before:content-[''] before:bg-current",

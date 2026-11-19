@@ -89,7 +89,7 @@ export function PasswordForm({ onChanged }: Props) {
           aria-describedby={describe('current')}
         />
         {errors.current && (
-          <p id="account-current-error" className="text-sm text-destructive">
+          <p id="account-current-error" className="animate-msg-in text-sm text-destructive">
             {errors.current}
           </p>
         )}
@@ -111,7 +111,7 @@ export function PasswordForm({ onChanged }: Props) {
         <div id="account-next-meter" className="space-y-1">
           <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full bg-foreground/70 transition-[width] duration-150 ease-out motion-reduce:transition-none"
+              className="h-full bg-primary transition-[width] duration-250 ease-out motion-reduce:transition-none"
               style={{ width: `${meterRatio * 100}%` }}
             />
           </div>
@@ -120,7 +120,7 @@ export function PasswordForm({ onChanged }: Props) {
           </p>
         </div>
         {errors.next && (
-          <p id="account-next-error" className="text-sm text-destructive">
+          <p id="account-next-error" className="animate-msg-in text-sm text-destructive">
             {errors.next}
           </p>
         )}
@@ -140,7 +140,7 @@ export function PasswordForm({ onChanged }: Props) {
           aria-describedby={describe('confirm')}
         />
         {errors.confirm && (
-          <p id="account-confirm-error" className="text-sm text-destructive">
+          <p id="account-confirm-error" className="animate-msg-in text-sm text-destructive">
             {errors.confirm}
           </p>
         )}
@@ -168,7 +168,7 @@ export function PasswordForm({ onChanged }: Props) {
           id="account-error"
           data-testid="account-error"
           role="alert"
-          className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive"
+          className="animate-msg-in rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive"
         >
           {serverError}
         </div>
