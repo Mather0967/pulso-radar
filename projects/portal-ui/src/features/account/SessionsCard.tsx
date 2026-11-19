@@ -79,7 +79,7 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
             data-testid="revoke-others"
             onClick={() => setConfirmOthers(true)}
             disabled={!hasOthers || busy !== null}
-            className="min-h-10 md:min-h-9"
+            className="min-h-10 border-destructive/60 text-destructive hover:text-destructive md:min-h-9"
           >
             {busy === 'others' && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             Cerrar las demás sesiones
@@ -126,12 +126,12 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{sessionTitle(s.browser)}</p>
-                <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                <p className="truncate font-mono text-xs text-muted-foreground tabular-nums">
                   {sessionDateLabel(s.createdAt)}
                 </p>
               </div>
               {s.current ? (
-                <Badge variant="outline">Esta sesión</Badge>
+                <Badge variant="outline" className="shrink-0 whitespace-nowrap">Esta sesión</Badge>
               ) : (
                 <Button
                   variant="outline"
@@ -139,7 +139,7 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
                   data-testid="session-revoke"
                   aria-label={`Cerrar la sesión de ${sessionTitle(s.browser)}`}
                   onClick={() => setTarget(s)}
-                  className="min-h-10 border-destructive/60 text-destructive hover:text-destructive md:min-h-8"
+                  className="min-h-10 shrink-0 border-destructive/60 text-destructive hover:text-destructive md:min-h-8"
                 >
                   Cerrar
                 </Button>

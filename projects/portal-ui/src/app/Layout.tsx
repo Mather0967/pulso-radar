@@ -109,7 +109,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
               <Search aria-hidden="true" />
               <span className="hidden md:inline">Buscar…</span>
             </span>
-            <kbd className="hidden rounded border px-1.5 font-mono text-[11px] leading-5 text-muted-foreground md:inline-block">
+            <kbd className="hidden rounded border px-1.5 font-mono text-xs leading-5 text-muted-foreground md:inline-block">
               {isMac ? '⌘K' : 'Ctrl K'}
             </kbd>
           </Button>
@@ -127,7 +127,7 @@ export function Layout({ onOpenSearch }: LayoutProps) {
                 {pending > 0 && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-background bg-foreground px-1 font-mono text-[10px] font-semibold leading-none text-background"
+                    className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-background bg-foreground px-1 font-mono text-xs font-semibold leading-none text-background"
                   >
                     {pending > 9 ? '9+' : pending}
                   </span>

@@ -64,8 +64,11 @@ export function MonthView({
               onDropJob={onDropJob}
               className="min-h-[112px]"
             >
-              <span className={cn('text-xs font-medium tabular-nums', key === todayKey ? 'text-primary' : 'text-muted-foreground')}>
-                {date.getDate()}
+              <span className="flex items-center gap-1.5">
+                <span className={cn('text-xs font-medium tabular-nums', key === todayKey ? 'text-foreground' : 'text-muted-foreground')}>
+                  {date.getDate()}
+                </span>
+                {key === todayKey ? <span aria-label="Hoy" className="size-1.5 rounded-full bg-foreground" /> : null}
               </span>
               {list.slice(0, MAX_CHIPS).map((job) => (
                 <JobChip

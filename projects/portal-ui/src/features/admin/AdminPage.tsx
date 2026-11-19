@@ -78,7 +78,7 @@ function AdminPanel() {
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-6 md:px-6 md:py-8">
       <header className="flex flex-col gap-3">
-        <p className="font-mono text-[11px] font-medium uppercase leading-4 tracking-[0.08em] text-muted-foreground">
+        <p className="font-mono text-xs font-medium uppercase leading-4 tracking-[0.08em] text-muted-foreground">
           Solo administradores
         </p>
         <h1 className="text-2xl font-semibold leading-8 tracking-[-0.02em] text-foreground md:text-[28px] md:leading-9">
@@ -101,14 +101,14 @@ function AdminPanel() {
           aria-label="Secciones de administración"
           className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
         >
-          <TabsTrigger value="users" data-testid="tab-users" className="rounded-none border-b-2 border-transparent px-0 pb-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="users" data-testid="tab-users" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
             Usuarios
             {loaded ? <span className="ml-2 text-xs tabular-nums text-muted-foreground">{usersState.users.length}</span> : null}
           </TabsTrigger>
-          <TabsTrigger value="grants" data-testid="tab-grants" className="rounded-none border-b-2 border-transparent px-0 pb-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="grants" data-testid="tab-grants" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
             Permisos
           </TabsTrigger>
-          <TabsTrigger value="messages" data-testid="tab-messages" className="rounded-none border-b-2 border-transparent px-0 pb-3 data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="messages" data-testid="tab-messages" className="rounded-none pb-3 focus:outline-none focus:ring-0 focus-visible:ring-2">
             Mensajes
             {messagesState.unread > 0 ? (
               <span data-testid="messages-badge" className="ml-2 rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium tabular-nums text-foreground">

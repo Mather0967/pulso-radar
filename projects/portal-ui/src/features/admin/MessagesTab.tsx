@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -169,7 +170,7 @@ export function MessagesTab({ messages, admins, unread, status, error, onRetry, 
             </Button>
           </div>
         ) : messages.length === 0 ? (
-          <EmptyState title="Todavía no hay mensajes." description="Escribí el primero." />
+          <EmptyState icon={<MessageSquare />} title="Todavía no hay mensajes." description="Escribí el primero." />
         ) : (
           <ol data-testid="messages-list" className="flex flex-col divide-y divide-border rounded-lg border border-border">
             {messages.map((m) => (

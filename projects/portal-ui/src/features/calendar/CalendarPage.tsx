@@ -21,6 +21,7 @@ import {
   startOfDay,
   toIso,
   NARROW_QUERY,
+  COMPACT_QUERY,
   type CalView,
 } from './dates'
 import { canCreate as canCreateIn, canEditJob, compareJobs, filterJobs, EMPTY_FILTERS, personName, type Filters } from './jobs'
@@ -102,7 +103,10 @@ function LoadingGrid({ view }: { view: CalView }) {
 
 export default function CalendarPage() {
   const narrow = useNarrow()
-  const [view, setView] = useState<CalView>('month')
+  // Sin hash, la vista por defecto depende del ancho: Semana bajo 1024 px, Mes en escritorio.
+  const [view, setView] = useState<CalView>(() =>
+    typeof window !== 'undefined' && window.matchMedia && window.matchMedia(COMPACT_QUERY).matches ? 'week' : 'month',
+  )
   const [cursor, setCursor] = useState<Date>(() => startOfDay())
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -115,7 +119,7 @@ export default function CalendarPage() {
   const effectiveView: CalView = narrow ? 'agenda' : view
   const range = useMemo(() => rangeFor(effectiveView, cursor), [effectiveView, cursor])
   const data = useJobs(range)
-  const { jobs, me, people, status, error, loadedKey } = data
+  const { jobs, me, people, status, error, loadedKey, errorStatus } = data
   const showLoading = useDelayedFlag(status === 'loading' && jobs.length === 0, 150)
 
   const canWrite = canCreateIn(me)
@@ -334,13 +338,26 @@ export default function CalendarPage() {
   const failed = status === 'error'
 
   let body: ReactNode
+  const emptyBlock = (
+    <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-border px-6 py-8 text-center">
+      <p className="text-base font-semibold leading-6">No hay trabajos en este rango.</p>
+      {canWrite ? (
+        <Button variant="outline" onClick={() => openNew(startOfDay())}>
+          Crear trabajo
+        </Button>
+      ) : null}
+    </div>
+  )
   if (failed) {
+    const forbidden = errorStatus === 403
     body = (
       <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-border bg-card p-5">
         <p className="text-sm leading-5 text-foreground">{error ?? 'No se pudo cargar el calendario.'}</p>
-        <Button variant="outline" onClick={() => void data.reload()}>
-          Reintentar
-        </Button>
+        {forbidden ? null : (
+          <Button variant="outline" onClick={() => void data.reload()}>
+            Reintentar
+          </Button>
+        )}
       </div>
     )
   } else if (loading) {
@@ -362,6 +379,7 @@ export default function CalendarPage() {
         animateKey={animateKey}
       />
     )
+    if (status === 'ready' && visible.length === 0) body = <>{body}{emptyBlock}</>
   } else if (effectiveView === 'week') {
     body = (
       <WeekView
@@ -378,6 +396,7 @@ export default function CalendarPage() {
         animateKey={animateKey}
       />
     )
+    if (status === 'ready' && visible.length === 0) body = <>{body}{emptyBlock}</>
   } else {
     body = (
       <AgendaView

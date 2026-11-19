@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import type { Person } from '@/lib/types'
+import type { JobStatus, Person, ProjectId } from '@/lib/types'
 import type { CalView } from './dates'
 import {
   NO_FILTER,
@@ -56,15 +56,21 @@ type FilterFieldsProps = {
 }
 
 /** Los tres selects de filtro. Usan 'all' como valor de «Todos» (Radix no admite valor vacío). */
-export function FilterFields({ filters, people, onChange, triggerClassName = 'h-10 w-full sm:w-[180px]' }: FilterFieldsProps) {
+export function FilterFields({ filters, people, onChange, triggerClassName = 'h-10 w-full sm:w-[196px]' }: FilterFieldsProps) {
   const assigneeInactive =
     filters.assignee !== NO_FILTER && !people.some((p) => p.id === filters.assignee)
+  const projectLabel = filters.project === NO_FILTER ? 'Proyecto: todos' : PROJECT_LABEL[filters.project as ProjectId]
+  const assigneeName =
+    filters.assignee === NO_FILTER
+      ? 'Responsable: todos'
+      : `Responsable: ${people.find((p) => p.id === filters.assignee)?.name ?? 'Usuario inactivo'}`
+  const statusLabel = filters.status === NO_FILTER ? 'Estado: todos' : `Estado: ${STATUS_LABEL[filters.status as JobStatus]}`
 
   return (
     <>
       <Select value={filters.project} onValueChange={(project) => onChange({ ...filters, project })}>
         <SelectTrigger data-testid="filter-project" aria-label="Filtrar por proyecto" className={triggerClassName}>
-          <SelectValue />
+          <SelectValue>{projectLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NO_FILTER}>Todos los proyectos</SelectItem>
@@ -77,7 +83,7 @@ export function FilterFields({ filters, people, onChange, triggerClassName = 'h-
       </Select>
       <Select value={filters.assignee} onValueChange={(assignee) => onChange({ ...filters, assignee })}>
         <SelectTrigger data-testid="filter-assignee" aria-label="Filtrar por responsable" className={triggerClassName}>
-          <SelectValue />
+          <SelectValue>{assigneeName}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NO_FILTER}>Todos los responsables</SelectItem>
@@ -91,7 +97,7 @@ export function FilterFields({ filters, people, onChange, triggerClassName = 'h-
       </Select>
       <Select value={filters.status} onValueChange={(status) => onChange({ ...filters, status })}>
         <SelectTrigger data-testid="filter-status" aria-label="Filtrar por estado" className={triggerClassName}>
-          <SelectValue />
+          <SelectValue>{statusLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NO_FILTER}>Todos los estados</SelectItem>

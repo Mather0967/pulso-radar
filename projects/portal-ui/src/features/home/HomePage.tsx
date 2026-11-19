@@ -102,9 +102,14 @@ export default function HomePage() {
             <h2 id={`group-${group.id}`} className="text-lg font-semibold leading-7">{group.title}</h2>
             <p className="text-sm leading-[22px] text-muted-foreground">{group.note}</p>
           </header>
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
+          <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)] md:grid-cols-2 md:gap-4 ${group.id === 'ventas' ? 'gap-2' : 'gap-4'}`}>
             {group.items.map((project) => (
-              <ProjectCard key={project.id} project={project} primary={project.id === primaryId} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                primary={project.id === primaryId}
+                compact={group.id === 'ventas'}
+              />
             ))}
           </div>
         </section>

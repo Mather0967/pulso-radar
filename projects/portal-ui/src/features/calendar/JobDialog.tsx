@@ -200,14 +200,14 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
         }}
       >
         <form data-testid="job-form" noValidate onSubmit={submit} className="flex min-h-0 flex-col">
-          <DialogHeader className="space-y-1 px-5 pb-3 pr-12 pt-5">
+          <DialogHeader className="space-y-1 px-6 pb-3 pr-12 pt-5">
             <DialogTitle className="text-lg font-semibold leading-7">{title}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {readOnly ? 'Solo lectura.' : 'Los campos marcados con * son obligatorios.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 px-5 pb-5">
+          <div className="flex flex-col gap-4 px-6 pb-5">
             <div className="flex flex-col gap-2">
               <Label htmlFor="job-title" className="text-sm font-medium">
                 Título *
@@ -236,6 +236,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                   ref={dateRef}
                   name="date"
                   type="date"
+                  className="[color-scheme:dark]"
                   value={form.date}
                   disabled={readOnly}
                   aria-invalid={errorField === 'date' || undefined}
@@ -245,6 +246,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
               <div className="flex items-end gap-2 pb-2">
                 <Checkbox
                   id="job-allday"
+                  className="data-[state=checked]:border-foreground data-[state=checked]:text-foreground"
                   name="allDay"
                   checked={form.allDay}
                   disabled={readOnly}
@@ -266,6 +268,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                   ref={startRef}
                   name="start"
                   type="time"
+                  className="[color-scheme:dark]"
                   value={form.start}
                   disabled={timesDisabled}
                   aria-invalid={errorField === 'start' || undefined}
@@ -281,6 +284,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                   ref={endRef}
                   name="end"
                   type="time"
+                  className="[color-scheme:dark]"
                   value={form.end}
                   disabled={timesDisabled}
                   aria-invalid={errorField === 'end' || undefined}
@@ -307,7 +311,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                     aria-invalid={errorField === 'project' || undefined}
                     className="h-10 w-full"
                   >
-                    <SelectValue />
+                    <SelectValue>{PROJECT_LABEL[form.project]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {projectOptions.map((p) => (
@@ -324,7 +328,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                 </Label>
                 <Select name="kind" value={form.kind} disabled={readOnly} onValueChange={(v) => set('kind', v as JobKind)}>
                   <SelectTrigger id="job-kind" className="h-10 w-full">
-                    <SelectValue />
+                    <SelectValue>{KIND_LABEL[form.kind]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {KIND_ORDER.map((k) => (
@@ -349,7 +353,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                   onValueChange={(v) => set('assignee', v === NO_ASSIGNEE ? '' : v)}
                 >
                   <SelectTrigger id="job-assignee" className="h-10 w-full">
-                    <SelectValue />
+                    <SelectValue>{form.assignee ? (people.find((p) => p.id === form.assignee)?.name ?? 'Usuario inactivo') : 'Sin responsable'}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_ASSIGNEE}>Sin responsable</SelectItem>
@@ -368,7 +372,7 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                 </Label>
                 <Select name="status" value={form.status} disabled={readOnly} onValueChange={(v) => set('status', v as JobStatus)}>
                   <SelectTrigger id="job-status" className="h-10 w-full">
-                    <SelectValue />
+                    <SelectValue>{STATUS_LABEL[form.status]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_ORDER.map((s) => (
@@ -399,17 +403,17 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
             </div>
           </div>
 
-          <DialogFooter className="sticky bottom-0 flex-col gap-3 border-t border-border bg-popover px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:space-x-0">
+          <DialogFooter className="sticky bottom-0 flex-col gap-3 border-t border-border bg-popover px-6 py-4 sm:flex-row sm:items-center sm:space-x-0">
             {error ? (
               <p
                 role="alert"
                 data-testid="job-error"
-                className="text-sm leading-5 text-[hsl(var(--bloqueado,4_80%_66%))] sm:mr-auto"
+                className="text-sm leading-5 text-[hsl(var(--bloqueado,4_80%_66%))] sm:mr-auto sm:max-w-[60%]"
               >
                 {error}
               </p>
             ) : null}
-            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="flex w-full flex-col-reverse justify-end gap-2 sm:w-auto sm:flex-row sm:items-center">
               {canDelete ? (
                 <Button
                   type="button"

@@ -45,6 +45,7 @@ export function useJobs(range: JobsRange) {
   const [error, setError] = useState<string | null>(null)
   /** Rango ('desde|hasta') de la última carga correcta; sirve para saber si los datos están al día. */
   const [loadedKey, setLoadedKey] = useState('')
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const seq = useRef(0)
   const hasData = useRef(false)
 
@@ -59,6 +60,7 @@ export function useJobs(range: JobsRange) {
       setMe(data.me ?? null)
       setJobs(Array.isArray(data.jobs) ? data.jobs : [])
       setError(null)
+      setErrorStatus(null)
       setStatus('ready')
       setLoadedKey(`${range.from}|${range.to}`)
     } catch (err) {
@@ -71,6 +73,7 @@ export function useJobs(range: JobsRange) {
         return
       }
       setError(message)
+      setErrorStatus(err instanceof ApiError ? err.status : null)
       setStatus('error')
     }
   }, [range.from, range.to])
@@ -164,6 +167,7 @@ export function useJobs(range: JobsRange) {
     status,
     error,
     loadedKey,
+    errorStatus,
     reload: load,
     upsertJob,
     createJob,

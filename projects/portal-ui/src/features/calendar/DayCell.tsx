@@ -48,7 +48,7 @@ export function DayCell({ date, isToday, isOutside = false, onCreate, onDropJob,
       }}
       className={cn(
         'relative flex min-w-0 flex-col gap-1 rounded-md border bg-card p-1.5 transition-colors duration-150',
-        isToday ? 'border-primary/70' : 'border-border',
+        isToday ? 'border-foreground/50' : 'border-border',
         isOutside && 'opacity-50',
         over && 'border-primary bg-accent',
         onCreate && 'cursor-pointer hover:border-[#354650]',

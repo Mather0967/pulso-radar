@@ -55,8 +55,9 @@ export function WeekView({
           >
             <div className="flex items-baseline gap-1.5 px-0.5">
               <span className="text-xs font-medium text-muted-foreground">{SHORT_DAYS_ES[i]}</span>
-              <span className={`text-sm font-medium tabular-nums ${key === todayKey ? 'text-primary' : 'text-foreground'}`}>
+              <span className="flex items-center gap-1.5 text-sm font-medium tabular-nums text-foreground">
                 {date.getDate()}
+                {key === todayKey ? <span aria-label="Hoy" className="size-1.5 rounded-full bg-foreground" /> : null}
               </span>
             </div>
             {list.map((job) => (

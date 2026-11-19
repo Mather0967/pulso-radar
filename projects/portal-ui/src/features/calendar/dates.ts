@@ -7,6 +7,8 @@ export const VIEWS: CalView[] = ['month', 'week', 'agenda'];
 export const AGENDA_BACK = 7;
 export const AGENDA_AHEAD = 60;
 export const NARROW_QUERY = '(max-width: 699.98px)';
+/** Bajo 1024 px la vista por defecto es Semana (el mes no entra con chips legibles). */
+export const COMPACT_QUERY = '(max-width: 1023.98px)';
 
 export const MONTHS_ES = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',

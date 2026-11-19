@@ -59,18 +59,18 @@ export function NoticesCard() {
                   return (
                     <li key={job.id} data-testid="notice-item" className="flex items-center gap-3 py-2.5">
                       <div className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-md border bg-muted/40 font-mono tabular-nums">
-                        <span className="text-[11px] uppercase leading-4 text-muted-foreground">{chip.top}</span>
+                        <span className="text-xs uppercase leading-4 text-muted-foreground">{chip.top}</span>
                         <span className="text-sm font-semibold leading-5">{chip.bottom}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium leading-5">{job.title}</p>
+                        <p className="line-clamp-2 text-sm font-medium leading-5">{job.title}</p>
                         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-muted-foreground">
                           <span className="font-mono tabular-nums">{dateText(job.date)}{time ? ` · ${time}` : ''}</span>
                         </p>
+                        <Badge variant={toProjectKey(job.project)} className="mt-1 max-w-full">
+                          {PROJECT_LABEL[toProjectKey(job.project)]}
+                        </Badge>
                       </div>
-                      <Badge variant={toProjectKey(job.project)} className="shrink-0">
-                        {PROJECT_LABEL[toProjectKey(job.project)]}
-                      </Badge>
                     </li>
                   );
                 })}

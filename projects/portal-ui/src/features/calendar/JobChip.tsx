@@ -1,4 +1,5 @@
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react'
+import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Job } from '@/lib/types'
 import { PROJECT_LABEL, PROJECT_DOT, STATUS_LABEL } from './constants'
@@ -23,7 +24,7 @@ type Props = {
 const STATUS_CLASS: Record<Job['status'], string> = {
   pendiente: '',
   en_curso: 'before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[hsl(var(--en-curso,205_80%_62%))] before:content-[""]',
-  hecho: 'line-through opacity-60',
+  hecho: 'opacity-70',
 }
 
 export function JobChip({
@@ -91,11 +92,12 @@ export function JobChip({
       {time ? (
         <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{time}</span>
       ) : null}
+      {job.status === 'hecho' ? <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" /> : null}
       <span className="min-w-0 flex-1 truncate">{job.title}</span>
       {who ? (
         <span
           aria-hidden="true"
-          className="shrink-0 rounded-full border border-border px-1 font-mono text-[11px] leading-4 tabular-nums text-muted-foreground"
+          className="shrink-0 rounded-full border border-border px-1 font-mono text-xs leading-4 tabular-nums text-muted-foreground"
         >
           {who}
         </span>
