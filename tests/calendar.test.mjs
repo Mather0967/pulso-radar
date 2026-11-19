@@ -103,7 +103,7 @@ test('validación: fechas, títulos, listas cerradas, horas, notas y responsable
   }finally{await f.close();}
 });
 
-test('texto con HTML se guarda tal cual, vuelve como JSON y no aparece en la página',async()=>{
+test('texto con HTML se guarda tal cual, vuelve como JSON y no aparece en la página',async(t)=>{
   const f=await portalFixture();try{
     const pulso=await f.login('pulso');
     const title='<script>alert(1)</script>',notes='<img onerror=x>';
@@ -115,7 +115,12 @@ test('texto con HTML se guarda tal cual, vuelve como JSON y no aparece en la pá
     const listed=(await(await list(f,pulso)).json()).jobs.find(j=>j.id===saved.id);
     assert.equal(listed.title,title);
     assert.equal(listed.notes,notes);
-    const page=await f.request('/calendario',pulso);
+    // /calendario ahora redirige a la SPA (/portal/calendario); la página que se sirve no trae datos.
+    const moved=await f.request('/calendario',pulso);
+    assert.equal(moved.status,303);
+    assert.equal(moved.headers.get('location'),'/portal/calendario');
+    if(!fs.existsSync(path.join(f.root,'projects/portal-ui/public/index.html')))return t.skip('falta el build de portal-ui en la fixture');
+    const page=await f.request('/portal/calendario',pulso);
     assert.equal(page.status,200);
     const html=await page.text();
     assert.equal(html.includes(title),false,'la página no trae el título');

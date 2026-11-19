@@ -8,6 +8,23 @@ export const token=()=>randomBytes(32).toString('base64url');
 export async function passwordHash(password){if(typeof password!=='string'||password.length<12||password.length>200)throw Error('Usá una contraseña de entre 12 y 200 caracteres.');const salt=randomBytes(16).toString('hex');return salt+':'+Buffer.from(await scrypt(password,salt,64)).toString('hex')}
 export async function verify(password,hash){if(typeof password!=='string'||password.length>200)return false;const [salt,key]=hash.split(':');const actual=Buffer.from(await scrypt(password,salt,64)),expected=Buffer.from(key,'hex');return expected.length===actual.length&&timingSafeEqual(actual,expected)}
 export const publicUser=u=>({id:u.id,name:u.name,email:u.email,role:u.role,projects:u.projects,active:u.active});
+// Resumen corto del navegador para la pantalla de sesiones («Chrome en macOS»). Se deriva del
+// User-Agent y no guarda ni devuelve la cadena cruda: basta con el nombre y el sistema.
+export function browserLabel(ua){
+  const text=typeof ua==='string'?ua.trim():'';
+  if(!text)return null;
+  let browser=null;
+  if(/\bEdg(?:e|A|iOS)?\//.test(text))browser='Edge';
+  else if(/\bOPR\/|\bOpera\b|\bOPT\//.test(text))browser='Opera';
+  else if(/SamsungBrowser\//.test(text))browser='Samsung Internet';
+  else if(/Firefox\/|FxiOS\//.test(text))browser='Firefox';
+  else if(/Chrome\/|CriOS\/|Chromium\//.test(text))browser='Chrome';
+  else if(/Safari\//.test(text))browser='Safari';
+  if(!browser)return 'Navegador desconocido';
+  // iPhone e iPad van antes que Mac («like Mac OS X») y Android antes que Linux.
+  const os=/iPhone/.test(text)?'iPhone':/iPad/.test(text)?'iPad':/Android/.test(text)?'Android':/Windows/.test(text)?'Windows':/Macintosh|Mac OS X/.test(text)?'macOS':/CrOS/.test(text)?'ChromeOS':/Linux/.test(text)?'Linux':null;
+  return (os?browser+' en '+os:browser).slice(0,60);
+}
 // Una sola forma de emitir la galleta de sesión: el portal y el acceso propio de LANDUR
 // tienen que escribir exactamente los mismos atributos o el navegador guarda dos sesiones.
 // `maxAge: 0` la borra en el cliente, además de revocarla en el servidor.
@@ -92,7 +109,7 @@ export class AuthStore{
  // `X-Forwarded-For`, así que rotar la cabecera no multiplica los intentos permitidos. El
  // costo es que un tercero puede bloquear a un usuario durante 15 minutos; con 20 intentos
  // por cuenta el techo queda acotado y avisado en la auditoría.
- async login(email,password,ip){return this.transact(async db=>{const now=Date.now();
+ async login(email,password,ip,meta={}){return this.transact(async db=>{const now=Date.now();
   const account=String(email??'').trim().toLowerCase();
   const ipKey='ip:'+digest(ip||'unknown'),accountKey='cuenta:'+digest(account);
   for(const [k,v]of Object.entries(db.attempts))if(v.until<now)delete db.attempts[k];
@@ -101,7 +118,39 @@ export class AuthStore{
    if(entry.count>=limit)return {error:'Demasiados intentos. Esperá 15 minutos.',status:429};
    entry.count++;db.attempts[id]=entry;
   }
-  const u=db.users.find(u=>u.email===account&&u.active);const valid=await verify(password,u?.password||'00000000000000000000000000000000:'+('00'.repeat(64)));if(!u||!valid)return {error:'Correo o contraseña incorrectos.',status:401};delete db.attempts[ipKey];delete db.attempts[accountKey];const value=token(),csrf=token();db.sessions=db.sessions.filter(s=>s.expires>now);db.sessions.push({hash:digest(value),csrf,userId:u.id,expires:now+28800000});return {value,user:publicUser(u),csrf}})}
+  const u=db.users.find(u=>u.email===account&&u.active);const valid=await verify(password,u?.password||'00000000000000000000000000000000:'+('00'.repeat(64)));if(!u||!valid)return {error:'Correo o contraseña incorrectos.',status:401};delete db.attempts[ipKey];delete db.attempts[accountKey];const value=token(),csrf=token();db.sessions=db.sessions.filter(s=>s.expires>now);db.sessions.push({hash:digest(value),csrf,userId:u.id,expires:now+28800000,createdAt:now,browser:browserLabel(meta?.ua)});return {value,user:publicUser(u),csrf}})}
+ // Cambio de contraseña desde la cuenta. Usa el mismo límite que el login (cuenta, 5 fallos en
+ // 15 minutos) y no `reauth`, que no cuenta intentos. Cierra las demás sesiones del usuario.
+ async changePassword(userId,current,next,keepCsrf){return this.transact(async db=>{const now=Date.now();
+  for(const [k,v]of Object.entries(db.attempts||{}))if(v.until<now)delete db.attempts[k];
+  db.attempts||={};
+  const key='pw:'+digest(String(userId));
+  const entry=db.attempts[key]||{count:0,until:now+900000};
+  if(entry.count>=5)return {error:'Demasiados intentos. Esperá 15 minutos.',status:429};
+  entry.count++;db.attempts[key]=entry;
+  const u=db.users.find(x=>x.id===userId&&x.active);
+  if(!u)return {error:'La contraseña actual no es correcta.',status:403};
+  if(!(await verify(current,u.password)))return {error:'La contraseña actual no es correcta.',status:403};
+  delete db.attempts[key];
+  if(next===current)return {error:'La nueva contraseña debe ser distinta.',status:400};
+  let hash;try{hash=await passwordHash(next)}catch(e){return {error:e.message,status:400}}
+  u.password=hash;
+  let revoked=0;
+  db.sessions=db.sessions.filter(s=>{if(s.userId!==u.id||s.csrf===keepCsrf)return true;if(s.expires>now)revoked++;return false});
+  return {changed:true,revoked}})}
+ // Sesiones propias para la pantalla de cuenta. El id es un prefijo del hash: opaco, sin token.
+ async listSessions(userId,keepCsrf){return this.transact(async db=>{const now=Date.now();
+  return db.sessions.filter(s=>s.userId===userId&&s.expires>now).map(s=>({id:s.hash.slice(0,16),createdAt:typeof s.createdAt==='number'?s.createdAt:null,expiresAt:s.expires,browser:typeof s.browser==='string'?s.browser:null,current:s.csrf===keepCsrf})).sort((a,b)=>(b.createdAt??0)-(a.createdAt??0))})}
+ async revokeSession(userId,id,keepCsrf){return this.transact(async db=>{const now=Date.now();
+  const target=db.sessions.find(s=>s.userId===userId&&s.expires>now&&s.hash.slice(0,16)===String(id));
+  if(!target)return {error:'La sesión no existe.',status:404};
+  if(target.csrf===keepCsrf)return {error:'Para cerrar esta sesión usá «Cerrar sesión».',status:400};
+  db.sessions=db.sessions.filter(s=>s!==target);
+  return {revoked:true}})}
+ async revokeOthers(userId,keepCsrf){return this.transact(async db=>{const now=Date.now();
+  let revoked=0;
+  db.sessions=db.sessions.filter(s=>{if(s.userId!==userId||s.csrf===keepCsrf)return true;if(s.expires>now)revoked++;return false});
+  return {revoked}})}
  // Reconfirmar la contraseña antes de una acción destructiva (borrado con historial).
  async reauth(userId,password){if(typeof password!=='string'||!password||password.length>200)return false;const user=await this.transact(db=>{const u=db.users.find(u=>u.id===userId&&u.active);return u?{...u}:null});return !!user&&verify(password,user.password)}
  async redeem(invitation,name,password){return this.transact(async db=>{const i=db.invites.find(i=>i.hash===digest(String(invitation||''))&&i.expires>Date.now()&&!i.used);if(!i)return {error:'El enlace no es válido o ya venció.',status:400};if(i.role==='admin'&&!i.createdBy&&db.users.some(u=>u.role==='admin'))return {error:'El administrador inicial ya existe.',status:409};const hash=await passwordHash(password);if(db.users.some(u=>u.email===i.email))return {error:'Ese correo ya tiene una cuenta.',status:409};const u={id:randomUUID(),name:String(name||'').trim().slice(0,100)||i.email,email:i.email,password:hash,role:i.role,projects:i.projects,active:true};db.users.push(u);i.used=true;return {created:true}})}

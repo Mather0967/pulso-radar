@@ -92,6 +92,35 @@ El código fuente está en el proyecto `demo-restaurantes` (fuera de este reposi
 
 La tarjeta de Clínica odontológica tiene el mismo botón **Abrir demo de gestión**, que abre el sistema de Bahía Odontología (agenda, pacientes, odontograma, presupuestos, finanzas, mensajes, automatizaciones, inventario, laboratorio, equipo e informes). Funciona igual que la de restaurantes: build estático en `projects/studio/public/odontologia/`, solo administradores, rutas por hash, datos en localStorage (clave `rivect-bahia`) y "Restaurar" en *Recorridos* o *Ajustes → Datos*. El código está en el proyecto `Demo-dentistas`; para actualizar, ahí `npm run publish:studio`, después `npm test` y publicar a `main`. Recompilar el Studio también vacía esta carpeta.
 
+## Portal (`/portal`)
+
+**Qué es.** La portada del portal RIVECT y su cuenta: la lista de proyectos a los que la persona tiene acceso, avisos de trabajos próximos (hoy y los siete días siguientes), un buscador con Ctrl+K (o ⌘+K), el calendario, la cuenta propia y, solo para administradores, la administración de usuarios, permisos y mensajes. Es una aplicación React (Vite + TypeScript + Tailwind, componentes al estilo shadcn/ui) que vive en `projects/portal-ui/`.
+
+**Rutas del cliente** (todas bajo `/portal/`):
+- `/portal/` inicio, con proyectos y avisos.
+- `/portal/calendario` calendario de trabajos (vistas mes, semana y agenda).
+- `/portal/cuenta` cambio de contraseña y sesiones abiertas.
+- `/portal/administracion` solo administradores; si no lo sos, vuelve a `/portal/` con un aviso.
+
+**Servidor.** `namecheap/server/main.mjs` monta la SPA con `createProjectSite` en `/portal/` (el mismo montaje que Studio y Retail: rutas sin extensión devuelven `index.html`, rutas con punto u ocultas dan 404, y `assets/` lleva caché inmutable). Antes del portón de sesión, `GET /portal` sigue la lógica de siempre: con un solo proyecto habilitado redirige a su URL (`/pulso`, `/landur/`); con varios redirige a `/portal/`. `GET /calendario` redirige a `/portal/calendario`. Las rutas y los estáticos viejos siguen en el servidor hasta la etapa de limpieza.
+
+**API nueva** (todas JSON, `Cache-Control: no-store`, errores `{error:'...'}` en español, escrituras con `x-csrf-token`):
+- `POST /auth/password` con `{current, next}`: 200 `{changed:true, revoked:n}`; 400 si la nueva no cumple 12–200 caracteres o es igual a la actual; 403 si la actual no es correcta; 429 tras 5 fallos seguidos por cuenta (15 minutos). Cierra las otras sesiones del usuario y conserva la actual.
+- `GET /auth/sessions`: las sesiones propias, más nuevas primero, con un `id` opaco de 16 caracteres, la fecha de inicio, el vencimiento, una etiqueta corta del navegador (por ejemplo «Chrome en macOS», nunca el User-Agent crudo) y `current`. Nunca devuelve el hash, el CSRF ni el token.
+- `POST /auth/sessions/revoke` con `{id}` cierra una sesión propia: 400 si es la actual, 404 si no existe o es de otra persona.
+- `POST /auth/sessions/revoke-others` cierra todas las demás sesiones propias: 200 `{revoked:n}`.
+- `GET /api/notices`: `{upcoming, unreadMessages, generatedAt}`. `upcoming` son hasta 20 trabajos de hoy a +7 días (fecha de Montevideo), solo de los proyectos que la persona puede ver. `unreadMessages` cuenta mensajes sin leer entre administradores (0 para quien no es administrador).
+
+**Límites.** Todavía no hay doble factor (2FA). Motivo: el acceso (`/login`) y la activación (`/activate`) los sirve `account.html` del hosting, que no está en este repositorio; cambiar el flujo de entrada requiere tocar ese HTML en producción primero. Las sesiones viejas sin fecha de inicio aparecen como «Sesión anterior».
+
+**Cómo construir.** Desde la raíz del repositorio:
+
+```bash
+cd projects/portal-ui && npm run build:portal
+```
+
+Esto compila (`tsc --noEmit`), genera el build de Vite con `base: '/portal/'` en `dist-portal/` y lo copia a `projects/portal-ui/public/` con `scripts/publish-portal.mjs`. Ese `public/` queda versionado, como en Retail: el despliegue (`scripts/cpanel-deploy.mjs`) lo copia tal cual y no hay build en el servidor. Si cambiás el código de la SPA, volvé a construir y commiteá también `public/`.
+
 ## Calendario del portal (`/calendario`)
 
 **Qué es.** Un calendario compartido para los trabajos del equipo con fecha: contactos, entrevistas, entregas, vencimientos y otros pendientes, asociados a Pulso, LANDUR, Studio, Retail o General. Tiene vistas de mes, semana y agenda; se navega con ← → y «Hoy», y se puede arrastrar un trabajo a otro día para cambiar su fecha. En pantallas angostas (menos de 700 px) se muestra siempre la agenda.

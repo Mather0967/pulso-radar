@@ -40,7 +40,9 @@ test('login del portal abre LANDUR sin otra contraseña; Pulso aislado',async()=
     assert.equal((await f.request('/landur/api/state',pulso)).status,403);
     assert.equal((await f.request('/pulso',landur)).status,403);
     assert.equal((await f.request('/api/workspace',landur)).status,403);
-    const portal=await(await f.request('/portal',admin)).text();assert.match(portal,/Abrir Pulso/);assert.match(portal,/Abrir LANDUR/);
+    // /portal con varios proyectos redirige a la SPA; el catálogo lo pide a /api/projects.
+    const multi=await f.request('/portal',admin);assert.equal(multi.status,303);assert.equal(multi.headers.get('location'),'/portal/');
+    const adminNames=(await(await f.request('/api/projects',admin)).json()).projects.map(p=>p.name);assert.ok(adminNames.includes('Pulso')&&adminNames.includes('LANDUR'));
     // Con un solo proyecto habilitado no hay selector: se entra directo y no se puede volver a elegir.
     const onlyLandur=await f.request('/portal',landur);assert.equal(onlyLandur.status,303);assert.equal(onlyLandur.headers.get('location'),'/landur/');
     const onlyPulso=await f.request('/portal',pulso);assert.equal(onlyPulso.status,303);assert.equal(onlyPulso.headers.get('location'),'/pulso');
@@ -303,8 +305,9 @@ test('RIVECT Studio: solo administradores con sesión, sin rutas fuera de la lis
     const js=await f.request('/studio/'+asset,admin);assert.equal(js.status,200);assert.match(js.headers.get('content-type'),/javascript/);
     for(const route of ['/studio/../server/main.mjs','/studio/%2e%2e/server/main.mjs','/studio/package.json','/studio/src/main.tsx'])assert.equal((await f.request(route,admin)).status,404,route);
     assert.equal((await f.request('/studio/',{...admin,method:'POST',body:{}})).status,405);
-    assert.match(await(await f.request('/portal',admin)).text(),/Abrir RIVECT Studio/);
-    assert.match(await(await f.request('/portal',admin)).text(),/Abrir Rivect Retail Intelligence/);
+    const names=(await(await f.request('/api/projects',admin)).json()).projects.map(p=>p.name);
+    assert.ok(names.includes('RIVECT Studio'),'el catálogo del portal lista Studio');
+    assert.ok(names.includes('Rivect Retail Intelligence'),'y Retail');
   }finally{await f.close();}
 });
 
@@ -395,5 +398,60 @@ test('invitar desde el panel: el cuerpo que arma el cliente asigna los permisos 
     assert.equal((await f.request('/auth/activate',{method:'POST',body:{token,name:'Invitado',password:'otra-clave-sintetica-larga'}})).status,200);
     const user=(await f.store.transact(db=>db.users.find(u=>u.email==='invitado@example.test')));
     assert.deepEqual(user.projects,{pulso:'editor',landur:'viewer'});
+  }finally{await f.close();}
+});
+
+// /portal como SPA (projects/portal-ui/public, montada con createProjectSite en /portal/).
+// Las rutas se piden sin normalizar (http crudo): fetch resolvería «..» antes de llegar al servidor.
+const rawGet=(f,route,cookie='')=>new Promise((resolve,reject)=>{
+  const req=http.request({port:f.server.address().port,host:'127.0.0.1',path:route,method:'GET',headers:{host:'localhost',...(cookie?{cookie}:{})}},res=>{
+    const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve({status:res.statusCode,location:res.headers.location,text:Buffer.concat(chunks).toString('utf8')}));
+  });
+  req.on('error',reject);req.end();
+});
+
+test('portal: /portal lleva a la URL del único proyecto y, con varios, a /portal/',async()=>{
+  const f=await portalFixture();try{
+    const admin=await f.login('admin'),pulso=await f.login('pulso'),landur=await f.login('landur'),reader=await f.login('reader');
+    const expectRedirect=async(user,location)=>{const res=await f.request('/portal',user);assert.equal(res.status,303);assert.equal(res.headers.get('location'),location);};
+    await expectRedirect(pulso,'/pulso');
+    await expectRedirect(landur,'/landur/');
+    await expectRedirect(reader,'/landur/');
+    await expectRedirect(admin,'/portal/');
+  }finally{await f.close();}
+});
+
+test('portal: /calendario redirige a /portal/calendario con sesión y sigue yendo a /login sin ella',async()=>{
+  const f=await portalFixture();try{
+    const pulso=await f.login('pulso');
+    const moved=await f.request('/calendario',pulso);
+    assert.equal(moved.status,303);
+    assert.equal(moved.headers.get('location'),'/portal/calendario');
+    assert.equal((await f.request('/calendario')).headers.get('location'),'/login');
+  }finally{await f.close();}
+});
+
+test('portal: /portal/ sirve el build de la SPA, con fallback de rutas y sin archivos internos',async(t)=>{
+  if(!fs.existsSync(path.join('projects','portal-ui','public','index.html')))return t.skip('falta el build de portal-ui');
+  const f=await portalFixture();try{
+    const index=fs.readFileSync(path.join('projects','portal-ui','public','index.html'),'utf8');
+    const admin=await f.login('admin');
+    const home=await f.request('/portal/',admin);
+    assert.equal(home.status,200);
+    assert.match(home.headers.get('content-type')||'',/text\/html/);
+    assert.equal(await home.text(),index,'sirve el index.html del build');
+    const deep=await f.request('/portal/cuenta',admin);
+    assert.equal(deep.status,200);
+    assert.equal(await deep.text(),index,'una ruta del cliente devuelve el shell');
+    for(const route of ['/portal/../server/auth.mjs','/portal/%2e%2e/server/auth.mjs','/portal/.env']){
+      assert.equal((await rawGet(f,route,admin.cookie)).status,404,route);
+    }
+  }finally{await f.close();}
+});
+
+test('portal: sin sesión, /portal/ y sus rutas van a /login',async()=>{
+  const f=await portalFixture();try{
+    assert.equal((await f.request('/portal/')).headers.get('location'),'/login');
+    assert.equal((await f.request('/portal/cuenta')).headers.get('location'),'/login');
   }finally{await f.close();}
 });
