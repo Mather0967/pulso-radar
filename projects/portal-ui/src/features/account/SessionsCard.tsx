@@ -15,7 +15,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { SessionInfo } from '@/lib/types';
-import { sessionDateLabel, sessionTitle } from './helpers';
+import { sessionFullDate, sessionRelativeLabel, sessionTitle } from './helpers';
 import { useSessions } from './useSessions';
 
 type Props = {
@@ -126,8 +126,11 @@ export function SessionsCard({ refreshKey = 0 }: Props) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{sessionTitle(s.browser)}</p>
-                <p className="truncate font-mono text-xs text-muted-foreground tabular-nums">
-                  {sessionDateLabel(s.createdAt)}
+                <p
+                  className="truncate font-mono text-xs text-muted-foreground tabular-nums"
+                  title={sessionFullDate(s.createdAt) ?? undefined}
+                >
+                  {sessionRelativeLabel(s.createdAt)}
                 </p>
               </div>
               {s.current ? (

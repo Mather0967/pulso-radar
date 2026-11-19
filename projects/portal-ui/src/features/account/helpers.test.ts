@@ -5,7 +5,8 @@ import {
   initials,
   passwordChangedMessage,
   passwordErrorMessage,
-  sessionDateLabel,
+  sessionFullDate,
+  sessionRelativeLabel,
   sessionTitle,
   validatePassword,
 } from './helpers';
@@ -35,7 +36,7 @@ describe('validatePassword', () => {
 
   it(`rechaza más de ${PASSWORD_MAX} caracteres`, () => {
     const long = 'c'.repeat(PASSWORD_MAX + 1);
-    expect(validatePassword({ current: 'x', next: long, confirm: long }).next).toMatch(/no puede tener más de 200/);
+    expect(validatePassword({ current: 'x', next: long, confirm: long }).next).toMatch(/no puede superar los 200 caracteres/);
   });
 
   it('rechaza una nueva igual a la actual', () => {
@@ -64,17 +65,40 @@ describe('passwordChangedMessage', () => {
   });
 });
 
-describe('sessionDateLabel', () => {
-  it('formatea la fecha en la zona de Montevideo (UTC-3)', () => {
+describe('sessionFullDate', () => {
+  it('formatea la fecha completa en la zona de Montevideo (UTC-3)', () => {
     // 17:05 UTC = 14:05 en Montevideo
-    const label = sessionDateLabel(Date.UTC(2026, 10, 19, 17, 5));
-    expect(label).toMatch(/^Iniciada 19\/11\/2026, 14:05$/);
+    expect(sessionFullDate(Date.UTC(2026, 10, 19, 17, 5))).toMatch(/^19\/11\/2026, 14:05$/);
   });
 
-  it('muestra «fecha desconocida» cuando no hay fecha', () => {
-    expect(sessionDateLabel(null)).toBe('fecha desconocida');
-    expect(sessionDateLabel(undefined)).toBe('fecha desconocida');
-    expect(sessionDateLabel(Number.NaN)).toBe('fecha desconocida');
+  it('devuelve null sin fecha', () => {
+    expect(sessionFullDate(null)).toBeNull();
+    expect(sessionFullDate(Number.NaN)).toBeNull();
+  });
+});
+
+describe('sessionRelativeLabel', () => {
+  const now = Date.UTC(2026, 10, 19, 17, 0); // 14:00 en Montevideo
+  const minutesAgo = (m: number) => now - m * 60_000;
+
+  it('usa minutos, horas y «un momento»', () => {
+    expect(sessionRelativeLabel(minutesAgo(0.5), now)).toBe('Iniciada hace un momento');
+    expect(sessionRelativeLabel(minutesAgo(3), now)).toBe('Iniciada hace 3 min');
+    expect(sessionRelativeLabel(minutesAgo(120), now)).toBe('Iniciada hace 2 h');
+  });
+
+  it('dice «ayer» cuando fue el día anterior en Montevideo', () => {
+    // 01:00 UTC del 19 = 22:00 del 18 en Montevideo; ahora es 14:00 del 19 (diferencia 13 h)
+    expect(sessionRelativeLabel(Date.UTC(2026, 10, 19, 1, 0), now)).toBe('Iniciada ayer');
+  });
+
+  it('usa días y, después de una semana, la fecha corta', () => {
+    expect(sessionRelativeLabel(now - 4 * 86_400_000, now)).toBe('Iniciada hace 4 días');
+    expect(sessionRelativeLabel(now - 30 * 86_400_000, now)).toBe('Iniciada el 20/10/2026');
+  });
+
+  it('«fecha desconocida» sin dato', () => {
+    expect(sessionRelativeLabel(null, now)).toBe('fecha desconocida');
   });
 });
 

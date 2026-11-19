@@ -78,8 +78,10 @@ export function NoticesCard() {
             )}
 
             {upcoming.length > MAX_ROWS && (
-              <p className="pt-2 text-[13px] text-muted-foreground">
-                Y {upcoming.length - MAX_ROWS} más en el calendario.
+              <p className="pt-2 text-[13px]">
+                <Link to="/calendario" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  Ver los {upcoming.length - MAX_ROWS} restantes en el calendario
+                </Link>
               </p>
             )}
 

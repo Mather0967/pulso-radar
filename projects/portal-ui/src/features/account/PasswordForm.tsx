@@ -40,6 +40,12 @@ export function PasswordForm({ onChanged }: Props) {
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setServerError(null);
+    if (values.next.length > PASSWORD_MAX) {
+      setErrors((prev) => ({ ...prev, next: undefined }));
+      setServerError(`La contraseña no puede superar los ${PASSWORD_MAX} caracteres.`);
+      document.getElementById('account-next')?.focus();
+      return;
+    }
     const found = validatePassword(values);
     setErrors(found);
     const firstInvalid = FIELD_ORDER.find((f) => found[f]);
@@ -81,7 +87,6 @@ export function PasswordForm({ onChanged }: Props) {
           onChange={update('current')}
           aria-invalid={!!errors.current}
           aria-describedby={describe('current')}
-          maxLength={PASSWORD_MAX}
         />
         {errors.current && (
           <p id="account-current-error" className="text-sm text-destructive">
@@ -102,7 +107,6 @@ export function PasswordForm({ onChanged }: Props) {
           onChange={update('next')}
           aria-invalid={!!errors.next}
           aria-describedby={errors.next ? 'account-next-error account-next-meter' : 'account-next-meter'}
-          maxLength={PASSWORD_MAX}
         />
         <div id="account-next-meter" className="space-y-1">
           <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-muted">
@@ -134,7 +138,6 @@ export function PasswordForm({ onChanged }: Props) {
           onChange={update('confirm')}
           aria-invalid={!!errors.confirm}
           aria-describedby={describe('confirm')}
-          maxLength={PASSWORD_MAX}
         />
         {errors.confirm && (
           <p id="account-confirm-error" className="text-sm text-destructive">

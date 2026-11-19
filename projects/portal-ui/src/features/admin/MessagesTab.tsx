@@ -110,6 +110,11 @@ export function MessagesTab({ messages, admins, unread, status, error, onRetry, 
               ))}
             </SelectContent>
           </Select>
+          {admins.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground" data-testid="no-other-admins">
+              No hay otros administradores activos. El mensaje va a todos.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="message-body">Mensaje</Label>

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { InviteDialog } from './InviteDialog';
 import {
   ACCESS_LABELS,
@@ -57,6 +58,14 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const shown = useMemo(() => filterUsers(users, search), [users, search]);
+  const activeAdmins = users.filter((u) => u.role === 'admin' && u.active).length;
+
+  /** Motivo por el que no se puede cambiar el rol (lo cubre el servidor; se explica en pantalla). */
+  function roleLockReason(user: AdminUser): string | null {
+    if (user.id === selfId) return 'No podés cambiar tu propio rol desde acá.';
+    if (user.role === 'admin' && user.active && activeAdmins <= 1) return 'Es el único administrador activo: tiene que quedar al menos uno.';
+    return null;
+  }
 
   async function save(user: AdminUser, patch: SaveUserPatch, success: string) {
     setBusyId(user.id);
@@ -110,6 +119,7 @@ export function UsersTab({ users, status, error, onRetry, selfId, onUpdateUser, 
     user,
     busy: busyId === user.id,
     isSelf: user.id === selfId,
+    lockReason: roleLockReason(user),
     pendingRole: pendingRole?.id === user.id ? pendingRole.role : null,
     onChangeRole: (role: AdminUser['role']) => changeRole(user, role),
     onConfirmRole: (role: AdminUser['role']) => confirmRole(user, role),
@@ -217,6 +227,7 @@ interface RowProps {
   user: AdminUser;
   busy: boolean;
   isSelf: boolean;
+  lockReason: string | null;
   pendingRole: AdminUser['role'] | null;
   onChangeRole: (role: AdminUser['role']) => void;
   onConfirmRole: (role: AdminUser['role']) => void;
@@ -245,18 +256,32 @@ function Identity({ user, isSelf }: { user: AdminUser; isSelf: boolean }) {
   );
 }
 
-function RoleControl({ user, busy, pendingRole, onChangeRole, onConfirmRole, onCancelRole, fullWidth }: RowProps & { fullWidth?: boolean }) {
+function RoleControl({ user, busy, lockReason, pendingRole, onChangeRole, onConfirmRole, onCancelRole, fullWidth }: RowProps & { fullWidth?: boolean }) {
+  const select = (
+    <Select value={pendingRole ?? user.role} onValueChange={(v) => onChangeRole(v as AdminUser['role'])} disabled={busy || !!lockReason}>
+      <SelectTrigger aria-label={`Rol de ${user.name}`} className={fullWidth ? 'h-11 w-full' : 'h-11 w-44 md:h-9'} data-testid="user-role">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="member">{ROLE_LABELS.member}</SelectItem>
+        <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
+      </SelectContent>
+    </Select>
+  );
   return (
     <div className={`flex flex-col gap-2 ${fullWidth ? 'w-full' : ''}`}>
-      <Select value={pendingRole ?? user.role} onValueChange={(v) => onChangeRole(v as AdminUser['role'])} disabled={busy}>
-        <SelectTrigger aria-label={`Rol de ${user.name}`} className={fullWidth ? 'h-11 w-full' : 'h-11 w-44 md:h-9'} data-testid="user-role">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="member">{ROLE_LABELS.member}</SelectItem>
-          <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
-        </SelectContent>
-      </Select>
+      {lockReason ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={`inline-flex ${fullWidth ? 'w-full' : ''}`} tabIndex={0} data-testid="role-locked">
+              {select}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{lockReason}</TooltipContent>
+        </Tooltip>
+      ) : (
+        select
+      )}
       {pendingRole ? (
         <div className="flex flex-col gap-2">
           <p className="text-[13px] text-muted-foreground">Cambiar el rol cierra sus sesiones.</p>

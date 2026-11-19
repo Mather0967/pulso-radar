@@ -127,17 +127,21 @@ export function payloadFromJob(job: Job): JobPayload {
   }
 }
 
+export const TITLE_MAX = 120
+export const NOTES_MAX = 2000
+
 export type FormField = 'title' | 'date' | 'start' | 'end' | 'project' | 'notes'
 
 /** Devuelve el primer error como [campo, mensaje], o null si el formulario es válido. */
 export function validatePayload(p: JobPayload): [FormField, string] | null {
-  if (!p.title) return ['title', 'Escribí un título.']
-  if (p.title.length > 120) return ['title', 'El título no puede superar los 120 caracteres.']
+  const title = p.title.trim()
+  if (!title) return ['title', 'Escribí un título.']
+  if (title.length > TITLE_MAX) return ['title', `El título no puede superar los ${TITLE_MAX} caracteres.`]
   if (!parseIso(p.date)) return ['date', 'Elegí una fecha válida.']
   if (!p.allDay) {
     if (!/^\d{2}:\d{2}$/.test(p.start)) return ['start', 'Indicá la hora de inicio o marcá "Todo el día".']
     if (p.end && p.end < p.start) return ['end', 'La hora de fin no puede ser anterior al inicio.']
   }
-  if (p.notes.length > 2000) return ['notes', 'Las notas no pueden superar los 2000 caracteres.']
+  if (p.notes.length > NOTES_MAX) return ['notes', `Las notas no pueden superar los ${NOTES_MAX} caracteres.`]
   return null
 }

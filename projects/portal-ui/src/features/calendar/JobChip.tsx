@@ -38,9 +38,11 @@ export function JobChip({
   entering = false,
 }: Props) {
   const canDrag = draggable ?? editable
-  const time = job.allDay ? 'Día' : job.start || ''
+  // Los de todo el día no llevan prefijo: el punto de color identifica el proyecto.
+  const time = job.allDay ? '' : job.start || ''
+  const timeLabel = job.allDay ? 'Todo el día' : job.start
   const who = assigneeName ? initials(assigneeName) : ''
-  const tooltip = `${job.title} · Responsable: ${assigneeName || 'sin responsable'} · ${PROJECT_LABEL[job.project]} · ${STATUS_LABEL[job.status]}`
+  const tooltip = `${job.title} · ${timeLabel || 'Sin hora'} · Responsable: ${assigneeName || 'sin responsable'} · ${PROJECT_LABEL[job.project]} · ${STATUS_LABEL[job.status]}`
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     // Alternativa de teclado al arrastre: Shift+←/→ mueve el trabajo un día.
@@ -76,7 +78,7 @@ export function JobChip({
       onKeyDown={handleKeyDown}
       onClick={handleClick}
       title={tooltip}
-      aria-label={`${job.title}, ${time ? `${time}, ` : ''}${PROJECT_LABEL[job.project]}, ${STATUS_LABEL[job.status]}`}
+      aria-label={`${job.title}, ${timeLabel ? `${timeLabel}, ` : ''}${PROJECT_LABEL[job.project]}, ${STATUS_LABEL[job.status]}`}
       className={cn(
         'relative flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-sm border border-border bg-background/60 text-left text-xs leading-4 text-foreground transition-colors duration-150 hover:border-[#354650] hover:bg-accent',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',

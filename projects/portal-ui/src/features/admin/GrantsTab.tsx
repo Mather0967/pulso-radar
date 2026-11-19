@@ -77,6 +77,7 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
   const [values, setValues] = useState<Record<ProjectKey, GrantFormValue>>(() => grantFormValues(selected));
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'info' | 'error' | 'ok'; text: string }>({ tone: 'info', text: '' });
   const admin = isAdminUser(selected);
   const editable = !!selected && !admin;
   const dirty = !!selected && GRANT_PROJECTS.some((p) => values[p] !== grantFormValues(selected)[p]);
@@ -90,6 +91,7 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
     event.preventDefault();
     if (!selected || !editable || !dirty || saving) return;
     if (isAccessRevocation(selected.projects, mergeGrants(selected.projects, grantsPayload(values)))) {
+      setNotice({ tone: 'info', text: 'Confirmá el cambio: quitar o bajar acceso cierra las sesiones del usuario.' });
       setConfirming(true);
       return;
     }
@@ -100,11 +102,16 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
     if (!selected) return;
     setConfirming(false);
     setSaving(true);
+    setNotice({ tone: 'info', text: 'Guardando permisos…' });
     try {
       await onUpdateGrants(selected, grantsPayload(values));
-      toast.success('Permisos guardados. El usuario deberá volver a iniciar sesión.');
+      const text = 'Permisos guardados. El usuario deberá volver a iniciar sesión.';
+      setNotice({ tone: 'ok', text });
+      toast.success(text);
     } catch (e) {
-      toast.error(messageOf(e), { duration: Infinity });
+      const text = messageOf(e);
+      setNotice({ tone: 'error', text });
+      toast.error(text, { duration: Infinity });
     } finally {
       setSaving(false);
     }
@@ -146,6 +153,16 @@ function GrantsEditor({ users, selected, onSelect, onUpdateGrants }: GrantsEdito
       {note ? (
         <p role="status" className="text-[13px] leading-5 text-muted-foreground" data-testid="grants-note">
           {note}
+        </p>
+      ) : null}
+      {notice.text ? (
+        <p
+          role="status"
+          data-testid="grants-status"
+          data-tone={notice.tone}
+          className={`text-[13px] leading-5 ${notice.tone === 'error' ? 'text-destructive' : notice.tone === 'ok' ? 'text-foreground' : 'text-muted-foreground'}`}
+        >
+          {notice.text}
         </p>
       ) : null}
       {editable ? (

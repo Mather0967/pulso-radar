@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
@@ -28,6 +29,8 @@ import {
   STATUS_ORDER,
 } from './constants'
 import {
+  NOTES_MAX,
+  TITLE_MAX,
   canDeleteJob,
   canEditJob,
   draftJob,
@@ -38,6 +41,23 @@ import {
   type JobPayload,
 } from './jobs'
 import { errorMessage, isStatus, serverJobFrom } from './useJobs'
+
+/** Contador visible; se vuelve rojo al pasar el máximo (el guardado se bloquea con un error). */
+function Counter({ testid, value, max }: { testid: string; value: number; max: number }) {
+  const over = value > max
+  return (
+    <span
+      data-testid={testid}
+      aria-live="polite"
+      className={cn(
+        'self-end font-mono text-xs tabular-nums',
+        over ? 'text-[hsl(var(--bloqueado,4_80%_66%))]' : 'text-muted-foreground',
+      )}
+    >
+      {value}/{max}
+    </span>
+  )
+}
 
 type Props = {
   /** Trabajo a editar o ver. null = nuevo trabajo. */
@@ -217,13 +237,13 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                 ref={titleRef}
                 name="title"
                 type="text"
-                maxLength={120}
                 autoComplete="off"
                 value={form.title}
                 disabled={readOnly}
                 aria-invalid={errorField === 'title' || undefined}
                 onChange={(e) => set('title', e.target.value)}
               />
+              <Counter testid="title-count" value={form.title.length} max={TITLE_MAX} />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -394,12 +414,12 @@ export function JobDialog({ job, initialDate, me, people, onClose, onCreate, onU
                 ref={notesRef}
                 name="notes"
                 rows={4}
-                maxLength={2000}
                 value={form.notes}
                 disabled={readOnly}
                 aria-invalid={errorField === 'notes' || undefined}
                 onChange={(e) => set('notes', e.target.value)}
               />
+              <Counter testid="notes-count" value={form.notes.length} max={NOTES_MAX} />
             </div>
           </div>
 

@@ -133,3 +133,26 @@ describe('email y mensajes', () => {
     expect(unreadBadgeText(7)).toBe('7');
   });
 });
+
+describe('payload de permisos: sin acceso, solo lectura, edición', () => {
+  const member: AdminUser = {
+    id: 'landur', name: 'Usuario LANDUR', email: 'landur@example.test', role: 'member', projects: { landur: 'editor' }, active: true,
+  };
+
+  it.each([
+    ['sin acceso', '', null],
+    ['solo lectura', 'viewer', 'viewer'],
+    ['edición', 'editor', 'editor'],
+  ] as const)('LANDUR en %s se envía como %s y deja los grants esperados', (_label, value, wire) => {
+    const values = { pulso: '' as const, landur: value };
+    const payload = grantsPayload(values);
+    expect(payload).toEqual({ pulso: null, landur: wire });
+    const after = mergeGrants(member.projects, payload);
+    expect(after.landur ?? null).toBe(wire);
+    expect(isAccessRevocation(member.projects, after)).toBe(value !== 'editor');
+  });
+
+  it('el formulario parte del grant actual y no marca cambios si nada cambió', () => {
+    expect(grantFormValues(member)).toEqual({ pulso: '', landur: 'editor' });
+  });
+});

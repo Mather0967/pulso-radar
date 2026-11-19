@@ -1,3 +1,5 @@
+import { addDays, todayMontevideo } from '@/lib/format';
+
 // Funciones puras de la cuenta: validación de la contraseña y textos de sesiones.
 
 export const PASSWORD_MIN = 12;
@@ -15,7 +17,7 @@ export function validatePassword(input: PasswordInput): PasswordErrors {
   if (length < PASSWORD_MIN) {
     errors.next = `La nueva contraseña debe tener al menos ${PASSWORD_MIN} caracteres.`;
   } else if (length > PASSWORD_MAX) {
-    errors.next = `La nueva contraseña no puede tener más de ${PASSWORD_MAX} caracteres.`;
+    errors.next = `La contraseña no puede superar los ${PASSWORD_MAX} caracteres.`;
   } else if (input.next === input.current) {
     errors.next = 'La nueva contraseña debe ser distinta.';
   }
@@ -51,10 +53,30 @@ const dateFormatter = new Intl.DateTimeFormat('es-UY', {
   hour12: false,
 });
 
-/** «Iniciada 19/11/2026, 14:05» o «fecha desconocida» (sesiones anteriores no guardaban la fecha). */
-export function sessionDateLabel(createdAt: number | null | undefined): string {
+/** Fecha completa en Montevideo, p. ej. «19/11/2026, 14:05»; null si no se sabe. */
+export function sessionFullDate(createdAt: number | null | undefined): string | null {
+  if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return null;
+  return dateFormatter.format(new Date(createdAt));
+}
+
+/**
+ * Tiempo relativo de una sesión: «Iniciada hace un momento», «Iniciada hace 3 min», «Iniciada hace 2 h»,
+ * «Iniciada ayer», «Iniciada hace 4 días» o la fecha corta; «fecha desconocida» si no hay dato.
+ */
+export function sessionRelativeLabel(createdAt: number | null | undefined, now: number = Date.now()): string {
   if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return 'fecha desconocida';
-  return `Iniciada ${dateFormatter.format(new Date(createdAt))}`;
+  const diff = Math.max(0, now - createdAt);
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  if (minutes < 1) return 'Iniciada hace un momento';
+  if (minutes < 60) return `Iniciada hace ${minutes} min`;
+  const today = todayMontevideo(new Date(now));
+  const sessionDay = todayMontevideo(new Date(createdAt));
+  if (sessionDay === addDays(today, -1)) return 'Iniciada ayer';
+  if (hours < 24) return `Iniciada hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Iniciada hace ${days} días`;
+  return `Iniciada el ${dateFormatter.format(new Date(createdAt)).split(',')[0]}`;
 }
 
 /** Nombre visible de una sesión: el resumen del navegador o «Sesión anterior». */

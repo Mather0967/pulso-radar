@@ -292,6 +292,41 @@ async function main() {
     assert(!usable, 'el lector puede usar «Nuevo trabajo»');
     await reader.screenshot({ path: shot('calendario-lector.png') });
 
+    // ---- administración: quitar un acceso desde el panel debe cortarlo de verdad ----
+    // Regresión: un revisor creyó que «Guardar permisos» no hacía nada. Se prueba de punta a punta con el
+    // login real del usuario afectado (el usuario `pulso` solo tiene pulso:editor; se le da y quita LANDUR).
+    {
+      const target = await login(f, 'pulso');
+      const before = await (await api(f, target, 'GET', '/api/projects')).json();
+      assert(!before.projects.some(p => p.id === 'landur'), 'pulso ya tenía LANDUR antes de la prueba');
+      const grant = await api(f, adminSession, 'PUT', '/api/admin/project-access', { id: 'pulso', projects: { pulso: 'editor', landur: 'editor' } });
+      assert(grant.status === 200, 'el administrador no pudo dar LANDUR (' + grant.status + ')');
+      const withLandur = await login(f, 'pulso');
+      assert((await (await api(f, withLandur, 'GET', '/api/projects')).json()).projects.some(p => p.id === 'landur'), 'pulso no ve LANDUR tras darlo');
+
+      const revokeCtx = await newContext(browser, f, adminSession, 1440, 900);
+      contexts.push(revokeCtx);
+      const rp = await revokeCtx.newPage();
+      trackErrors(rp, errors, 'permisos');
+      await rp.goto(f.base + '/portal/administracion?tab=grants', { waitUntil: 'networkidle' });
+      await rp.locator(tid('grant-user')).waitFor({ state: 'visible' });
+      await rp.click(tid('grant-user'));
+      await rp.locator('[role="option"]').filter({ hasText: 'Usuario Pulso' }).click();
+      await rp.click(tid('grant-landur'));
+      await rp.locator('[role="option"]').filter({ hasText: 'Sin acceso' }).click();
+      const putSeen = rp.waitForRequest(r => r.url().includes('/api/admin/project-access') && r.method() === 'PUT', { timeout: 8000 });
+      await rp.click(tid('grants-save'));
+      await rp.locator(tid('grants-confirm-save')).click();
+      await putSeen;
+      await poll(async () => !(await (await api(f, adminSession, 'GET', '/api/admin/users')).json()).users.find(u => u.id === 'pulso').projects.landur,
+        'tras «Guardar permisos» el usuario conserva LANDUR en la API');
+      assert((await api(f, withLandur, 'GET', '/auth/me')).status === 401, 'la sesión vieja del usuario sigue abierta tras quitarle el acceso');
+      const after = await login(f, 'pulso');
+      assert(!(await (await api(f, after, 'GET', '/api/projects')).json()).projects.some(p => p.id === 'landur'), 'pulso sigue viendo LANDUR');
+      assert((await api(f, after, 'GET', '/landur/api/state')).status === 403, 'pulso sigue entrando a LANDUR');
+      await rp.screenshot({ path: shot('administracion-permisos-revocados.png') });
+    }
+
     if (errors.length) throw new Error('Errores en el navegador:\n' + errors.join('\n'));
     console.log(JSON.stringify({ portal: 'passed', screenshots: SHOTS }));
   } finally {
