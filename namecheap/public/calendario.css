@@ -263,10 +263,10 @@ a {
 /* ==========================================================================
    Header
    ========================================================================== */
+/* Encabezado en flujo normal (no fijo): nunca tapa la barra de herramientas ni la cuadrícula */
 .top {
   height: 74px;
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 40;
   background: rgba(10, 21, 28, 0.78);
   backdrop-filter: blur(20px) saturate(160%);
@@ -910,6 +910,49 @@ input[type="time"] {
   letter-spacing: 0.04em;
 }
 
+/* Responsable (iniciales o primer nombre): solo en semana y agenda, nunca en el chip de mes */
+.cal-chip-who {
+  display: none;
+  flex: none;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(10, 21, 28, 0.55);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.cal-week-col .cal-chip-who,
+.cal-agenda-item .cal-chip-who {
+  display: inline-block;
+}
+
+/* Semana: el título puede ocupar hasta 2 líneas en vez de truncarse */
+.cal-week-col .cal-chip {
+  align-items: flex-start;
+}
+
+.cal-week-col .cal-chip-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.cal-agenda-item .cal-chip-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Proyectos: colores distintos y legibles sobre Medianoche */
 .cal-chip.p-pulso {
   --chip-ink: #ffb08a;
@@ -989,8 +1032,8 @@ input[type="time"] {
 .cal-chip.enter,
 .cal-agenda-day.enter,
 .cal-dow.enter {
-  animation: enterIn 0.55s var(--ease-spring) both;
-  animation-delay: calc(var(--i, 0) * 16ms);
+  animation: enterIn 0.28s var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
 }
 
 @keyframes enterIn {
@@ -1095,6 +1138,8 @@ input[type="time"] {
 }
 
 #job-dialog[open] {
+  display: flex;
+  flex-direction: column;
   opacity: 1;
   transform: translateY(0) scale(1);
 }
@@ -1127,11 +1172,12 @@ input[type="time"] {
 .job-form {
   display: flex;
   flex-direction: column;
-  max-height: inherit;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
 .dialog-head {
+  flex: none;
   padding: 22px 26px 0;
   position: relative;
 }
@@ -1156,6 +1202,7 @@ input[type="time"] {
 }
 
 .dialog-body {
+  flex: 1 1 auto;
   padding: 0 26px 6px;
   overflow-y: auto;
   min-height: 0;
@@ -1163,7 +1210,7 @@ input[type="time"] {
 }
 
 .form-error {
-  margin-top: 14px;
+  margin: 0;
   min-height: 0;
   font-size: 13.5px;
   font-weight: 600;
@@ -1174,20 +1221,32 @@ input[type="time"] {
   animation: msgIn 0.45s var(--ease-spring) backwards;
 }
 
+/* Error en el pie: ocupa una línea completa sobre los botones */
+.dialog-actions .form-error {
+  flex-basis: 100%;
+  order: -1;
+}
+
+.dialog-actions .form-error:empty {
+  display: none;
+}
+
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Pie fijo: siempre visible aunque el cuerpo del formulario se desplace */
 .dialog-actions {
+  flex: none;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 18px 26px 22px;
+  padding: 16px 26px 20px;
   margin-top: 10px;
   border-top: 1px solid var(--line);
-  background: rgba(10, 21, 28, 0.4);
+  background: #0f1f28;
 }
 
 .dialog-actions .spacer {
@@ -1338,6 +1397,27 @@ input[type="time"] {
     right: 16px;
     bottom: 16px;
     max-width: none;
+  }
+}
+
+/* ==========================================================================
+   Objetivos táctiles: pantallas táctiles o estrechas
+   ========================================================================== */
+@media (pointer: coarse), (max-width: 900px) {
+  .cal-chip {
+    min-height: 36px;
+  }
+  .cal-agenda-item .cal-chip {
+    min-height: 44px;
+  }
+  .tool-btn,
+  .btn,
+  .back {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .check {
+    min-height: 44px;
   }
 }
 

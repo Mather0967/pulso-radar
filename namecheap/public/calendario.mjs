@@ -252,7 +252,17 @@ function showGridMessage(text, cls = '') {
   els.grid.replaceChildren(node('p', cls ? `cal-empty ${cls}` : 'cal-empty', text));
 }
 
-function makeChip(job, { index = 0, animate = false, draggable = false } = {}) {
+function personName(id) {
+  if (!id) return '';
+  const p = state.people.find((x) => x.id === id);
+  return p ? p.name : 'Usuario inactivo';
+}
+
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join('');
+}
+
+function makeChip(job, { index = 0, animate = false, draggable = false, who = false } = {}) {
   const project = known(job.project, PROJECTS, 'general');
   const status = known(job.status, STATUSES, 'pendiente');
   const chip = node('button', `cal-chip p-${project} s-${status}`);
@@ -260,14 +270,16 @@ function makeChip(job, { index = 0, animate = false, draggable = false } = {}) {
   chip.dataset.jobId = job.id;
   chip.setAttribute('draggable', draggable ? 'true' : 'false');
   if (job.allDay) chip.classList.add('allday');
-  chip.title = `${job.title} · ${PROJECTS[project]} · ${KINDS[known(job.kind, KINDS, 'otro')]} · ${STATUSES[status]}`;
+  const person = personName(job.assignee);
+  chip.title = `${job.title} · Responsable: ${person || 'sin responsable'} · ${PROJECTS[project]} · ${STATUSES[status]}`;
   chip.append(
     node('span', 'cal-chip-time', job.allDay ? 'Día' : job.start || ''),
     node('span', 'cal-chip-title', job.title),
   );
+  if (who && person) chip.append(node('span', 'cal-chip-who', initials(person)));
   if (animate && !reduced()) {
     chip.classList.add('enter');
-    chip.style.setProperty('--i', String(index));
+    chip.style.setProperty('--i', String(Math.min(index, 12)));
   }
   return chip;
 }
@@ -298,13 +310,14 @@ function renderMonth(jobs, animate) {
     if (list.length > MAX_CHIPS) {
       const more = node('button', 'cal-more', `+${list.length - MAX_CHIPS} más`);
       more.type = 'button';
+      more.title = 'Ver la semana completa';
       more.setAttribute('aria-label', `Ver todos los trabajos de la semana del ${date.getDate()} de ${MONTHS[date.getMonth()]}`);
       holder.append(more);
     }
     cell.append(holder);
     if (animate && !reduced()) {
       cell.classList.add('enter');
-      cell.style.setProperty('--i', String(i));
+      cell.style.setProperty('--i', String(Math.min(i, 12)));
     }
     frag.append(cell);
   });
@@ -324,11 +337,11 @@ function renderWeek(jobs, animate) {
     const head = node('div', 'cal-week-head');
     head.append(node('span', 'cal-dow', SHORT_DAYS[i]), node('span', 'cal-day-num', String(date.getDate())));
     const slots = node('div', 'cal-slot-list');
-    (byDate.get(key) || []).forEach((job) => slots.append(makeChip(job, { draggable: canEditJob(job) })));
+    (byDate.get(key) || []).forEach((job) => slots.append(makeChip(job, { draggable: canEditJob(job), who: true })));
     col.append(head, slots);
     if (animate && !reduced()) {
       col.classList.add('enter');
-      col.style.setProperty('--i', String(i));
+      col.style.setProperty('--i', String(Math.min(i, 12)));
     }
     frag.append(col);
   }
@@ -352,7 +365,7 @@ function renderAgenda(jobs, animate) {
     const ul = node('ul', 'cal-agenda-list');
     for (const job of list) {
       const li = node('li', 'cal-agenda-item');
-      li.append(makeChip(job, { index: index++, animate, draggable: false }));
+      li.append(makeChip(job, { index: index++, animate, draggable: false, who: true }));
       ul.append(li);
     }
     section.append(ul);
@@ -468,12 +481,57 @@ function ensureOptions(select, map, keepFirst) {
 
 // ---------- navigation ----------
 
+// ---------- URL hash route (#/mes/YYYY-MM, #/semana/YYYY-MM-DD, #/agenda) ----------
+
+function routeFor(view, cursor) {
+  if (view === 'agenda') return '#/agenda';
+  if (view === 'week') return `#/semana/${iso(weekStart(cursor))}`;
+  return `#/mes/${iso(cursor).slice(0, 7)}`;
+}
+
+function parseRoute(hash) {
+  const h = hash || '';
+  let m = /^#\/mes\/(\d{4})-(\d{2})$/.exec(h);
+  if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) {
+    return { view: 'month', cursor: new Date(Number(m[1]), Number(m[2]) - 1, 1) };
+  }
+  m = /^#\/semana\/(\d{4}-\d{2}-\d{2})$/.exec(h);
+  if (m) {
+    const d = parseIso(m[1]);
+    return d ? { view: 'week', cursor: d } : null;
+  }
+  if (h === '#/agenda') return { view: 'agenda', cursor: null };
+  return null;
+}
+
+// Writes the current view into the hash. Forced agenda (narrow screens) leaves the hash alone.
+function commitRoute(replace = false) {
+  if (state.forced) return;
+  const h = routeFor(state.view, state.cursor);
+  if (location.hash === h) return;
+  if (replace) history.replaceState(null, '', h);
+  else location.hash = h;
+}
+
+function onHashChange() {
+  const r = parseRoute(location.hash);
+  if (!r || routeFor(state.view, state.cursor) === location.hash) return;
+  if (r.cursor) state.cursor = r.cursor;
+  if (!state.forced) {
+    state.view = r.view;
+    state.preferredView = r.view;
+  }
+  updateButtons();
+  loadJobs();
+}
+
 function setView(view) {
   if (view === state.view) return;
   if (state.forced && view !== 'agenda') return;
   state.view = view;
   if (!state.forced) state.preferredView = view;
   updateButtons();
+  commitRoute();
   loadJobs();
 }
 
@@ -484,11 +542,13 @@ function navigate(dir) {
     ? new Date(c.getFullYear(), c.getMonth() + dir, 1)
     : addDays(c, 7 * dir);
   state.pendingSlide = dir > 0 ? 'slide-left' : 'slide-right';
+  commitRoute();
   loadJobs();
 }
 
 function goToday() {
   state.cursor = today();
+  commitRoute();
   loadJobs();
 }
 
@@ -497,6 +557,7 @@ function goToWeek(date) {
   state.preferredView = 'week';
   state.cursor = date;
   updateButtons();
+  commitRoute();
   loadJobs();
 }
 
@@ -573,11 +634,17 @@ function setDialogReadonly(ro) {
   syncTimeFields();
 }
 
-function setFormError(message) {
+function setFormError(message, focusEl = null) {
   for (const input of Array.from(els.form.querySelectorAll('[aria-invalid]'))) {
     input.removeAttribute('aria-invalid');
   }
   els.formError.textContent = message;
+  if (!message) return;
+  if (focusEl && !focusEl.disabled && typeof focusEl.focus === 'function') {
+    focusEl.setAttribute('aria-invalid', 'true');
+    focusEl.focus();
+  }
+  els.formError.scrollIntoView({ block: 'nearest' });
 }
 
 function readForm() {
@@ -626,6 +693,7 @@ function openDialog({ job = null, date = null, opener = null } = {}) {
   if (job && ro) setFormError('Solo lectura: no tenés permiso de edición en este proyecto.');
   els.delete.hidden = ro || !job || !canDelete(job);
   els.cancel.textContent = ro ? 'Cerrar' : 'Cancelar';
+  els.dialogTitle.textContent = ro ? 'Ver trabajo' : job ? 'Editar trabajo' : 'Nuevo trabajo';
   els.dialog.showModal();
   (ro ? els.cancel : field('title')).focus();
 }
@@ -789,19 +857,19 @@ function wire() {
   });
 
   // Dialog.
+  window.addEventListener('hashchange', onHashChange);
+
   els.form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (state.editing ? !canEditJob(state.editing) : !canWrite()) return;
     const payload = readForm();
     if (!writable().includes(payload.project)) {
-      setFormError('No tenés permiso de edición en ese proyecto.');
+      setFormError('No tenés permiso de edición en ese proyecto.', field('project'));
       return;
     }
     const problem = validatePayload(payload);
     if (problem) {
-      setFormError(problem[1]);
-      const input = field(problem[0]);
-      if (input) input.setAttribute('aria-invalid', 'true');
+      setFormError(problem[1], field(problem[0]));
       return;
     }
     els.save.disabled = true;
@@ -822,9 +890,9 @@ function wire() {
       toast(message);
     } catch (err) {
       if (err.status === 409 && err.job) {
+        // Keep what the user typed; the next Save overwrites with the new version.
         state.editing = err.job;
-        fillForm(err.job);
-        setFormError(err.message);
+        setFormError('Otra persona modificó este trabajo. Revisá los cambios y volvé a guardar para sobrescribir, o cerrá para ver la versión actual.');
         loadJobs({ animate: false });
       } else if (err.status === 404) {
         toast('Ese trabajo ya no existe o no lo podés ver.', true);
@@ -927,6 +995,7 @@ function wire() {
       const was = state.view;
       syncForced();
       updateButtons();
+      if (!state.forced) commitRoute();
       if (state.view !== was) loadJobs();
     };
     if (els.narrow.addEventListener) els.narrow.addEventListener('change', onNarrow);
@@ -939,6 +1008,14 @@ function wire() {
 async function init() {
   wire();
   syncForced();
+  const route = parseRoute(location.hash);
+  if (route) {
+    if (route.cursor) state.cursor = route.cursor;
+    if (!state.forced) {
+      state.view = route.view;
+      state.preferredView = route.view;
+    }
+  }
   updateButtons();
   els.newBtn.disabled = true;
   showGridMessage('Cargando calendario…');
@@ -960,6 +1037,7 @@ async function init() {
       if (err.status !== 401 && err.status !== 403) toast(err.message, true);
     });
   await Promise.all([people, loadJobs({ animate: true })]);
+  commitRoute(true);
 }
 
 function start() {
@@ -982,6 +1060,7 @@ function start() {
     delete: document.querySelector('#job-delete'),
     cancel: document.querySelector('#job-cancel'),
     formError: document.querySelector('#job-error'),
+    dialogTitle: document.querySelector('#job-dialog-title'),
     narrow: typeof matchMedia === 'function' ? matchMedia('(max-width: 699.98px)') : null,
   };
   state.cursor = today();
