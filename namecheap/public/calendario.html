@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#11222C">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Calendario · RIVECT</title>
+  <link rel="icon" href="/symbol.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/calendario.css">
+  <script type="module" src="/calendario.mjs"></script>
+</head>
+<body>
+  <noscript><p class="noscript">Este calendario necesita JavaScript. Activalo para ver y editar los trabajos.</p></noscript>
+
+  <div class="ambient-canvas" aria-hidden="true">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+    <div class="grid-pattern"></div>
+  </div>
+
+  <header class="top">
+    <a class="brand" href="/portal" aria-label="RIVECT · Calendario">
+      <img src="/logo.svg" alt="RIVECT · Inteligencia que mueve" width="178" height="44">
+    </a>
+    <a class="back" href="/portal">← Mis proyectos</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Calendario</h1>
+      <p>Contactos, entrevistas, entregas y vencimientos de todos tus proyectos.</p>
+    </section>
+
+    <section class="toolbar glass" aria-label="Controles del calendario">
+      <div class="nav-group">
+        <button id="cal-prev" class="tool-btn icon-btn" type="button" aria-label="Anterior">‹</button>
+        <button id="cal-today" class="tool-btn" type="button">Hoy</button>
+        <button id="cal-next" class="tool-btn icon-btn" type="button" aria-label="Siguiente">›</button>
+        <h2 id="cal-title" class="cal-title" aria-live="polite"></h2>
+      </div>
+
+      <div class="view-group" role="group" aria-label="Vista">
+        <button class="tool-btn" type="button" data-view="month" aria-pressed="true">Mes</button>
+        <button class="tool-btn" type="button" data-view="week" aria-pressed="false">Semana</button>
+        <button class="tool-btn" type="button" data-view="agenda" aria-pressed="false">Agenda</button>
+      </div>
+
+      <button id="cal-new" class="btn btn-primary" type="button">Nuevo trabajo</button>
+    </section>
+
+    <section class="filters glass" aria-label="Filtros">
+      <label class="field">
+        <span>Proyecto</span>
+        <select id="f-project" name="f-project">
+          <option value="">Todos</option>
+          <option value="pulso">Pulso</option>
+          <option value="landur">LANDUR</option>
+          <option value="studio">Studio</option>
+          <option value="retail">Retail</option>
+          <option value="general">General</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Responsable</span>
+        <select id="f-assignee" name="f-assignee">
+          <option value="">Todos</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Estado</span>
+        <select id="f-status" name="f-status">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="en_curso">En curso</option>
+          <option value="hecho">Hecho</option>
+        </select>
+      </label>
+    </section>
+
+    <p id="cal-readonly" class="readonly-note" hidden>Tu acceso al calendario es de solo lectura.</p>
+
+    <section class="board" aria-label="Trabajos">
+      <div id="cal-grid" class="cal-grid view-month"></div>
+    </section>
+  </main>
+
+  <dialog id="job-dialog" aria-labelledby="job-dialog-title">
+    <form id="job-form" class="job-form" novalidate>
+      <header class="dialog-head">
+        <h2 id="job-dialog-title">Nuevo trabajo</h2>
+      </header>
+
+      <div class="dialog-body">
+        <label class="field field-wide">
+          <span>Título</span>
+          <input id="job-title" name="title" type="text" maxlength="120" required autocomplete="off">
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Fecha</span>
+            <input id="job-date" name="date" type="date" required>
+          </label>
+          <label class="check">
+            <input id="job-allday" name="allDay" type="checkbox">
+            <span>Todo el día</span>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Inicio</span>
+            <input id="job-start" name="start" type="time">
+          </label>
+          <label class="field">
+            <span>Fin</span>
+            <input id="job-end" name="end" type="time">
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Proyecto</span>
+            <select id="job-project" name="project" required>
+              <option value="pulso">Pulso</option>
+              <option value="landur">LANDUR</option>
+              <option value="studio">Studio</option>
+              <option value="retail">Retail</option>
+              <option value="general">General</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Tipo</span>
+            <select id="job-kind" name="kind" required>
+              <option value="contacto">Contacto</option>
+              <option value="entrevista">Entrevista</option>
+              <option value="entrega">Entrega</option>
+              <option value="vencimiento">Vencimiento</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Responsable</span>
+            <select id="job-assignee" name="assignee">
+              <option value="">Sin asignar</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Estado</span>
+            <select id="job-status" name="status" required>
+              <option value="pendiente">Pendiente</option>
+              <option value="en_curso">En curso</option>
+              <option value="hecho">Hecho</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field field-wide">
+          <span>Notas</span>
+          <textarea id="job-notes" name="notes" rows="4" maxlength="2000"></textarea>
+        </label>
+      </div>
+
+      <footer class="dialog-actions">
+        <p id="job-error" class="form-error" role="alert"></p>
+        <button id="job-delete" class="btn btn-danger" type="button" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button id="job-cancel" class="btn btn-ghost" type="button">Cancelar</button>
+        <button id="job-save" class="btn btn-primary" type="submit">Guardar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

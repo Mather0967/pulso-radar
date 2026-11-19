@@ -91,3 +91,27 @@ El código fuente está en el proyecto `demo-restaurantes` (fuera de este reposi
 ### Demo de gestión para clínicas odontológicas (`/studio/odontologia/`)
 
 La tarjeta de Clínica odontológica tiene el mismo botón **Abrir demo de gestión**, que abre el sistema de Bahía Odontología (agenda, pacientes, odontograma, presupuestos, finanzas, mensajes, automatizaciones, inventario, laboratorio, equipo e informes). Funciona igual que la de restaurantes: build estático en `projects/studio/public/odontologia/`, solo administradores, rutas por hash, datos en localStorage (clave `rivect-bahia`) y "Restaurar" en *Recorridos* o *Ajustes → Datos*. El código está en el proyecto `Demo-dentistas`; para actualizar, ahí `npm run publish:studio`, después `npm test` y publicar a `main`. Recompilar el Studio también vacía esta carpeta.
+
+## Calendario del portal (`/calendario`)
+
+**Qué es.** Un calendario compartido para los trabajos del equipo con fecha: contactos, entrevistas, entregas, vencimientos y otros pendientes, asociados a Pulso, LANDUR, Studio, Retail o General. Tiene vistas de mes, semana y agenda; se navega con ← → y «Hoy», y se puede arrastrar un trabajo a otro día para cambiar su fecha. En pantallas angostas (menos de 700 px) se muestra siempre la agenda.
+
+**Permisos.** Igual que en el resto del portal:
+- **Ver**: administradores y usuarios con acceso de lectura o edición en algún proyecto.
+- **Escribir** (crear y editar): administradores y usuarios con edición en algún proyecto. Quien sólo tiene lectura ve la etiqueta «solo lectura» y el botón «Nuevo trabajo» deshabilitado.
+- **Borrar**: administradores, o quien puede escribir y es el autor del trabajo.
+
+**Dónde se guardan los datos.** En `DATA_DIR/calendar/jobs.json`, con `{version:1, jobs:[...]}`. Cada escritura es atómica y usa ETag: si dos personas editan el mismo trabajo a la vez, la segunda recibe un aviso de conflicto con la versión actual en lugar de pisar el cambio.
+
+**API.** Cinco rutas, todas en JSON:
+- `GET /api/calendar/jobs?from=YYYY-MM-DD&to=YYYY-MM-DD`: lista los trabajos del rango (ambos extremos opcionales) y devuelve `me` con los permisos de quien consulta.
+- `POST /api/calendar/jobs`: crea un trabajo.
+- `PUT /api/calendar/jobs/:id`: edita un trabajo; hay que enviar la `version` actual (si no coincide, 409).
+- `DELETE /api/calendar/jobs/:id`: borra un trabajo.
+- `GET /api/calendar/people`: lista las personas activas para el campo «Responsable».
+
+**Límites.** Hasta 2000 trabajos en total y 16 KB por solicitud.
+
+**Despliegue.** `scripts/cpanel-deploy.mjs` copia el calendario con el resto del portal: `server/calendar.mjs`, `public/calendario.html`, `public/calendario.css` y `public/calendario.mjs` están en `managedPaths`.
+
+**Lo que no hace (por ahora).** No envía recordatorios, no se sincroniza con otros calendarios (Google, Outlook, iCal) y no tiene trabajos recurrentes.

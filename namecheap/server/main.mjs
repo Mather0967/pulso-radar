@@ -11,6 +11,7 @@ import {projectAccess,availableProjects,mergeProjectGrants,renderProjectsPage} f
 import {adminMessagesAPI} from './messages.mjs';
 import {createLandurPortal} from './landur.mjs';
 import {createStudio,createProjectSite} from './studio.mjs';
+import {createCalendar} from './calendar.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const dataDir=path.resolve(root,process.env.DATA_DIR||'data');
 const store=new AuthStore(dataDir),env={NVIDIA_API_KEY:process.env.NVIDIA_API_KEY||'',NVIDIA_MODEL:process.env.NVIDIA_MODEL||'deepseek-ai/deepseek-v4.1-flash',TAVILY_API_KEY:process.env.TAVILY_API_KEY||'',GROQ_API_KEY:process.env.GROQ_API_KEY||'',GROQ_MODEL:process.env.GROQ_MODEL||'openai/gpt-oss-120b',BUCKET:diskBucket(path.join(dataDir,'pulso')),GEMINI_API_KEY:process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||'',GEMINI_MODEL:process.env.GEMINI_MODEL||'gemini-3.8-flash'};
@@ -32,11 +33,12 @@ const landur=createLandurPortal({dataDir:path.join(dataDir,'landur'),session:{
 const studio=createStudio({dir:path.join(root,'projects/studio/public'),access:u=>projectAccess(u,'studio')});
 // Retail Intelligence: demo comercial de tiendas, solo para administradores.
 const retail=createProjectSite({dir:path.join(root,'projects/rivect-retail/public'),access:u=>projectAccess(u,'retail'),mount:'/retail'});
+const calendar=createCalendar({dataDir,listUsers:()=>store.transact(db=>db.users.filter(x=>x.active).map(publicUser))});
 async function route(req,ip){
  const url=new URL(req.url),p=url.pathname,method=req.method;
  // El aviso de la planilla no es un navegador: no manda `Origin`. Se autentica con su token en landur.mjs.
  if(!['GET','HEAD'].includes(method)&&p!=='/landur/api/hooks/sync'&&!originAllowed(req,{local}))return json(rejectOrigin(req,p,ip),403);
- if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg','/fonts/pjs-400.woff2','/fonts/pjs-600.woff2','/fonts/pjs-700.woff2','/fonts/pjs-800.woff2','/fonts/jbm-500.woff2','/fonts/jbm-600.woff2'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
+ if(['/projects.css','/projects.mjs','/projects-brand.svg','/landur-brand.png','/portal.css','/portal.mjs','/logo.svg','/symbol.svg','/landing.css','/landing.mjs','/manrope.woff2','/wordmark.svg','/fonts/pjs-400.woff2','/fonts/pjs-600.woff2','/fonts/pjs-700.woff2','/fonts/pjs-800.woff2','/fonts/jbm-500.woff2','/fonts/jbm-600.woff2','/calendario.mjs','/calendario.css'].includes(p)){if(method!=='GET')return json({error:'Método no admitido'},405);const type=p.endsWith('.woff2')?'font/woff2':p.endsWith('.css')?'text/css':p.endsWith('.mjs')?'text/javascript':p.endsWith('.png')?'image/png':'image/svg+xml';return new Response(await readFile(path.join(root,'public',p.slice(1))),{headers:{'Content-Type':type+(p.endsWith('.woff2')?'':'; charset=utf-8')}})}
  const u=await store.session(req.headers.get('cookie'));
  if(p.startsWith('/api/public/'))return publicAPI(req,{user:u,store:siteStore,ip});
  if(p==='/'&&method==='GET')return html('index.html');
@@ -48,6 +50,8 @@ async function route(req,ip){
  if(p==='/landur'||p.startsWith('/landur/'))return landur(req,u,ip);
  if(!u){if(p.startsWith('/api/')||p.startsWith('/auth/'))return json({error:'Iniciá sesión para continuar.'},401);return redirect('/login')}
  if(!['GET','HEAD'].includes(method)&&req.headers.get('x-csrf-token')!==u.csrf)return json({error:'Sesión no válida. Volvé a iniciar sesión.'},403);
+ if(p==='/calendario'&&method==='GET')return html('calendario.html');
+ if(p.startsWith('/api/calendar/'))return calendar(req,u);
  if(p==='/studio'||p.startsWith('/studio/'))return studio(req,u);
  if(p==='/retail'||p.startsWith('/retail/'))return retail(req,u);
  if(p==='/auth/me'&&method==='GET')return json({user:publicUser(u),csrf:u.csrf});
