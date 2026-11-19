@@ -20,6 +20,16 @@ function present(m,userId,names){
   };
 }
 
+// Cantidad de mensajes sin leer para el avisos del inicio. Misma regla que GET /api/admin/messages:
+// visibles para el usuario, no enviados por él y no marcados como leídos. Un no admin recibe 0.
+export async function unreadCount(store,userId){
+  return store.transact(db=>{
+    const user=db.users.find(u=>u.id===userId);
+    if(!user||user.role!=='admin'||!user.active)return 0;
+    return (db.messages||[]).filter(m=>visibleTo(m,userId)&&!(m.from===userId||m.readBy.includes(userId))).length;
+  });
+}
+
 async function readJson(req){
   try{const body=await req.json();return body&&typeof body==='object'&&!Array.isArray(body)?body:null;}
   catch{return null;}

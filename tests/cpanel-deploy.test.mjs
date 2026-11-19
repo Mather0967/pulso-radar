@@ -6,8 +6,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {installRelease,managedPaths,mountedProjectDirs,verifyMountedProjects} from '../scripts/cpanel-deploy.mjs';
 const repositoryRoot=fileURLToPath(new URL('..',import.meta.url));
-const directories=['src','dist/server','projects/landur/server','projects/landur/public','projects/studio/public','projects/rivect-retail/public'];
-const mounted=['projects/studio/public','projects/rivect-retail/public'];
+const directories=['src','dist/server','projects/landur/server','projects/landur/public','projects/studio/public','projects/rivect-retail/public','projects/portal-ui/public'];
+const mounted=['projects/studio/public','projects/rivect-retail/public','projects/portal-ui/public'];
 // Repositorio de origen y destino mínimos. `server/main.mjs` es el real: de ahí salen los montajes.
 function prepare(){
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'pulso-deploy-')),repository=path.join(temp,'repo'),target=path.join(temp,'app'),state=path.join(temp,'state');

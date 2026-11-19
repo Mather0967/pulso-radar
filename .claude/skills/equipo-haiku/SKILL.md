@@ -1,9 +1,9 @@
 ---
 name: equipo-haiku
-description: Equipo jerárquico de agentes. Opus es el estratega (planes y escalamientos), Sonnet el orquestador operativo y 12 Haikus el equipo de trabajo (explorador, 8 trabajadores, integrador-QA, pentester y cliente escéptico). Ningún archivo tiene dos dueños. Usar con Sonnet como modelo principal del chat (`/model sonnet`) cuando el usuario pida «el equipo de haikus», «los 12 haikus» o una tarea grande que se pueda repartir por archivos.
+description: Equipo jerárquico de agentes. Opus es el estratega (planes y escalamientos), Sonnet el orquestador operativo y 13 Haikus el equipo de trabajo (explorador, 8 trabajadores, integrador-QA, pentester, cliente escéptico y director de diseño). Ningún archivo tiene dos dueños. Usar con Sonnet como modelo principal del chat (`/model sonnet`) cuando el usuario pida «el equipo de haikus», «los 13 haikus» o una tarea grande que se pueda repartir por archivos.
 ---
 
-# Equipo Opus → Sonnet → 12 Haikus
+# Equipo Opus → Sonnet → 13 Haikus
 
 ## Cómo arrancar
 
@@ -28,7 +28,7 @@ Hace todo el trabajo de orquestar:
 4. Hace el triage: lo menor se aplica o va a pendientes; lo crítico va a Opus.
 5. Cierra: corre él mismo una verificación final (no confía en el «pasa» de nadie), hace commit y push, y le resume al usuario.
 
-### 12 Haikus · equipo de trabajo
+### 13 Haikus · equipo de trabajo
 
 | # | Rol | Misión | Edita |
 |---|-----|--------|:-----:|
@@ -37,8 +37,9 @@ Hace todo el trabajo de orquestar:
 | 10 | Integrador-QA | Cuando terminan los trabajadores: compila, corre los tests, hace el build y prueba de verdad. Reporta solo fallas, con archivo y dueño | No |
 | 11 | Pentester | Busca problemas de seguridad en lo que cambió (prompt abajo) | No |
 | 12 | Cliente complicado y escéptico | Usa el producto como un cliente desconfiado (prompt abajo) | No |
+| 13 | Director de diseño | Profesional del diseño web que **no programa**: antes de construir entrega un brief de diseño y al final dice, pantalla por pantalla, si le gusta y qué directrices corregir (prompt abajo). Solo si la tarea tiene interfaz | No |
 
-Si la tarea es chica, se usan menos trabajadores (2–9). El 1, el 10, el 11 y el 12 van siempre.
+Si la tarea es chica, se usan menos trabajadores (2–9). El 1, el 10, el 11 y el 12 van siempre; el 13 va cuando hay interfaz.
 
 ## Escalera de escalamiento
 
@@ -55,7 +56,7 @@ Si la tarea es chica, se usan menos trabajadores (2–9). El 1, el 10, el 11 y e
 - Si un agente usa algo que crea otro agente al mismo tiempo, el prompt trae **la interfaz exacta** (nombres, tipos, firmas). Así no necesita abrir ni crear el archivo ajeno.
 - Si un agente necesita cambiar un archivo que no es suyo, no lo toca: se lo pide a Sonnet, que decide (o escala a Opus) y se lo encarga al dueño.
 - Los cambios mecánicos que tocan muchos archivos (por ejemplo, reemplazar un nombre en todo el proyecto) los hace **un solo agente antes que el resto**.
-- Los Haikus 1, 10, 11 y 12 no editan nada, así que no compiten con nadie.
+- Los Haikus 1, 10, 11, 12 y 13 no editan nada, así que no compiten con nadie.
 - **Nadie más que Sonnet** hace commits, push o deploys, y solo al final.
 
 ## Formato de los mensajes
@@ -66,7 +67,7 @@ Si la tarea es chica, se usan menos trabajadores (2–9). El 1, el 10, el 11 y e
 
 ## Orden
 
-Plan (Opus) → Haiku 1 → Haikus 2–9 en paralelo → Haiku 10 → Haikus 11 y 12 en paralelo → triage (Sonnet; lo crítico a Opus) → arreglos de cada dueño, con un test que falle primero → cierre (Sonnet).
+Plan (Opus) → Haiku 1 y Haiku 13 (brief de diseño) en paralelo → Haikus 2–9 en paralelo, todos con el brief → Haiku 10 → Haikus 11, 12 y 13 (veredicto de diseño) en paralelo → triage (Sonnet; lo crítico a Opus) → arreglos de cada dueño, con un test que falle primero → cierre (Sonnet).
 
 ## Prompt base · Haiku 11 (pentester)
 
@@ -80,3 +81,11 @@ Plan (Opus) → Haiku 1 → Haikus 2–9 en paralelo → Haiku 10 → Haikus 11 
 > READ-ONLY. Do NOT edit repository files, commit, or start sessions/agents (scratch files only in a temp folder). You are a skeptical, hard-to-please customer being sold this product. You distrust everything and try to find every possible problem.
 > Use the product like that customer would: run it locally (tests, scripts, a headless browser via Playwright if it's a UI) and look at screenshots at laptop, large and phone sizes. Try odd and real-world inputs, wrong orders of steps, reloads, the back button, empty and huge values. Check every claim on screen: numbers that don't add up or contradict each other, promises it can't keep, texts that sound fake or exaggerated, mixed languages, confusing words, anything broken or unprofessional.
 > Reply in Spanish, max 15 lines: objections ranked by how much they'd hurt a sale or daily use, as «qué hice → qué pasó → por qué me molesta», each marked [bug] or [percepción]. If you truly find nothing: «No encontré nada que me frene.»
+
+## Prompt base · Haiku 13 (director de diseño)
+
+> You are a senior WEB DESIGN DIRECTOR. You do NOT write product code and you do NOT edit repository files, commit, or start sessions/agents. You may run scripts only to take screenshots (scratch folder only).
+> **Brief (before the build):** look at the current product and any reference screens, then write a design brief in Spanish, max 70 lines, with concrete numbers instead of adjectives: verdict on what exists, principles, color tokens (with AA contrast), type scale, spacing/radius/elevation, layout per screen (what goes above the fold on desktop and phone), which components and variants to use, motion durations/easing and what not to animate, empty/loading/error/read-only states, anti-patterns, and 8 approval checks.
+> **Verdict (after the build):** open the real screens at desktop, tablet and phone sizes, read the screenshots, and for EACH screen say «me gusta» or «no me gusta», with 1–3 precise directives (what to change, with values) for the owner of that file. Judge against your own brief; flag anything that looks unfinished, cluttered, low-contrast or inconsistent between screens.
+> Reply in Spanish, max 15 lines.
+

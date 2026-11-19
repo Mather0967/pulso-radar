@@ -103,6 +103,15 @@ async function readBody(req){
   return parsed;
 }
 
+// Misma selección que GET /api/calendar/jobs: visibilidad por proyecto, rango opcional y orden.
+function selectJobs(doc,perms,from,to){
+  return doc.jobs
+    .filter(j=>perms.see(j.project))
+    .filter(j=>(!from||j.date>=from)&&(!to||j.date<=to))
+    .sort(compareJobs)
+    .map(publicJob);
+}
+
 export function createCalendar({dataDir,listUsers}){
   const store=diskBucket(path.join(dataDir,'calendar'));
 
@@ -162,11 +171,7 @@ export function createCalendar({dataDir,listUsers}){
       if(to&&!realDate(to))throw new Fail(400,'La fecha hasta no es válida.');
       if(from&&to&&from>to)throw new Fail(400,'El rango de fechas no es válido.');
       const {doc}=await load();
-      const jobs=doc.jobs
-        .filter(j=>perms.see(j.project))
-        .filter(j=>(!from||j.date>=from)&&(!to||j.date<=to))
-        .sort(compareJobs)
-        .map(publicJob);
+      const jobs=selectJobs(doc,perms,from,to);
       const writeProjects=perms.writeProjects;
       return json({jobs,me:{id:user.id,write:writeProjects.length>0,admin:perms.admin,writeProjects}});
     }
@@ -223,7 +228,16 @@ export function createCalendar({dataDir,listUsers}){
     return json({deleted:true});
   }
 
-  return async function calendar(req,user){
+  // Trabajos que este usuario puede ver (los de un proyecto sin acceso no salen). Sin acceso a
+  // ningún proyecto, lista vacía. Lo usan los avisos del inicio.
+  async function listVisible(user,{from='',to=''}={}){
+    const perms=permissionsFor(user);
+    if(!perms.anyAccess)return [];
+    const {doc}=await load();
+    return selectJobs(doc,perms,from,to);
+  }
+
+  const calendar=async function calendar(req,user){
     try{return await route(req,user);}
     catch(error){
       if(error instanceof Fail)return json(error.body,error.status);
@@ -231,4 +245,6 @@ export function createCalendar({dataDir,listUsers}){
       return json({error:'No se pudo completar la operación.'},500);
     }
   };
+  calendar.listVisible=listVisible;
+  return calendar;
 }

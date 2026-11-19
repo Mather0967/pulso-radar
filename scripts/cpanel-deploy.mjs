@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 // Only these code paths are managed. Portal content, data and environment stay on the host.
-export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js','server/projects.mjs','server/messages.mjs','server/landur.mjs','public/projects.css','public/projects.mjs','public/projects-brand.svg','public/landur-brand.png','projects/landur/server','projects/landur/public','server/studio.mjs','projects/studio/public','projects/rivect-retail/public','server/calendar.mjs','public/calendario.html','public/calendario.css','public/calendario.mjs'];
+export const managedPaths=['src','dist/server','scripts/storage.mjs','server/main.mjs','server/auth.mjs','server/access.mjs','public/pulso-session.js','server/projects.mjs','server/messages.mjs','server/landur.mjs','public/projects.css','public/projects.mjs','public/projects-brand.svg','public/landur-brand.png','projects/landur/server','projects/landur/public','server/studio.mjs','projects/studio/public','projects/rivect-retail/public','server/calendar.mjs','public/calendario.html','public/calendario.css','public/calendario.mjs','projects/portal-ui/public','server/notices.mjs'];
 // Proyectos que el portal sirve como SPA (`createProjectSite`/`createStudio` en server/main.mjs).
 // La lista sale del propio servidor para que un montaje nuevo no dependa de acordarse de otra lista.
 export function mountedProjectDirs(repository){

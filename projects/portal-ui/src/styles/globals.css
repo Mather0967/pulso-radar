@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modo oscuro único (design-brief §3). Tokens HSL: se usan como hsl(var(--x)). */
+:root {
+  --background: 204 38% 6%;
+  --foreground: 40 33% 96%;
+  --card: 203 32% 9%;
+  --card-foreground: 40 33% 96%;
+  --popover: 203 32% 10%;
+  --popover-foreground: 40 33% 96%;
+  --primary: 21 100% 59%;
+  --primary-foreground: 202 44% 12%;
+  --secondary: 201 25% 18%;
+  --secondary-foreground: 40 33% 96%;
+  --muted: 201 22% 14%;
+  --muted-foreground: 200 16% 66%;
+  --accent: 201 25% 17%;
+  --accent-foreground: 40 33% 96%;
+  --destructive: 4 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 201 22% 18%;
+  --input: 201 16% 40%;
+  --ring: 21 100% 59%;
+  --radius: 0.5rem;
+
+  /* Proyectos (siempre con punto + nombre) y estados de trabajo. */
+  --project-pulso: 186 52% 56%;
+  --project-landur: 255 80% 74%;
+  --project-studio: 340 60% 68%;
+  --project-retail: 43 80% 62%;
+  --project-general: 200 14% 62%;
+  --status-pending: 200 14% 62%;
+  --status-progress: 205 80% 62%;
+  --status-done: 152 55% 50%;
+  --status-blocked: 4 80% 66%;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: #091015;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background: #091015;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  h1 {
+    @apply font-semibold tracking-[-0.02em];
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  h2 {
+    @apply font-semibold;
+    font-size: 18px;
+    line-height: 28px;
+  }
+
+  h3 {
+    @apply font-semibold;
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 28px;
+      line-height: 36px;
+    }
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Foco visible en todo interactivo: nunca outline: none. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+}
+
+@layer utilities {
+  .text-eyebrow {
+    @apply font-mono font-medium uppercase;
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+  }
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.35);
+  color: hsl(var(--foreground));
+}
+
+/* Barras de desplazamiento discretas en el tema oscuro. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--input));
+  background-clip: padding-box;
+}
+
+/* Preferencia de movimiento reducido: sin transiciones ni animaciones visibles. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

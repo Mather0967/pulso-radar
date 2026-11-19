@@ -202,10 +202,14 @@ test('el portal escapa nombres de usuario y no refleja HTML', async () => {
   try {
     await f.store.transact(db => { db.users.find(u => u.id === 'admin').name = '<img src=x onerror=alert(1)>Rafa'; });
     const admin = await f.login('admin');
-    const page = await f.request('/portal', {cookie: admin.cookie});
-    const html = await page.text();
-    assert.ok(!html.includes('<img src=x onerror'), 'el nombre no debe inyectarse como HTML');
-    assert.ok(html.includes('&lt;img src=x onerror'), 'el nombre debe aparecer escapado');
+    // /portal ya es una redirección a la SPA: el nombre llega como dato JSON y la SPA lo pinta como texto (React).
+    const redirect = await f.request('/portal', {cookie: admin.cookie});
+    assert.equal(redirect.status, 303);
+    assert.equal(redirect.headers.get('location'), '/portal/');
+    const me = await f.request('/auth/me', {cookie: admin.cookie});
+    assert.equal(me.headers.get('content-type')?.includes('application/json'), true);
+    const {user} = await me.json();
+    assert.equal(user.name, '<img src=x onerror=alert(1)>Rafa', 'el dato viaja tal cual; el escape es responsabilidad del cliente');
   } finally { await f.close(); }
 });
 
